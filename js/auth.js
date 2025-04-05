@@ -1,22 +1,7 @@
-// Authentication module for Comedor Grupo Avika - Firebase v9 approach
-
-// Import Firebase services
-import { 
-    signInWithEmailAndPassword,
-    signOut,
-    onAuthStateChanged 
-} from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
-
-import {
-    doc,
-    getDoc,
-    collection
-} from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
-
-import { auth, db } from './firebase-config.js';
+// Authentication module for Comedor Grupo Avika - Firebase v8 approach
 
 // User Roles
-export const USER_ROLES = {
+const USER_ROLES = {
     ADMIN: 'admin',
     COORDINATOR: 'coordinator'
 };
@@ -26,7 +11,7 @@ export const USER_ROLES = {
  * @param {string} requiredRole - Role required for access
  * @returns {boolean} - Whether user has access
  */
-export function checkAuth(requiredRole) {
+function checkAuth(requiredRole) {
     const userRole = sessionStorage.getItem("userRole");
     const userId = sessionStorage.getItem("userId");
     
@@ -48,7 +33,7 @@ export function checkAuth(requiredRole) {
  * Redirect user based on their role
  * @param {string} role - User role
  */
-export function redirectBasedOnRole(role) {
+function redirectBasedOnRole(role) {
     switch (role) {
         case USER_ROLES.ADMIN:
             window.location.href = "pages/admin/dashboard.html";
@@ -59,13 +44,9 @@ export function redirectBasedOnRole(role) {
         default:
             showError("Rol de usuario no reconocido");
             // Sign out if role is invalid
-            signOut(auth);
+            firebase.auth().signOut();
     }
 }
-
-// DOM Elements
-const loginForm = document.getElementById('login-form');
-const errorMessage = document.getElementById('error-message');
 
 /**
  * Login user with email and password
@@ -73,7 +54,7 @@ const errorMessage = document.getElementById('error-message');
  * @param {string} password - User password
  * @returns {Promise<object>} - User object if successful
  */
-export async function loginUser(email, password) {
+async function loginUser(email, password) {
     try {
         // Show loader and disable button if they exist
         const loginButton = document.getElementById("loginButton");
@@ -83,12 +64,11 @@ export async function loginUser(email, password) {
         if (loginLoader) loginLoader.style.display = "block";
         
         // Attempt login
-        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
         const user = userCredential.user;
         
         // Get additional user information from Firestore
-        const userDocRef = doc(db, "users", user.uid);
-        const userDoc = await getDoc(userDocRef);
+        const userDoc = await firebase.firestore().collection("users").doc(user.uid).get();
         
         if (userDoc.exists()) {
             const userData = userDoc.data();
@@ -128,7 +108,7 @@ export async function loginUser(email, password) {
  * Handle authentication errors with friendly messages
  * @param {Error} error - Error object
  */
-export function handleAuthError(error) {
+function handleAuthError(error) {
     let errorMessage = "Error al iniciar sesión";
     
     // Custom error messages
@@ -150,7 +130,7 @@ export function handleAuthError(error) {
  * Display error message to user
  * @param {string} message - Error message to display
  */
-export function showError(message) {
+function showError(message) {
     const errorElement = document.getElementById("loginError");
     if (errorElement) {
         errorElement.textContent = message;
@@ -161,7 +141,7 @@ export function showError(message) {
 /**
  * Clear error message
  */
-export function clearError() {
+function clearError() {
     const errorElement = document.getElementById("loginError");
     if (errorElement) {
         errorElement.textContent = "";
@@ -172,8 +152,8 @@ export function clearError() {
 /**
  * Log out current user
  */
-export function logout() {
-    signOut(auth)
+function logout() {
+    firebase.auth().signOut()
         .then(() => {
             // Clear session storage
             sessionStorage.clear();
@@ -185,13 +165,12 @@ export function logout() {
         });
 }
 
-// Initialize auth state listener
-onAuthStateChanged(auth, async (user) => {
+// Check if user is already logged in when page loads
+firebase.auth().onAuthStateChanged(async (user) => {
     if (user) {
         try {
             // Get user data including role
-            const userDocRef = doc(db, "users", user.uid);
-            const userDoc = await getDoc(userDocRef);
+            const userDoc = await firebase.firestore().collection("users").doc(user.uid).get();
             
             if (userDoc.exists()) {
                 const userData = userDoc.data();
@@ -215,25 +194,4 @@ onAuthStateChanged(auth, async (user) => {
             console.error("Error checking user role:", error);
         }
     }
-});
-
-// Login form submission
-if (loginForm) {
-    loginForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        // Get form values
-        const email = document.getElementById('email').value;
-        const password = document.getElementById('password').value;
-        
-        // Clear previous error messages
-        clearError();
-        
-        try {
-            // Sign in user
-            await loginUser(email, password);
-        } catch (error) {
-            console.error('Login error:', error);
-        }
-    });
-} 
+}); 
