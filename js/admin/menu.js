@@ -33,7 +33,7 @@ let menuData = {}; // Store menu data by day
 
 // Initialize day tabs
 function initializeDayTabs() {
-    const tabsContainer = document.getElementById('menu-day-tabs');
+    const tabsContainer = document.querySelector('.days-tabs');
     if (!tabsContainer) return;
     
     // Clear existing tabs
@@ -41,7 +41,7 @@ function initializeDayTabs() {
     
     // Create tabs for each day
     DAYS.forEach(day => {
-        const tabElement = document.createElement('div');
+        const tabElement = document.createElement('button');
         tabElement.classList.add('day-tab');
         tabElement.textContent = day;
         
@@ -67,25 +67,45 @@ function initializeDayTabs() {
 
 // Initialize menu form
 function initializeMenuForm() {
-    const addMenuItemButton = document.getElementById('add-menu-item');
-    if (addMenuItemButton) {
-        addMenuItemButton.addEventListener('click', addMenuItemField);
+    const addMenuItemButtons = document.querySelectorAll('.add-menu-item');
+    if (addMenuItemButtons) {
+        addMenuItemButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const day = button.getAttribute('data-day');
+                addMenuItemField(day);
+            });
+        });
     }
     
-    const saveMenuButton = document.getElementById('save-menu');
-    if (saveMenuButton) {
-        saveMenuButton.addEventListener('click', saveMenu);
+    const newMenuButton = document.getElementById('new-menu-btn');
+    if (newMenuButton) {
+        newMenuButton.addEventListener('click', showNewMenuModal);
     }
     
-    const publishMenuButton = document.getElementById('publish-menu');
+    const importExcelButton = document.getElementById('import-excel-btn');
+    if (importExcelButton) {
+        importExcelButton.addEventListener('click', showImportExcelModal);
+    }
+    
+    const publishMenuButton = document.getElementById('publish-menu-btn');
     if (publishMenuButton) {
-        publishMenuButton.addEventListener('click', publishMenu);
+        publishMenuButton.addEventListener('click', showPublishMenuModal);
+    }
+    
+    const prevWeekButton = document.getElementById('previous-week');
+    if (prevWeekButton) {
+        prevWeekButton.addEventListener('click', navigateToPreviousWeek);
+    }
+    
+    const nextWeekButton = document.getElementById('next-week');
+    if (nextWeekButton) {
+        nextWeekButton.addEventListener('click', navigateToNextWeek);
     }
 }
 
 // Add a new menu item field
-function addMenuItemField() {
-    const menuItemsContainer = document.querySelector('.day-content.active .menu-items-container');
+function addMenuItemField(day) {
+    const menuItemsContainer = document.querySelector(`.day-content#${day.toLowerCase()}-content .menu-items-container`);
     const menuItemIndex = menuItemsContainer.children.length;
     
     const menuItem = document.createElement('div');
@@ -184,7 +204,7 @@ function showMenuForDay(day) {
         });
     } else {
         // Add an empty menu item if no items exist
-        addMenuItemField();
+        addMenuItemField(day);
     }
 }
 
@@ -379,7 +399,7 @@ function validateAllDays() {
 
 // Update publish status UI
 function updatePublishStatus(isPublished) {
-    const publishBtn = document.getElementById('publish-menu');
+    const publishBtn = document.getElementById('publish-menu-btn');
     const publishStatus = document.getElementById('publish-status');
     
     if (publishBtn && publishStatus) {
@@ -524,4 +544,301 @@ function showSuccessMessage(message) {
             successAlert.style.display = 'none';
         }, 5000);
     }
+}
+
+// Show New Menu Modal
+function showNewMenuModal() {
+    // Reset form if needed
+    const newMenuForm = document.getElementById('new-menu-form');
+    if (newMenuForm) {
+        newMenuForm.reset();
+    }
+    
+    // Initialize date picker for the week selection
+    const weekInput = document.getElementById('new-menu-week');
+    if (weekInput && typeof flatpickr === 'function') {
+        flatpickr(weekInput, {
+            dateFormat: "Y-m-d",
+            locale: "es",
+            defaultDate: new Date(),
+            onChange: function(selectedDates) {
+                if (selectedDates && selectedDates.length > 0) {
+                    // Set to Monday of the selected week
+                    const selectedDate = selectedDates[0];
+                    const monday = getMonday(selectedDate);
+                    weekInput.value = formatDate(monday);
+                }
+            }
+        });
+    }
+    
+    // Add event listener to create new menu form
+    if (newMenuForm) {
+        newMenuForm.addEventListener('submit', createNewMenu);
+    }
+    
+    // Show the modal
+    const modal = document.getElementById('new-menu-modal');
+    if (modal) {
+        modal.style.display = 'block';
+    }
+}
+
+// Create new menu handler
+async function createNewMenu(e) {
+    e.preventDefault();
+    
+    const weekInput = document.getElementById('new-menu-week');
+    if (!weekInput || !weekInput.value) {
+        showErrorMessage('Por favor selecciona una semana para el menú.');
+        return;
+    }
+    
+    try {
+        showLoadingState(true);
+        
+        // Parse date from input
+        const selectedDate = new Date(weekInput.value);
+        
+        // Set current week start date to the selected week
+        currentWeekStartDate = getMonday(selectedDate);
+        
+        // Reset menu data
+        menuData = {};
+        DAYS.forEach(day => {
+            menuData[day] = { items: [] };
+        });
+        
+        // Update UI
+        const weekRange = document.getElementById('week-range');
+        if (weekRange) {
+            const weekStartStr = formatDate(currentWeekStartDate);
+            const weekEndDate = new Date(currentWeekStartDate);
+            weekEndDate.setDate(weekEndDate.getDate() + 4); // Friday is 4 days after Monday
+            const weekEndStr = formatDate(weekEndDate);
+            weekRange.textContent = `Semana del ${weekStartStr} al ${weekEndStr}`;
+        }
+        
+        // Update publish status
+        updatePublishStatus(false);
+        
+        // Show menu for current day
+        showMenuForDay(currentDay);
+        
+        // Close modal
+        const modal = document.getElementById('new-menu-modal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+        
+        showSuccessMessage('Nuevo menú creado correctamente.');
+    } catch (error) {
+        console.error('Error creating new menu:', error);
+        showErrorMessage('Error al crear nuevo menú: ' + error.message);
+    } finally {
+        showLoadingState(false);
+    }
+}
+
+// Show Import Excel Modal
+function showImportExcelModal() {
+    // Reset any previous file selection
+    const fileInput = document.getElementById('excel-file');
+    if (fileInput) {
+        fileInput.value = '';
+    }
+    
+    // Add event listener to the form
+    const importForm = document.getElementById('import-excel-form');
+    if (importForm) {
+        importForm.addEventListener('submit', importExcelFile);
+    }
+    
+    // Show the modal
+    const modal = document.getElementById('import-excel-modal');
+    if (modal) {
+        modal.style.display = 'block';
+    }
+}
+
+// Import Excel file handler
+async function importExcelFile(e) {
+    e.preventDefault();
+    
+    const fileInput = document.getElementById('excel-file');
+    if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+        showErrorMessage('Por favor selecciona un archivo Excel.');
+        return;
+    }
+    
+    try {
+        showLoadingState(true);
+        
+        const file = fileInput.files[0];
+        
+        // Read Excel file
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                
+                // Assuming first sheet contains the menu
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                
+                // Convert to JSON
+                const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                
+                // Process Excel data to update menu
+                await processExcelData(jsonData);
+                
+                // Close modal
+                const modal = document.getElementById('import-excel-modal');
+                if (modal) {
+                    modal.style.display = 'none';
+                }
+                
+                showSuccessMessage('Menú importado correctamente.');
+            } catch (error) {
+                console.error('Error processing Excel file:', error);
+                showErrorMessage('Error al procesar archivo Excel: ' + error.message);
+            } finally {
+                showLoadingState(false);
+            }
+        };
+        
+        reader.onerror = function() {
+            showErrorMessage('Error al leer el archivo Excel.');
+            showLoadingState(false);
+        };
+        
+        reader.readAsArrayBuffer(file);
+    } catch (error) {
+        console.error('Error importing Excel file:', error);
+        showErrorMessage('Error al importar archivo Excel: ' + error.message);
+        showLoadingState(false);
+    }
+}
+
+// Process Excel data to update menu
+async function processExcelData(jsonData) {
+    // This is a placeholder function - you need to adapt this to your Excel structure
+    // Example: if Excel has columns for Day, Item Name, Description, etc.
+    
+    // Reset menu data
+    menuData = {};
+    DAYS.forEach(day => {
+        menuData[day] = { items: [] };
+    });
+    
+    // Process each row in the Excel file
+    for (const row of jsonData) {
+        // Example mapping - adjust according to your Excel structure
+        const day = row.Dia; // Assuming "Dia" column in Excel
+        const itemName = row.Nombre; // Assuming "Nombre" column
+        const itemDescription = row.Descripcion; // Assuming "Descripcion" column
+        const itemType = row.Tipo; // Assuming "Tipo" column
+        
+        // Find the corresponding day in your DAYS array
+        const matchingDay = DAYS.find(d => d.toLowerCase() === day.toLowerCase());
+        
+        if (matchingDay && itemName) {
+            // Add item to the menu data
+            if (!menuData[matchingDay].items) {
+                menuData[matchingDay].items = [];
+            }
+            
+            menuData[matchingDay].items.push({
+                name: itemName,
+                description: itemDescription || '',
+                type: itemType || 'main'
+            });
+        }
+    }
+    
+    // Update UI
+    showMenuForDay(currentDay);
+}
+
+// Show Publish Menu Modal
+function showPublishMenuModal() {
+    // Check if there are menu items in all days
+    const isValid = validateAllDays();
+    
+    // Get validation errors container
+    const validationErrors = document.getElementById('publish-menu-validation-errors');
+    
+    if (!isValid) {
+        if (validationErrors) {
+            validationErrors.innerHTML = '<p>No se puede publicar el menú porque algunos días no tienen platos añadidos.</p>';
+            validationErrors.style.display = 'block';
+        }
+    } else {
+        if (validationErrors) {
+            validationErrors.style.display = 'none';
+        }
+        
+        // Add event listener to confirm button
+        const confirmButton = document.getElementById('confirm-publish-menu-btn');
+        if (confirmButton) {
+            confirmButton.onclick = publishMenu;
+        }
+        
+        // Show the modal
+        const modal = document.getElementById('publish-menu-modal');
+        if (modal) {
+            modal.style.display = 'block';
+        }
+    }
+}
+
+// Navigate to previous week
+function navigateToPreviousWeek() {
+    // Create a new date object from the current week start date
+    const newDate = new Date(currentWeekStartDate);
+    
+    // Set to previous week (-7 days)
+    newDate.setDate(newDate.getDate() - 7);
+    
+    // Update current week start date
+    currentWeekStartDate = newDate;
+    
+    // Update UI and load menu
+    const weekRange = document.getElementById('week-range');
+    if (weekRange) {
+        const weekStartStr = formatDate(currentWeekStartDate);
+        const weekEndDate = new Date(currentWeekStartDate);
+        weekEndDate.setDate(weekEndDate.getDate() + 4); // Friday is 4 days after Monday
+        const weekEndStr = formatDate(weekEndDate);
+        weekRange.textContent = `Semana del ${weekStartStr} al ${weekEndStr}`;
+    }
+    
+    // Load menu for the new week
+    loadCurrentMenu();
+}
+
+// Navigate to next week
+function navigateToNextWeek() {
+    // Create a new date object from the current week start date
+    const newDate = new Date(currentWeekStartDate);
+    
+    // Set to next week (+7 days)
+    newDate.setDate(newDate.getDate() + 7);
+    
+    // Update current week start date
+    currentWeekStartDate = newDate;
+    
+    // Update UI and load menu
+    const weekRange = document.getElementById('week-range');
+    if (weekRange) {
+        const weekStartStr = formatDate(currentWeekStartDate);
+        const weekEndDate = new Date(currentWeekStartDate);
+        weekEndDate.setDate(weekEndDate.getDate() + 4); // Friday is 4 days after Monday
+        const weekEndStr = formatDate(weekEndDate);
+        weekRange.textContent = `Semana del ${weekStartStr} al ${weekEndStr}`;
+    }
+    
+    // Load menu for the new week
+    loadCurrentMenu();
 } 
