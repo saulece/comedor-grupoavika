@@ -1,30 +1,8 @@
-// Firebase configuration for Comedor Grupo Avika
-// Initialize Firebase with v8 syntax
-
-// Firebase configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyCIyAwAEqFEw_bcqmun5BlNjVPiRy2-bMs",
-  authDomain: "comedor-grupoavika.firebaseapp.com",
-  databaseURL: "https://comedor-grupoavika-default-rtdb.firebaseio.com",
-  projectId: "comedor-grupoavika",
-  storageBucket: "comedor-grupoavika.firebasestorage.app",
-  messagingSenderId: "277401445097",
-  appId: "1:277401445097:web:f1da7e5c8b3f3ab3570678",
-  measurementId: "G-P3ZDJJQVW9"
-};
-
-// Initialize Firebase
-firebase.initializeApp(firebaseConfig);
-
-// Initialize services
-const db = firebase.firestore();
-const auth = firebase.auth();
+// Admin Menu Management for Comedor Grupo Avika
 
 // Collection references
 const menuCollection = db.collection("menus");
 const userCollection = db.collection("users");
-
-// Admin Menu Management for Comedor Grupo Avika
 
 // Ensure admin only access
 document.addEventListener('DOMContentLoaded', () => {
