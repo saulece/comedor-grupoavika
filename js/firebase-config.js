@@ -12,8 +12,10 @@ const firebaseConfig = {
   measurementId: "G-P3ZDJJQVW9"
 };
 
-// Initialize Firebase
-firebase.initializeApp(firebaseConfig);
+// Initialize Firebase only if not already initialized
+if (!firebase.apps || !firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+}
 
 // Get Firebase services
 const db = firebase.firestore();
@@ -26,5 +28,10 @@ const employeesCollection = db.collection("employees");
 const confirmationsCollection = db.collection("confirmations");
 const menuCollection = db.collection("menus");
 
-// Export initialized services for use in other files
-export { db, auth, analytics };
+// Check if we're in a module context before exporting
+if (typeof exports !== 'undefined') {
+  // Export initialized services for use in other files
+  exports.db = db;
+  exports.auth = auth;
+  exports.analytics = analytics;
+}
