@@ -6,50 +6,48 @@
     <title>Gestión de Menú - Administrador</title>
     <link rel="stylesheet" href="../../css/styles.css">
     <link rel="stylesheet" href="../../css/admin.css">
+    <link rel="stylesheet" href="../../css/custom.css">
     <link rel="icon" type="image/x-icon" href="../../favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-    <link rel="stylesheet" href="../../css/custom.css">
 </head>
 <body>
     <div class="admin-container">
         <!-- Sidebar -->
-        <!-- Sidebar -->
-<div class="sidebar">
-    <div class="sidebar-header">
-        <img src="../../assets/img/logo-small.png" alt="Grupo Avika Logo">
-        <h3>Grupo Avika</h3>
-    </div>
-    <div class="sidebar-menu">
-        <ul>
-            <li>
-                <a href="dashboard.html" class="active">
-                    <i class="fas fa-tachometer-alt"></i> Dashboard
-                </a>
-            </li>
-            <li>
-                <a href="menu.html">
-                    <i class="fas fa-utensils"></i> Menú
-                </a>
-            </li>
-            <li>
-                <a href="confirmations.html">
-                    <i class="fas fa-clipboard-check"></i> Confirmaciones
-                </a>
-            </li>
-            <li>
-                <a href="users.html">
-                    <i class="fas fa-users-cog"></i> Usuarios
-                </a>
-            </li>
-            <li>
-                <a href="#" id="logout-btn">
-                    <i class="fas fa-sign-out-alt"></i> Cerrar sesión
-                </a>
-            </li>
-        </ul>
-    </div>
-</div>
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <img src="../../assets/img/logo-small.png" alt="Grupo Avika Logo">
+                <h3>Grupo Avika</h3>
+            </div>
+            <div class="sidebar-menu">
+                <ul>
+                    <li>
+                        <a href="dashboard.html">
+                            <i class="fas fa-tachometer-alt"></i> Dashboard
+                        </a>
+                    </li>
+                    <li>
+                        <a href="menu.html" class="active">
+                            <i class="fas fa-utensils"></i> Menú
+                        </a>
+                    </li>
+                    <li>
+                        <a href="confirmations.html">
+                            <i class="fas fa-clipboard-check"></i> Confirmaciones
+                        </a>
+                    </li>
+                    <li>
+                        <a href="users.html">
+                            <i class="fas fa-users-cog"></i> Usuarios
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" id="logout-btn">
+                            <i class="fas fa-sign-out-alt"></i> Cerrar sesión
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
 
         <!-- Main Content -->
         <div class="main-content">
@@ -60,128 +58,106 @@
                 </div>
             </div>
 
-            <!-- Week Selector -->
-            <div class="week-selector">
-                <button id="previous-week" class="btn btn-icon">
-                    <i class="fas fa-chevron-left"></i>
-                </button>
-                <div class="week-display">
-                    <span id="week-range">Semana del DD/MM/YYYY al DD/MM/YYYY</span>
-                </div>
-                <button id="next-week" class="btn btn-icon">
-                    <i class="fas fa-chevron-right"></i>
-                </button>
-            </div>
-
             <!-- Menu Controls -->
-            <div class="menu-controls">
-                <div class="menu-status-display">
-                    <span id="menu-status-badge" class="badge">Borrador</span>
-                    <span id="menu-status-text">Este menú está en borrador</span>
+            <div class="card menu-controls-card">
+                <div class="card-header">
+                    <h3>Control del Menú</h3>
                 </div>
-                <div class="menu-actions">
-                    <button id="new-menu-btn" class="btn btn-secondary">
-                        <i class="fas fa-plus"></i> Nuevo Menú
-                    </button>
-                    <button id="import-excel-btn" class="btn btn-secondary">
-                        <i class="fas fa-file-excel"></i> Importar Excel
-                    </button>
-                    <button id="publish-menu-btn" class="btn btn-primary">
-                        <i class="fas fa-upload"></i> Publicar Menú
-                    </button>
+                <div class="card-body">
+                    <div class="menu-navigation">
+                        <div class="week-selector">
+                            <button id="previous-week" class="btn btn-icon">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <div class="week-display">
+                                <span id="week-range">Semana del DD/MM/YYYY</span>
+                                <span id="menu-status" class="badge badge-warning">Borrador</span>
+                            </div>
+                            <button id="next-week" class="btn btn-icon">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="menu-actions">
+                        <button id="new-menu-btn" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Nuevo Menú
+                        </button>
+                        <button id="import-excel-btn" class="btn btn-secondary">
+                            <i class="fas fa-file-excel"></i> Importar Excel
+                        </button>
+                        <button id="publish-menu-btn" class="btn btn-success">
+                            <i class="fas fa-upload"></i> Publicar Menú
+                        </button>
+                    </div>
                 </div>
             </div>
 
             <!-- Days Tabs -->
-            <!-- Days Tabs -->
-<div class="days-tabs">
-    <button class="day-tab active" data-day="lunes">Lunes</button>
-    <button class="day-tab" data-day="martes">Martes</button>
-    <button class="day-tab" data-day="miercoles">Miércoles</button>
-    <button class="day-tab" data-day="jueves">Jueves</button>
-    <button class="day-tab" data-day="viernes">Viernes</button>
-    <button class="day-tab" data-day="sabado">Sábado</button>
-    <button class="day-tab" data-day="domingo">Domingo</button>
-</div>
-
-            <!-- Menu Content -->
-            <!-- Menu Content -->
-<div class="menu-content">
-    <div class="day-content active" id="lunes-content">
-        <!-- ... (contenido existente) ... -->
-    </div>
-    <div class="day-content" id="martes-content">
-        <!-- ... (contenido existente) ... -->
-    </div>
-    <div class="day-content" id="miercoles-content">
-        <!-- ... (contenido existente) ... -->
-    </div>
-    <div class="day-content" id="jueves-content">
-        <!-- ... (contenido existente) ... -->
-    </div>
-    <div class="day-content" id="viernes-content">
-        <!-- ... (contenido existente) ... -->
-    </div>
-    <div class="day-content" id="sabado-content">
-        <div class="menu-items-container">
-            <div class="menu-items-header">
-                <h3>Menú del Sábado</h3>
-                <button class="btn btn-icon add-menu-item" data-day="sabado">
-                    <i class="fas fa-plus"></i>
-                </button>
+            <div class="day-selector">
+                <div class="days-tabs">
+                    <button class="day-tab active" data-day="lunes">Lunes</button>
+                    <button class="day-tab" data-day="martes">Martes</button>
+                    <button class="day-tab" data-day="miercoles">Miércoles</button>
+                    <button class="day-tab" data-day="jueves">Jueves</button>
+                    <button class="day-tab" data-day="viernes">Viernes</button>
+                    <button class="day-tab" data-day="sabado">Sábado</button>
+                    <button class="day-tab" data-day="domingo">Domingo</button>
+                </div>
             </div>
-            <div id="sabado-items" class="menu-items-list">
-                <div class="empty-state">
-                    <p>No hay elementos en el menú para este día</p>
-                    <button class="btn btn-primary add-menu-item" data-day="sabado">Agregar Elemento</button>
+
+            <!-- Menu Editor -->
+            <div class="card menu-editor-card">
+                <div class="card-header">
+                    <h3 id="day-title">Menú del Lunes</h3>
+                    <button id="add-item-btn" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Agregar Plato
+                    </button>
+                </div>
+                <div class="card-body">
+                    <!-- Menu Items Container -->
+                    <div id="menu-items-container">
+                        <div id="empty-state" class="empty-state">
+                            <p>No hay elementos en el menú para este día</p>
+                            <button class="btn btn-primary add-menu-item">Agregar Plato</button>
+                        </div>
+                    </div>
+
+                    <!-- Save Button -->
+                    <div class="form-actions">
+                        <button id="save-menu-btn" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Guardar Cambios
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-    <div class="day-content" id="domingo-content">
-        <div class="menu-items-container">
-            <div class="menu-items-header">
-                <h3>Menú del Domingo</h3>
-                <button class="btn btn-icon add-menu-item" data-day="domingo">
-                    <i class="fas fa-plus"></i>
-                </button>
-            </div>
-            <div id="domingo-items" class="menu-items-list">
-                <div class="empty-state">
-                    <p>No hay elementos en el menú para este día</p>
-                    <button class="btn btn-primary add-menu-item" data-day="domingo">Agregar Elemento</button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 
-    <!-- Menu Item Modal -->
+    <!-- Menu Item Form Modal -->
     <div id="menu-item-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 id="menu-item-modal-title">Agregar elemento al menú</h3>
+                <h3>Agregar Plato</h3>
                 <button class="close-modal">&times;</button>
             </div>
             <div class="modal-body">
                 <form id="menu-item-form">
-                    <input type="hidden" id="menu-item-day" name="day">
-                    <input type="hidden" id="menu-item-id" name="id">
+                    <input type="hidden" id="edit-item-id">
                     
                     <div class="form-group">
-                        <label for="menu-item-name">Nombre del platillo</label>
-                        <input type="text" id="menu-item-name" name="name" class="form-control" required>
+                        <label for="item-name">Nombre del plato</label>
+                        <input type="text" id="item-name" class="form-control" required>
                     </div>
                     
                     <div class="form-group">
-                        <label for="menu-item-description">Descripción</label>
-                        <textarea id="menu-item-description" name="description" class="form-control" rows="3"></textarea>
+                        <label for="item-description">Descripción</label>
+                        <textarea id="item-description" class="form-control" rows="3"></textarea>
                     </div>
                     
                     <div class="form-group">
-                        <label for="menu-item-type">Tipo</label>
-                        <select id="menu-item-type" name="type" class="form-control" required>
-                            <option value="">Seleccionar tipo</option>
+                        <label for="item-type">Tipo</label>
+                        <select id="item-type" class="form-control">
                             <option value="main">Plato principal</option>
                             <option value="side">Guarnición</option>
                             <option value="dessert">Postre</option>
@@ -189,60 +165,9 @@
                         </select>
                     </div>
                     
-                    <div class="form-group form-buttons">
+                    <div class="form-buttons">
                         <button type="button" class="btn btn-secondary cancel-modal">Cancelar</button>
-                        <button type="submit" class="btn btn-primary" id="save-menu-item-btn">Guardar</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Publish Menu Modal -->
-    <!-- Publish Menu Modal -->
-<div id="publish-menu-modal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3>Publicar Menú</h3>
-            <button class="close-modal">&times;</button>
-        </div>
-        <div class="modal-body">
-            <p>¿Estás seguro de que deseas publicar este menú? Una vez publicado, los coordinadores podrán verlo.</p>
-            <div id="publish-menu-validation-errors" class="validation-errors" style="display: none;"></div>
-            <div class="form-group form-buttons">
-                <button type="button" class="btn btn-secondary cancel-modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" id="confirm-publish-menu-btn">Publicar</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-    <!-- Import Excel Modal -->
-    <div id="import-excel-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Importar Menú desde Excel</h3>
-                <button class="close-modal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <form id="import-excel-form">
-                    <div class="form-group">
-                        <label for="excel-file">Selecciona un archivo Excel</label>
-                        <input type="file" id="excel-file" name="excel-file" class="form-control" accept=".xlsx, .xls">
-                    </div>
-                    
-                    <div class="template-download">
-                        <p>Descarga la plantilla para importar el menú:</p>
-                        <button type="button" id="download-template-btn" class="btn btn-secondary">
-                            <i class="fas fa-download"></i> Descargar Plantilla
-                        </button>
-                    </div>
-                    
-                    <div id="import-excel-validation-errors" class="validation-errors" style="display: none;"></div>
-                    
-                    <div class="form-group form-buttons">
-                        <button type="button" class="btn btn-secondary cancel-modal">Cancelar</button>
-                        <button type="submit" class="btn btn-primary" id="confirm-import-excel-btn">Importar</button>
+                        <button type="submit" class="btn btn-primary">Guardar</button>
                     </div>
                 </form>
             </div>
@@ -261,12 +186,54 @@
                 <form id="new-menu-form">
                     <div class="form-group">
                         <label for="new-menu-week">Semana del menú</label>
-                        <input type="text" id="new-menu-week" name="week" class="form-control" placeholder="Selecciona una fecha" readonly>
+                        <input type="date" id="new-menu-week" class="form-control" required>
                     </div>
                     
-                    <div class="form-group form-buttons">
+                    <div class="form-buttons">
                         <button type="button" class="btn btn-secondary cancel-modal">Cancelar</button>
-                        <button type="submit" class="btn btn-primary" id="confirm-new-menu-btn">Crear Menú</button>
+                        <button type="submit" class="btn btn-primary">Crear Menú</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Publish Menu Modal -->
+    <div id="publish-menu-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Publicar Menú</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>¿Estás seguro de que deseas publicar este menú? Una vez publicado, los coordinadores podrán verlo.</p>
+                <div id="publish-menu-validation-errors" class="validation-errors" style="display: none;"></div>
+                
+                <div class="form-buttons">
+                    <button type="button" class="btn btn-secondary cancel-modal">Cancelar</button>
+                    <button type="button" class="btn btn-success" id="confirm-publish-menu-btn">Publicar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Excel Modal -->
+    <div id="import-excel-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Importar Menú desde Excel</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="import-excel-form">
+                    <div class="form-group">
+                        <label for="excel-file">Selecciona un archivo Excel</label>
+                        <input type="file" id="excel-file" class="form-control" accept=".xlsx, .xls">
+                    </div>
+                    
+                    <div class="form-buttons">
+                        <button type="button" class="btn btn-secondary cancel-modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Importar</button>
                     </div>
                 </form>
             </div>
@@ -287,16 +254,9 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     
-    <!-- External Libraries -->
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    
     <!-- Custom Scripts -->
     <script src="../../js/firebase-config.js"></script>
     <script src="../../js/auth.js"></script>
-    <script src="../../js/utils/data-formatter.js"></script>
-    <script src="../../js/utils/excel-parser.js"></script>
     <script src="../../js/admin/menu.js"></script>
 </body>
-</html> 
+</html>

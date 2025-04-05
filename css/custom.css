@@ -139,18 +139,112 @@
     color: #3498db;
 }
 
-/* Menú */
+/* Mejoras para la interfaz de gestión de menú */
+.menu-controls-card {
+    margin-bottom: 1.5rem;
+}
+
+.menu-navigation {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.week-selector {
+    display: flex;
+    align-items: center;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 0.5rem;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.week-display {
+    padding: 0 1rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+#menu-status {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.badge-warning {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+.badge-success {
+    background-color: #28a745;
+    color: white;
+}
+
+.menu-actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+}
+
+.day-selector {
+    margin-bottom: 1.5rem;
+}
+
+.days-tabs {
+    display: flex;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.day-tab {
+    flex: 1;
+    border: none;
+    background: none;
+    padding: 0.75rem 0;
+    cursor: pointer;
+    font-weight: 500;
+    color: #6c757d;
+    transition: all 0.2s;
+    border-bottom: 3px solid transparent;
+}
+
+.day-tab.active {
+    background-color: #fff;
+    color: #3498db;
+    border-bottom-color: #3498db;
+    box-shadow: 0 0 10px rgba(0,0,0,0.05);
+}
+
+.day-tab:hover:not(.active) {
+    background-color: rgba(52, 152, 219, 0.05);
+    color: #3498db;
+}
+
+#menu-items-container {
+    min-height: 300px;
+}
+
 .menu-item {
     background-color: #f8f9fa;
-    border-radius: 6px;
+    border-radius: 8px;
     padding: 1rem;
     margin-bottom: 1rem;
     border: 1px solid #e9ecef;
-    transition: all 0.3s ease;
+    transition: all 0.3s;
+    position: relative;
 }
 
 .menu-item:hover {
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
     transform: translateY(-2px);
 }
 
@@ -158,7 +252,77 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.menu-item-content {
+    margin-bottom: 1rem;
+}
+
+.menu-item-name {
+    font-weight: 600;
+    color: #343a40;
+    margin-bottom: 0.25rem;
+}
+
+.menu-item-description {
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.menu-item-actions {
+    display: flex;
+    gap: 0.5rem;
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+}
+
+.btn-icon-sm {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    padding: 0;
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 1rem;
+    text-align: center;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 2px dashed #dee2e6;
+}
+
+.empty-state p {
+    color: #6c757d;
+    margin-bottom: 1.5rem;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1.5rem;
+}
+
+/* Botones de acción mejorados */
+.btn-success {
+    background-color: #28a745;
+    color: white;
+    box-shadow: 0 2px 5px rgba(40, 167, 69, 0.3);
+}
+
+.btn-success:hover {
+    background-color: #218838;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(40, 167, 69, 0.4);
 }
 
 /* Modales */
@@ -285,17 +449,6 @@
     .day-tab {
         flex: 0 0 50%;
     }
-}
-/* Estilo para el indicador del día de la semana */
-.day-of-week {
-    background-color: #3498db;
-    color: white;
-    padding: 4px 10px;
-    border-radius: 4px;
-    margin-top: 8px;
-    display: inline-block;
-    font-weight: 500;
-    box-shadow: 0 2px 5px rgba(52, 152, 219, 0.3);
 }
 /* Mejoras para los modales */
 .modal {

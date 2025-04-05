@@ -4,15 +4,18 @@
 // Admin Users Management for Comedor Grupo Avika
 
 // Ensure admin only access
+// Admin Users Management for Comedor Grupo Avika
+
+// Ensure admin only access
 document.addEventListener('DOMContentLoaded', () => {
     if (!checkAuth(USER_ROLES.ADMIN)) {
         return;
     }
     
-    // Set user name
-    const userObject = JSON.parse(sessionStorage.getItem('user') || '{}');
+    // Set user name from session
+    const userObject = sessionStorage.getItem('user') ? JSON.parse(sessionStorage.getItem('user')) : {};
     const userNameElement = document.getElementById('user-name');
-    if (userNameElement && userObject) {
+    if (userNameElement) {
         userNameElement.textContent = userObject.displayName || 'Administrador';
     }
     
@@ -30,6 +33,9 @@ document.addEventListener('DOMContentLoaded', () => {
     loadCoordinators();
 });
 
+// Use the Firebase services already initialized in firebase-config.js
+// Do NOT redeclare db or auth here
+
 // Setup event listeners
 function setupEventListeners() {
     // Create coordinator form
@@ -44,9 +50,15 @@ function setupEventListeners() {
         resetPasswordForm.addEventListener('submit', resetPasswordHandler);
     }
     
+    // Delete user confirmation button
+    const deleteUserBtn = document.getElementById('confirm-delete-user-btn');
+    if (deleteUserBtn) {
+        deleteUserBtn.addEventListener('click', deleteUserHandler);
+    }
+    
     // Modal close buttons
-    document.querySelectorAll('.close-modal, .cancel-modal').forEach(button => {
-        button.addEventListener('click', () => {
+    document.querySelectorAll('.close-modal, .cancel-modal').forEach(btn => {
+        btn.addEventListener('click', () => {
             document.querySelectorAll('.modal').forEach(modal => {
                 modal.style.display = 'none';
             });
@@ -60,7 +72,7 @@ async function loadCoordinators() {
         showLoadingState(true);
         
         // Get coordinators from Firestore
-        const snapshot = await firebase.firestore().collection('users')
+        const snapshot = await db.collection('users')
             .where('role', '==', 'coordinator')
             .orderBy('createdAt', 'desc')
             .get();
@@ -146,12 +158,6 @@ function setupActionButtons() {
             document.getElementById('delete-user-modal').style.display = 'block';
         });
     });
-    
-    // Delete confirmation button
-    const deleteUserBtn = document.getElementById('confirm-delete-user-btn');
-    if (deleteUserBtn) {
-        deleteUserBtn.addEventListener('click', deleteUserHandler);
-    }
 }
 
 // Create coordinator handler
@@ -173,17 +179,17 @@ async function createCoordinatorHandler(e) {
         }
         
         // Check if email already exists
-        const emailCheck = await firebase.firestore().collection('users').where('email', '==', email).get();
+        const emailCheck = await db.collection('users').where('email', '==', email).get();
         if (!emailCheck.empty) {
             throw new Error('El correo electrónico ya está registrado');
         }
         
         // Create user in Firebase Auth
-        const userCredential = await firebase.auth().createUserWithEmailAndPassword(email, password);
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
         const user = userCredential.user;
         
         // Add user to Firestore
-        await firebase.firestore().collection('users').doc(user.uid).set({
+        await db.collection('users').doc(user.uid).set({
             name: name,
             email: email,
             role: 'coordinator',
@@ -207,7 +213,6 @@ async function createCoordinatorHandler(e) {
         showLoadingState(false);
     }
 }
-
 // Reset password handler
 async function resetPasswordHandler(e) {
     e.preventDefault();
