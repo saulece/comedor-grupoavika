@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Coordinador</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+    <link rel="stylesheet" href="../../css/coordinator.css">
+    <link rel="icon" type="image/x-icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+    <div class="coordinator-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <img src="../../assets/img/logo-small.png" alt="Grupo Avika Logo">
+                <h3>Grupo Avika</h3>
+            </div>
+            <div class="sidebar-menu">
+                <ul>
+                    <li>
+                        <a href="dashboard.html" class="active">
+                            <i class="fas fa-tachometer-alt"></i> Dashboard
+                        </a>
+                    </li>
+                    <li>
+                        <a href="menu.html">
+                            <i class="fas fa-utensils"></i> Menú
+                        </a>
+                    </li>
+                    <li>
+                        <a href="confirmations.html">
+                            <i class="fas fa-clipboard-check"></i> Confirmaciones
+                        </a>
+                    </li>
+                    <li>
+                        <a href="employees.html">
+                            <i class="fas fa-users"></i> Empleados
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" id="logout-btn">
+                            <i class="fas fa-sign-out-alt"></i> Cerrar sesión
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="content-header">
+                <h2>Dashboard</h2>
+                <div class="user-info">
+                    <span id="user-name">Coordinador</span>
+                </div>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="stats-container">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h4>Empleados a Cargo</h4>
+                        <p id="total-employees">0</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-utensils"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h4>Confirmaciones Hoy</h4>
+                        <p id="today-confirmations">0</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-calendar-check"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h4>Semana Actual</h4>
+                        <p id="current-week">Semana del DD/MM al DD/MM</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Menu Status -->
+            <div class="card menu-status-card">
+                <div class="card-header">
+                    <h3>Menú Actual</h3>
+                </div>
+                <div class="card-body">
+                    <div id="menu-status-container">
+                        <div class="menu-status-loading">
+                            <p>Cargando información del menú...</p>
+                        </div>
+                    </div>
+                    <a href="menu.html" class="btn btn-primary">Ver Menú Completo</a>
+                </div>
+            </div>
+
+            <!-- Quick Confirmations -->
+            <div class="card quick-confirmations-card">
+                <div class="card-header">
+                    <h3>Confirmaciones</h3>
+                </div>
+                <div class="card-body">
+                    <div id="confirmation-status">
+                        <p>Confirmación para hoy: <span id="today-confirmation-status">No realizada</span></p>
+                    </div>
+                    <a href="confirmations.html" class="btn btn-primary">Gestionar Confirmaciones</a>
+                </div>
+            </div>
+
+            <!-- Employee Management Quick Access -->
+            <div class="card employees-card">
+                <div class="card-header">
+                    <h3>Empleados</h3>
+                </div>
+                <div class="card-body">
+                    <div class="employee-summary">
+                        <p>Total de empleados: <span id="employee-count">0</span></p>
+                    </div>
+                    <a href="employees.html" class="btn btn-primary">Gestionar Empleados</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loading-indicator" style="display: none;">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Alert Messages -->
+    <div id="error-alert" class="alert-message error-message" style="display: none;"></div>
+    <div id="success-alert" class="alert-message success-message" style="display: none;"></div>
+
+    <!-- Firebase Scripts -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    
+    <!-- Custom Scripts -->
+    <script src="../../js/firebase-config.js"></script>
+    <script src="../../js/auth.js"></script>
+    <script src="../../js/coordinator/dashboard.js"></script>
+</body>
+</html>

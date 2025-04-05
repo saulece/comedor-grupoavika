@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirmaciones - Coordinador</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+    <link rel="stylesheet" href="../../css/coordinator.css">
+    <link rel="icon" type="image/x-icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+</head>
+<body>
+    <div class="coordinator-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <img src="../../assets/img/logo-small.png" alt="Grupo Avika Logo">
+                <h3>Grupo Avika</h3>
+            </div>
+            <div class="sidebar-menu">
+                <ul>
+                    <li>
+                        <a href="dashboard.html">
+                            <i class="fas fa-tachometer-alt"></i> Dashboard
+                        </a>
+                    </li>
+                    <li>
+                        <a href="menu.html">
+                            <i class="fas fa-utensils"></i> Menú
+                        </a>
+                    </li>
+                    <li>
+                        <a href="confirmations.html" class="active">
+                            <i class="fas fa-clipboard-check"></i> Confirmaciones
+                        </a>
+                    </li>
+                    <li>
+                        <a href="employees.html">
+                            <i class="fas fa-users"></i> Empleados
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" id="logout-btn">
+                            <i class="fas fa-sign-out-alt"></i> Cerrar sesión
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="content-header">
+                <h2>Confirmaciones de Comedor</h2>
+                <div class="user-info">
+                    <span id="user-name">Coordinador</span>
+                </div>
+            </div>
+
+            <!-- Date Selector -->
+            <div class="date-selector">
+                <div class="form-group">
+                    <label for="confirmation-date">Fecha de Confirmación</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-calendar"></i>
+                        <input type="text" id="confirmation-date" class="form-control" placeholder="Selecciona una fecha" readonly>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Confirmation Summary -->
+            <div class="confirmation-summary">
+                <div class="summary-card">
+                    <div class="summary-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="summary-info">
+                        <h4>Total Empleados</h4>
+                        <p id="total-employees-count">0</p>
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-icon">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="summary-info">
+                        <h4>Confirmados</h4>
+                        <p id="confirmed-count">0</p>
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-icon">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <div class="summary-info">
+                        <h4>Estado</h4>
+                        <p id="confirmation-status">No enviado</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Employee Selection -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>Selección de Empleados</h3>
+                    <div class="actions">
+                        <button id="select-all-btn" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-check-double"></i> Seleccionar Todos
+                        </button>
+                        <button id="clear-selection-btn" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-times"></i> Limpiar Selección
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="search-bar">
+                        <div class="input-with-icon">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="employee-search" class="form-control" placeholder="Buscar empleado...">
+                        </div>
+                    </div>
+                    
+                    <div id="employees-list" class="employees-checkboxes">
+                        <!-- Employee checkboxes will be loaded here -->
+                        <div class="empty-state">
+                            <p>Cargando empleados...</p>
+                        </div>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button id="submit-confirmation-btn" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Guardar Confirmación
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Confirmation History -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>Historial de Confirmaciones</h3>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="data-table" id="confirmation-history-table">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Empleados Confirmados</th>
+                                    <th>Estado</th>
+                                    <th>Fecha de Registro</th>
+                                </tr>
+                            </thead>
+                            <tbody id="confirmation-history-body">
+                                <tr>
+                                    <td colspan="4" class="text-center">No hay confirmaciones registradas</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Success Modal -->
+    <div id="confirmation-success-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Confirmación Guardada</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="success-message-container">
+                    <i class="fas fa-check-circle success-icon"></i>
+                    <p>La confirmación se ha guardado exitosamente.</p>
+                    <p>Total empleados confirmados: <span id="modal-confirmed-count">0</span></p>
+                </div>
+                <div class="form-group form-buttons">
+                    <button type="button" class="btn btn-secondary close-modal">Cerrar</button>
+                    <button type="button" class="btn btn-primary" id="view-dashboard-btn">
+                        Ir al Dashboard
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loading-indicator" style="display: none;">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Alert Messages -->
+    <div id="error-alert" class="alert-message error-message" style="display: none;"></div>
+    <div id="success-alert" class="alert-message success-message" style="display: none;"></div>
+    <div id="info-alert" class="alert-message info-message" style="display: none;"></div>
+
+    <!-- Firebase Scripts -->
+    <script type="module" src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js"></script>
+    <script type="module" src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js"></script>
+    <script type="module" src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js"></script>
+    
+    <!-- External Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
+    
+    <!-- Custom Scripts -->
+    <script type="module" src="../../js/coordinator/confirmations.js"></script>
+</body>
+</html>

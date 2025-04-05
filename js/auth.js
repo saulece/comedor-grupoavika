@@ -1,17 +1,56 @@
-// Authentication module for Comedor Grupo Avika
-import { auth, db } from './firebase-config.js';
-import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
-import { doc, getDoc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
-
-// DOM Elements
-const loginForm = document.getElementById('login-form');
-const errorMessage = document.getElementById('error-message');
+// Authentication module for Comedor Grupo Avika - Firebase v8 approach
 
 // User Roles
 const USER_ROLES = {
     ADMIN: 'admin',
     COORDINATOR: 'coordinator'
 };
+
+/**
+ * Check if route requires authentication and correct role
+ * @param {string} requiredRole - Role required for access
+ * @returns {boolean} - Whether user has access
+ */
+function checkAuth(requiredRole) {
+    const userRole = sessionStorage.getItem("userRole");
+    const userId = sessionStorage.getItem("userId");
+    
+    if (!userId) {
+        window.location.href = "../../index.html";
+        return false;
+    }
+    
+    if (requiredRole && userRole !== requiredRole) {
+        // Redirect to appropriate dashboard
+        redirectBasedOnRole(userRole);
+        return false;
+    }
+    
+    return true;
+}
+
+/**
+ * Redirect user based on their role
+ * @param {string} role - User role
+ */
+function redirectBasedOnRole(role) {
+    switch (role) {
+        case USER_ROLES.ADMIN:
+            window.location.href = "pages/admin/dashboard.html";
+            break;
+        case USER_ROLES.COORDINATOR:
+            window.location.href = "pages/coordinator/dashboard.html";
+            break;
+        default:
+            showError("Rol de usuario no reconocido");
+            // Sign out if role is invalid
+            firebase.auth().signOut();
+    }
+}
+
+// DOM Elements
+const loginForm = document.getElementById('login-form');
+const errorMessage = document.getElementById('error-message');
 
 /**
  * Login user with email and password
@@ -29,11 +68,11 @@ export async function loginUser(email, password) {
         if (loginLoader) loginLoader.style.display = "block";
         
         // Attempt login
-        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
         const user = userCredential.user;
         
         // Get additional user information from Firestore
-        const userDoc = await getDoc(doc(db, "users", user.uid));
+        const userDoc = await firebase.firestore().collection("users").doc(user.uid).get();
         
         if (userDoc.exists()) {
             const userData = userDoc.data();
@@ -66,25 +105,6 @@ export async function loginUser(email, password) {
         if (loginLoader) loginLoader.style.display = "none";
         
         throw error;
-    }
-}
-
-/**
- * Redirect user based on their role
- * @param {string} role - User role
- */
-export function redirectBasedOnRole(role) {
-    switch (role) {
-        case USER_ROLES.ADMIN:
-            window.location.href = "pages/admin/dashboard.html";
-            break;
-        case USER_ROLES.COORDINATOR:
-            window.location.href = "pages/coordinator/dashboard.html";
-            break;
-        default:
-            showError("Rol de usuario no reconocido");
-            // Sign out if role is invalid
-            auth.signOut();
     }
 }
 
@@ -137,7 +157,7 @@ export function clearError() {
  * Log out current user
  */
 export function logout() {
-    auth.signOut()
+    firebase.auth().signOut()
         .then(() => {
             // Clear session storage
             sessionStorage.clear();
@@ -149,35 +169,12 @@ export function logout() {
         });
 }
 
-/**
- * Check if route requires authentication and correct role
- * @param {string} requiredRole - Role required for access
- * @returns {boolean} - Whether user has access
- */
-export function checkAuth(requiredRole) {
-    const userRole = sessionStorage.getItem("userRole");
-    const userId = sessionStorage.getItem("userId");
-    
-    if (!userId) {
-        window.location.href = "../../index.html";
-        return false;
-    }
-    
-    if (requiredRole && userRole !== requiredRole) {
-        // Redirect to appropriate dashboard
-        redirectBasedOnRole(userRole);
-        return false;
-    }
-    
-    return true;
-}
-
 // Check if user is already logged in when page loads
-auth.onAuthStateChanged(async (user) => {
+firebase.auth().onAuthStateChanged(async (user) => {
     if (user) {
         try {
             // Get user data including role
-            const userDoc = await getDoc(doc(db, "users", user.uid));
+            const userDoc = await firebase.firestore().collection("users").doc(user.uid).get();
             
             if (userDoc.exists()) {
                 const userData = userDoc.data();

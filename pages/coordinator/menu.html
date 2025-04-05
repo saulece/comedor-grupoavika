@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Menú Semanal - Coordinador</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+    <link rel="stylesheet" href="../../css/coordinator.css">
+    <link rel="icon" type="image/x-icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+    <div class="coordinator-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <img src="../../assets/img/logo-small.png" alt="Grupo Avika Logo">
+                <h3>Grupo Avika</h3>
+            </div>
+            <div class="sidebar-menu">
+                <ul>
+                    <li>
+                        <a href="dashboard.html">
+                            <i class="fas fa-tachometer-alt"></i> Dashboard
+                        </a>
+                    </li>
+                    <li>
+                        <a href="menu.html" class="active">
+                            <i class="fas fa-utensils"></i> Menú
+                        </a>
+                    </li>
+                    <li>
+                        <a href="confirmations.html">
+                            <i class="fas fa-clipboard-check"></i> Confirmaciones
+                        </a>
+                    </li>
+                    <li>
+                        <a href="employees.html">
+                            <i class="fas fa-users"></i> Empleados
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" id="logout-btn">
+                            <i class="fas fa-sign-out-alt"></i> Cerrar sesión
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="content-header">
+                <h2>Menú Semanal</h2>
+                <div class="user-info">
+                    <span id="user-name">Coordinador</span>
+                </div>
+            </div>
+
+            <!-- Week Selector -->
+            <div class="week-selector">
+                <button id="prev-week-btn" class="btn btn-icon">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <div class="week-display">
+                    <span id="current-week-display">Semana del DD/MM/YYYY al DD/MM/YYYY</span>
+                </div>
+                <button id="next-week-btn" class="btn btn-icon">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+
+            <!-- Menu Tabs -->
+            <div class="menu-tabs">
+                <button class="menu-tab active" data-day="lunes">Lunes</button>
+                <button class="menu-tab" data-day="martes">Martes</button>
+                <button class="menu-tab" data-day="miercoles">Miércoles</button>
+                <button class="menu-tab" data-day="jueves">Jueves</button>
+                <button class="menu-tab" data-day="viernes">Viernes</button>
+            </div>
+
+            <!-- Weekly Menu -->
+            <div id="weekly-menu" class="card">
+                <div id="lunes-menu" class="daily-menu active">
+                    <!-- Menu items for Monday will be loaded here -->
+                </div>
+                <div id="martes-menu" class="daily-menu">
+                    <!-- Menu items for Tuesday will be loaded here -->
+                </div>
+                <div id="miercoles-menu" class="daily-menu">
+                    <!-- Menu items for Wednesday will be loaded here -->
+                </div>
+                <div id="jueves-menu" class="daily-menu">
+                    <!-- Menu items for Thursday will be loaded here -->
+                </div>
+                <div id="viernes-menu" class="daily-menu">
+                    <!-- Menu items for Friday will be loaded here -->
+                </div>
+            </div>
+
+            <!-- No Menu Message -->
+            <div id="no-menu-message" class="card" style="display: none;">
+                <div class="card-body empty-state">
+                    <i class="fas fa-utensils empty-icon"></i>
+                    <p>No hay menú publicado para esta semana.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loading-indicator" style="display: none;">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Alert Messages -->
+    <div id="error-alert" class="alert-message error-message" style="display: none;"></div>
+
+    <!-- Firebase Scripts -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    
+    <!-- Custom Scripts -->
+    <script src="../../js/firebase-config.js"></script>
+    <script src="../../js/auth.js"></script>
+    <script src="../../js/coordinator/menu-view.js"></script>
+</body>
+</html>

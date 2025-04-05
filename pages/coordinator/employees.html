@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Empleados - Coordinador</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+    <link rel="stylesheet" href="../../css/coordinator.css">
+    <link rel="icon" type="image/x-icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+    <div class="coordinator-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <img src="../../assets/img/logo-small.png" alt="Grupo Avika Logo">
+                <h3>Grupo Avika</h3>
+            </div>
+            <div class="sidebar-menu">
+                <ul>
+                    <li>
+                        <a href="dashboard.html">
+                            <i class="fas fa-tachometer-alt"></i> Dashboard
+                        </a>
+                    </li>
+                    <li>
+                        <a href="menu.html">
+                            <i class="fas fa-utensils"></i> Menú
+                        </a>
+                    </li>
+                    <li>
+                        <a href="confirmations.html">
+                            <i class="fas fa-clipboard-check"></i> Confirmaciones
+                        </a>
+                    </li>
+                    <li>
+                        <a href="employees.html" class="active">
+                            <i class="fas fa-users"></i> Empleados
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" id="logout-btn">
+                            <i class="fas fa-sign-out-alt"></i> Cerrar sesión
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="content-header">
+                <h2>Gestión de Empleados</h2>
+                <div class="user-info">
+                    <span id="user-name">Coordinador</span>
+                </div>
+            </div>
+
+            <!-- Employee Controls -->
+            <div class="employee-controls">
+                <div class="search-bar">
+                    <div class="input-with-icon">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="employee-search" class="form-control" placeholder="Buscar empleado...">
+                    </div>
+                </div>
+                <div class="control-actions">
+                    <button id="add-employee-btn" class="btn btn-primary">
+                        <i class="fas fa-user-plus"></i> Agregar Empleado
+                    </button>
+                    <button id="import-employees-btn" class="btn btn-secondary">
+                        <i class="fas fa-file-import"></i> Importar
+                    </button>
+                    <button id="export-employees-btn" class="btn btn-secondary">
+                        <i class="fas fa-file-export"></i> Exportar
+                    </button>
+                </div>
+            </div>
+
+            <!-- Employee Summary -->
+            <div class="summary-bar">
+                <div class="summary-item">
+                    <i class="fas fa-users"></i>
+                    <span>Total: <strong id="employee-count">0</strong> empleados</span>
+                </div>
+            </div>
+
+            <!-- Employee List -->
+            <div class="card">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="data-table" id="employees-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Nombre</th>
+                                    <th>Posición</th>
+                                    <th>Email</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="employees-table-body">
+                                <tr>
+                                    <td colspan="6" class="text-center">Cargando empleados...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="table-pagination" id="employees-pagination">
+                        <div class="pagination-info">
+                            Mostrando <span id="page-info">0-0 de 0</span> resultados
+                        </div>
+                        <div class="pagination-controls">
+                            <button id="prev-page" class="btn btn-icon pagination-btn" disabled>
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <span id="page-number">Página 1</span>
+                            <button id="next-page" class="btn btn-icon pagination-btn" disabled>
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Employee Modal -->
+    <div id="employee-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="employee-modal-title">Agregar Empleado</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="employee-form">
+                    <input type="hidden" id="employee-id" name="id">
+                    
+                    <div class="form-group">
+                        <label for="employee-name">Nombre Completo</label>
+                        <input type="text" id="employee-name" name="name" class="form-control" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="employee-email">Email</label>
+                        <input type="email" id="employee-email" name="email" class="form-control" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="employee-position">Posición</label>
+                        <input type="text" id="employee-position" name="position" class="form-control" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="employee-status">Estado</label>
+                        <select id="employee-status" name="status" class="form-control" required>
+                            <option value="active">Activo</option>
+                            <option value="inactive">Inactivo</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group form-buttons">
+                        <button type="button" class="btn btn-secondary cancel-modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary" id="save-employee-btn">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Employee Modal -->
+    <div id="delete-employee-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Eliminar Empleado</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>¿Estás seguro de que deseas eliminar a <strong id="delete-employee-name"></strong>?</p>
+                <p class="warning-text">Esta acción no se puede deshacer.</p>
+                
+                <div class="form-group form-buttons">
+                    <button type="button" class="btn btn-secondary cancel-modal">Cancelar</button>
+                    <button type="button" class="btn btn-danger" id="confirm-delete-employee-btn">Eliminar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Employees Modal -->
+    <div id="import-employees-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Importar Empleados</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="import-form">
+                    <div class="form-group">
+                        <label for="import-file">Selecciona un archivo CSV o Excel</label>
+                        <input type="file" id="import-file" name="import-file" class="form-control" accept=".csv, .xlsx, .xls">
+                    </div>
+                    
+                    <div class="template-download">
+                        <p>Descarga la plantilla para importar empleados:</p>
+                        <button type="button" id="download-template-btn" class="btn btn-secondary">
+                            <i class="fas fa-download"></i> Descargar Plantilla
+                        </button>
+                    </div>
+                    
+                    <div class="form-group form-buttons">
+                        <button type="button" class="btn btn-secondary cancel-modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary" id="confirm-import-btn">Importar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loading-indicator" style="display: none;">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Alert Messages -->
+    <div id="error-alert" class="alert-message error-message" style="display: none;"></div>
+    <div id="success-alert" class="alert-message success-message" style="display: none;"></div>
+
+    <!-- Firebase Scripts -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    
+    <!-- External Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <!-- Custom Scripts -->
+    <script src="../../js/firebase-config.js"></script>
+    <script src="../../js/auth.js"></script>
+    <script src="../../js/coordinator/employees.js"></script>
+</body>
+</html>

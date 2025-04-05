@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administración de Usuarios - Administrador</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+    <link rel="stylesheet" href="../../css/admin.css">
+    <link rel="icon" type="image/x-icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+    <div class="admin-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <img src="../../assets/img/logo-small.png" alt="Grupo Avika Logo">
+                <h3>Grupo Avika</h3>
+            </div>
+            <div class="sidebar-menu">
+                <ul>
+                    <li>
+                        <a href="dashboard.html">
+                            <i class="fas fa-tachometer-alt"></i> Dashboard
+                        </a>
+                    </li>
+                    <li>
+                        <a href="menu.html">
+                            <i class="fas fa-utensils"></i> Menú
+                        </a>
+                    </li>
+                    <li>
+                        <a href="confirmations.html">
+                            <i class="fas fa-clipboard-check"></i> Confirmaciones
+                        </a>
+                    </li>
+                    <li>
+                        <a href="users.html" class="active">
+                            <i class="fas fa-users-cog"></i> Usuarios
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" id="logout-btn">
+                            <i class="fas fa-sign-out-alt"></i> Cerrar sesión
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="content-header">
+                <h2>Administración de Usuarios</h2>
+                <div class="user-info">
+                    <span id="user-name">Administrador</span>
+                </div>
+            </div>
+
+            <!-- Create User Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>Crear Nuevo Coordinador</h3>
+                </div>
+                <div class="card-body">
+                    <form id="create-coordinator-form">
+                        <div class="form-group">
+                            <label for="coordinator-name">Nombre completo</label>
+                            <input type="text" id="coordinator-name" class="form-control" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="coordinator-email">Correo electrónico</label>
+                            <input type="email" id="coordinator-email" class="form-control" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="coordinator-password">Contraseña</label>
+                            <input type="password" id="coordinator-password" class="form-control" required>
+                            <small class="form-text">La contraseña debe tener al menos 8 caracteres, incluyendo una letra mayúscula, una minúscula y un número.</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="coordinator-branch">Sucursal / Departamento</label>
+                            <select id="coordinator-branch" class="form-control" required>
+                                <option value="">Seleccionar sucursal</option>
+                                <option value="Fuentes">Fuentes</option>
+                                <option value="Delicias">Delicias</option>
+                                <option value="Centenario">Centenario</option>
+                                <option value="Ishinoka">Ishinoka</option>
+                                <option value="Matriz">Matriz</option>
+                                <option value="Cedis">Cedis</option>
+                                <option value="Coorporativo">Coorporativo</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <button type="submit" class="btn btn-primary" id="create-coordinator-btn">
+                                <i class="fas fa-user-plus"></i> Crear Coordinador
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Users List Card -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h3>Coordinadores Existentes</h3>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="data-table" id="coordinators-table">
+                            <thead>
+                                <tr>
+                                    <th>Nombre</th>
+                                    <th>Correo electrónico</th>
+                                    <th>Sucursal</th>
+                                    <th>Fecha de Creación</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="coordinators-table-body">
+                                <tr>
+                                    <td colspan="5" class="text-center">Cargando coordinadores...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Reset Password Modal -->
+    <div id="reset-password-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Reiniciar Contraseña</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>¿Estás seguro de que deseas reiniciar la contraseña para <strong id="reset-user-name"></strong>?</p>
+                <form id="reset-password-form">
+                    <input type="hidden" id="reset-user-id">
+                    <div class="form-group">
+                        <label for="new-password">Nueva contraseña</label>
+                        <input type="password" id="new-password" class="form-control" required>
+                    </div>
+                    
+                    <div class="form-group form-buttons">
+                        <button type="button" class="btn btn-secondary cancel-modal">Cancelar</button>
+                        <button type="submit" class="btn btn-warning" id="confirm-reset-password-btn">Reiniciar Contraseña</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Delete User Modal -->
+    <div id="delete-user-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Eliminar Coordinador</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>¿Estás seguro de que deseas eliminar al coordinador <strong id="delete-user-name"></strong>?</p>
+                <p class="warning-text">Esta acción no se puede deshacer. Todos los datos relacionados con este coordinador serán eliminados.</p>
+                
+                <div class="form-group form-buttons">
+                    <button type="button" class="btn btn-secondary cancel-modal">Cancelar</button>
+                    <button type="button" class="btn btn-danger" id="confirm-delete-user-btn">Eliminar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Loading Indicator -->
+    <div id="loading-indicator" style="display: none;">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Alert Messages -->
+    <div id="error-alert" class="alert-message error-message" style="display: none;"></div>
+    <div id="success-alert" class="alert-message success-message" style="display: none;"></div>
+
+    <!-- Firebase Scripts -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    
+    <!-- Custom Scripts -->
+    <script src="../../js/firebase-config.js"></script>
+    <script src="../../js/auth.js"></script>
+    <script src="../../js/admin/users.js"></script>
+</body>
+</html>
