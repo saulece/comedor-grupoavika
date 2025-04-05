@@ -22,10 +22,9 @@ document.addEventListener('DOMContentLoaded', () => {
 let currentWeek = getMonday(new Date()); // Default to current week
 
 // Days of the week in Spanish
-const DAYS = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes'];
-const DAYS_DISPLAY = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
-
-// Initialize week selector
+// Days of the week in Spanish
+const DAYS = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sabado', 'domingo'];
+const DAYS_DISPLAY = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 function initializeWeekSelector() {
     const prevWeekBtn = document.getElementById('prev-week-btn');
     const nextWeekBtn = document.getElementById('next-week-btn');

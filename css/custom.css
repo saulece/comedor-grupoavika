@@ -261,3 +261,39 @@
     border-left: 4px solid #17a2b8;
     color: #0c5460;
 }
+/* Mejoras para las pestañas del menú con fin de semana */
+.days-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.day-tab {
+    flex: 0 0 auto;
+    min-width: 100px;
+    text-align: center;
+}
+
+@media (max-width: 768px) {
+    .day-tab {
+        flex: 0 0 33.333%;
+        min-width: auto;
+    }
+}
+
+@media (max-width: 576px) {
+    .day-tab {
+        flex: 0 0 50%;
+    }
+}
+/* Estilo para el indicador del día de la semana */
+.day-of-week {
+    background-color: #3498db;
+    color: white;
+    padding: 4px 10px;
+    border-radius: 4px;
+    margin-top: 8px;
+    display: inline-block;
+    font-weight: 500;
+    box-shadow: 0 2px 5px rgba(52, 152, 219, 0.3);
+}

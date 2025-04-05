@@ -89,6 +89,9 @@ function isValidDateString(dateString) {
 /**
  * Initialize date picker with appropriate constraints
  */
+/**
+ * Initialize date picker with appropriate constraints
+ */
 function initializeDatePickers() {
     const datePicker = document.getElementById('confirmation-date');
     
@@ -100,9 +103,9 @@ function initializeDatePickers() {
         // Set min to today
         datePicker.min = formatDateInput(today);
         
-        // Set max to 7 days from now
+        // Set max to 14 days from now (aumentado a 14 días para dar más flexibilidad)
         const maxDate = new Date();
-        maxDate.setDate(maxDate.getDate() + 7);
+        maxDate.setDate(maxDate.getDate() + 14);
         datePicker.max = formatDateInput(maxDate);
         
         // Add change event listener to load existing confirmations
@@ -113,10 +116,43 @@ function initializeDatePickers() {
         console.warn('Date picker element not found');
     }
 }
-
+/**
+ * Display day of week for selected date
+ * @param {string} dateString - Date in YYYY-MM-DD format
+ */
+function showDayOfWeek(dateString) {
+    if (!dateString || !isValidDateString(dateString)) return;
+    
+    const date = new Date(dateString);
+    const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    const dayOfWeek = days[date.getDay()];
+    
+    const dayDisplay = document.getElementById('day-of-week-display');
+    if (dayDisplay) {
+        dayDisplay.textContent = dayOfWeek;
+    } else {
+        // Create the element if it doesn't exist
+        const dateContainer = document.querySelector('.date-selector');
+        if (dateContainer) {
+            const newDisplay = document.createElement('div');
+            newDisplay.id = 'day-of-week-display';
+            newDisplay.className = 'day-of-week';
+            newDisplay.textContent = dayOfWeek;
+            dateContainer.appendChild(newDisplay);
+        }
+    }
+}
 /**
  * Setup event listeners for interactive elements
  */
+// Add change event listener to load existing confirmations
+datePicker.addEventListener('change', () => {
+    loadExistingConfirmations(datePicker.value);
+    showDayOfWeek(datePicker.value);
+});
+
+// También muestra el día actual al cargar la página
+showDayOfWeek(formatDateInput(new Date()));
 function setupEventListeners() {
     // Confirmation form submission
     const confirmationForm = document.getElementById('confirmation-form');

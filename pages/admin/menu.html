@@ -87,99 +87,68 @@
             </div>
 
             <!-- Days Tabs -->
-            <div class="days-tabs">
-                <button class="day-tab active" data-day="monday">Lunes</button>
-                <button class="day-tab" data-day="tuesday">Martes</button>
-                <button class="day-tab" data-day="wednesday">Miércoles</button>
-                <button class="day-tab" data-day="thursday">Jueves</button>
-                <button class="day-tab" data-day="friday">Viernes</button>
-            </div>
+            <!-- Days Tabs -->
+<div class="days-tabs">
+    <button class="day-tab active" data-day="lunes">Lunes</button>
+    <button class="day-tab" data-day="martes">Martes</button>
+    <button class="day-tab" data-day="miercoles">Miércoles</button>
+    <button class="day-tab" data-day="jueves">Jueves</button>
+    <button class="day-tab" data-day="viernes">Viernes</button>
+    <button class="day-tab" data-day="sabado">Sábado</button>
+    <button class="day-tab" data-day="domingo">Domingo</button>
+</div>
 
             <!-- Menu Content -->
-            <div class="menu-content">
-                <div class="day-content active" id="monday-content">
-                    <div class="menu-items-container">
-                        <div class="menu-items-header">
-                            <h3>Menú del Lunes</h3>
-                            <button class="btn btn-icon add-menu-item" data-day="monday">
-                                <i class="fas fa-plus"></i>
-                            </button>
-                        </div>
-                        <div id="monday-items" class="menu-items-list">
-                            <div class="empty-state">
-                                <p>No hay elementos en el menú para este día</p>
-                                <button class="btn btn-primary add-menu-item" data-day="monday">Agregar Elemento</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="day-content" id="tuesday-content">
-                    <div class="menu-items-container">
-                        <div class="menu-items-header">
-                            <h3>Menú del Martes</h3>
-                            <button class="btn btn-icon add-menu-item" data-day="tuesday">
-                                <i class="fas fa-plus"></i>
-                            </button>
-                        </div>
-                        <div id="tuesday-items" class="menu-items-list">
-                            <div class="empty-state">
-                                <p>No hay elementos en el menú para este día</p>
-                                <button class="btn btn-primary add-menu-item" data-day="tuesday">Agregar Elemento</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="day-content" id="wednesday-content">
-                    <div class="menu-items-container">
-                        <div class="menu-items-header">
-                            <h3>Menú del Miércoles</h3>
-                            <button class="btn btn-icon add-menu-item" data-day="wednesday">
-                                <i class="fas fa-plus"></i>
-                            </button>
-                        </div>
-                        <div id="wednesday-items" class="menu-items-list">
-                            <div class="empty-state">
-                                <p>No hay elementos en el menú para este día</p>
-                                <button class="btn btn-primary add-menu-item" data-day="wednesday">Agregar Elemento</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="day-content" id="thursday-content">
-                    <div class="menu-items-container">
-                        <div class="menu-items-header">
-                            <h3>Menú del Jueves</h3>
-                            <button class="btn btn-icon add-menu-item" data-day="thursday">
-                                <i class="fas fa-plus"></i>
-                            </button>
-                        </div>
-                        <div id="thursday-items" class="menu-items-list">
-                            <div class="empty-state">
-                                <p>No hay elementos en el menú para este día</p>
-                                <button class="btn btn-primary add-menu-item" data-day="thursday">Agregar Elemento</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="day-content" id="friday-content">
-                    <div class="menu-items-container">
-                        <div class="menu-items-header">
-                            <h3>Menú del Viernes</h3>
-                            <button class="btn btn-icon add-menu-item" data-day="friday">
-                                <i class="fas fa-plus"></i>
-                            </button>
-                        </div>
-                        <div id="friday-items" class="menu-items-list">
-                            <div class="empty-state">
-                                <p>No hay elementos en el menú para este día</p>
-                                <button class="btn btn-primary add-menu-item" data-day="friday">Agregar Elemento</button>
-                            </div>
-                        </div>
-                    </div>
+            <!-- Menu Content -->
+<div class="menu-content">
+    <div class="day-content active" id="lunes-content">
+        <!-- ... (contenido existente) ... -->
+    </div>
+    <div class="day-content" id="martes-content">
+        <!-- ... (contenido existente) ... -->
+    </div>
+    <div class="day-content" id="miercoles-content">
+        <!-- ... (contenido existente) ... -->
+    </div>
+    <div class="day-content" id="jueves-content">
+        <!-- ... (contenido existente) ... -->
+    </div>
+    <div class="day-content" id="viernes-content">
+        <!-- ... (contenido existente) ... -->
+    </div>
+    <div class="day-content" id="sabado-content">
+        <div class="menu-items-container">
+            <div class="menu-items-header">
+                <h3>Menú del Sábado</h3>
+                <button class="btn btn-icon add-menu-item" data-day="sabado">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
+            <div id="sabado-items" class="menu-items-list">
+                <div class="empty-state">
+                    <p>No hay elementos en el menú para este día</p>
+                    <button class="btn btn-primary add-menu-item" data-day="sabado">Agregar Elemento</button>
                 </div>
             </div>
         </div>
     </div>
+    <div class="day-content" id="domingo-content">
+        <div class="menu-items-container">
+            <div class="menu-items-header">
+                <h3>Menú del Domingo</h3>
+                <button class="btn btn-icon add-menu-item" data-day="domingo">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
+            <div id="domingo-items" class="menu-items-list">
+                <div class="empty-state">
+                    <p>No hay elementos en el menú para este día</p>
+                    <button class="btn btn-primary add-menu-item" data-day="domingo">Agregar Elemento</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
     <!-- Menu Item Modal -->
     <div id="menu-item-modal" class="modal">
