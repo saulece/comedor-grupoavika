@@ -1,9 +1,5 @@
 // Admin Menu Management for Comedor Grupo Avika
 
-// Collection references
-const menuCollection = db.collection("menus");
-const userCollection = db.collection("users");
-
 // Ensure admin only access
 document.addEventListener('DOMContentLoaded', () => {
     if (!checkAuth(USER_ROLES.ADMIN)) {
