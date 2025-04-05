@@ -1,7 +1,7 @@
 // Admin Menu Management for Comedor Grupo Avika
 
 // Firebase references
-const db = firebase.firestore();
+// Use the db already defined in firebase-config.js
 const menuCollection = db.collection('menus');
 
 // Global variables and constants
