@@ -85,7 +85,7 @@ function initializeMenuForm() {
 
 // Add a new menu item field
 function addMenuItemField() {
-    const menuItemsContainer = document.getElementById('menu-items-container');
+    const menuItemsContainer = document.querySelector('.day-content.active .menu-items-container');
     const menuItemIndex = menuItemsContainer.children.length;
     
     const menuItem = document.createElement('div');
@@ -141,7 +141,7 @@ function updateMenuItemNumbers() {
 // Show menu for the selected day
 function showMenuForDay(day) {
     // Clear menu items
-    const menuItemsContainer = document.getElementById('menu-items-container');
+    const menuItemsContainer = document.querySelector(`.day-content#${day.toLowerCase()}-content .menu-items-list`);
     if (menuItemsContainer) {
         menuItemsContainer.innerHTML = '';
     }
