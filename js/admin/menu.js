@@ -34,7 +34,10 @@ let menuData = {}; // Store menu data by day
 // Initialize day tabs
 function initializeDayTabs() {
     const tabsContainer = document.querySelector('.days-tabs');
-    if (!tabsContainer) return;
+    if (!tabsContainer) {
+        console.warn('Day tabs container not found');
+        return;
+    }
     
     // Clear existing tabs
     tabsContainer.innerHTML = '';
@@ -67,31 +70,46 @@ function initializeDayTabs() {
 
 // Initialize menu form
 function initializeMenuForm() {
+    // Initialize add menu item buttons
     const addMenuItemButtons = document.querySelectorAll('.add-menu-item');
-    if (addMenuItemButtons) {
+    if (addMenuItemButtons && addMenuItemButtons.length > 0) {
         addMenuItemButtons.forEach(button => {
-            button.addEventListener('click', () => {
-                const day = button.getAttribute('data-day');
+            button.addEventListener('click', (e) => {
+                e.preventDefault();
+                const day = button.getAttribute('data-day') || currentDay;
                 addMenuItemField(day);
             });
         });
     }
     
+    // New menu button
     const newMenuButton = document.getElementById('new-menu-btn');
     if (newMenuButton) {
-        newMenuButton.addEventListener('click', showNewMenuModal);
+        newMenuButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            showNewMenuModal();
+        });
     }
     
+    // Import Excel button
     const importExcelButton = document.getElementById('import-excel-btn');
     if (importExcelButton) {
-        importExcelButton.addEventListener('click', showImportExcelModal);
+        importExcelButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            showImportExcelModal();
+        });
     }
     
+    // Publish menu button
     const publishMenuButton = document.getElementById('publish-menu-btn');
     if (publishMenuButton) {
-        publishMenuButton.addEventListener('click', showPublishMenuModal);
+        publishMenuButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            showPublishMenuModal();
+        });
     }
     
+    // Week navigation buttons
     const prevWeekButton = document.getElementById('previous-week');
     if (prevWeekButton) {
         prevWeekButton.addEventListener('click', navigateToPreviousWeek);
@@ -105,9 +123,37 @@ function initializeMenuForm() {
 
 // Add a new menu item field
 function addMenuItemField(day) {
-    const menuItemsContainer = document.querySelector(`.day-content#${day.toLowerCase()}-content .menu-items-container`);
-    const menuItemIndex = menuItemsContainer.children.length;
+    // Get lowercase day if needed for IDs
+    const dayLower = day.toLowerCase();
     
+    // Find the container for this day's menu items
+    let menuItemsContainer;
+    
+    // Try different selectors to find the container
+    const selectors = [
+        `.day-content#${dayLower}-content .menu-items-container`,
+        `#${dayLower}-items`,
+        `#${dayLower}-content .menu-items-list`,
+        `.menu-items-list`
+    ];
+    
+    // Try each selector
+    for (const selector of selectors) {
+        menuItemsContainer = document.querySelector(selector);
+        if (menuItemsContainer) break;
+    }
+    
+    // If still not found, create a fallback container
+    if (!menuItemsContainer) {
+        console.warn(`Menu items container for ${day} not found, using fallback`);
+        // Try to find any container to append to
+        menuItemsContainer = document.querySelector('.menu-content') || document.body;
+    }
+    
+    // Create menu item index
+    const menuItemIndex = menuItemsContainer.querySelectorAll('.menu-item').length;
+    
+    // Create the menu item element
     const menuItem = document.createElement('div');
     menuItem.classList.add('menu-item');
     menuItem.innerHTML = `
@@ -129,6 +175,13 @@ function addMenuItemField(day) {
         </div>
     `;
     
+    // Remove any empty state message
+    const emptyState = menuItemsContainer.querySelector('.empty-state');
+    if (emptyState) {
+        menuItemsContainer.removeChild(emptyState);
+    }
+    
+    // Append the menu item
     menuItemsContainer.appendChild(menuItem);
     
     // Add event listener to remove button
@@ -137,14 +190,16 @@ function addMenuItemField(day) {
         removeButton.addEventListener('click', function() {
             menuItemsContainer.removeChild(menuItem);
             // Update menu item numbers
-            updateMenuItemNumbers();
+            updateMenuItemNumbers(menuItemsContainer);
         });
     }
 }
 
 // Update menu item numbers after removing an item
-function updateMenuItemNumbers() {
-    const menuItems = document.querySelectorAll('.menu-item');
+function updateMenuItemNumbers(container) {
+    if (!container) return;
+    
+    const menuItems = container.querySelectorAll('.menu-item');
     menuItems.forEach((item, index) => {
         const header = item.querySelector('h4');
         if (header) {
@@ -160,14 +215,34 @@ function updateMenuItemNumbers() {
 
 // Show menu for the selected day
 function showMenuForDay(day) {
-    // Clear menu items
-    const menuItemsContainer = document.querySelector(`.day-content#${day.toLowerCase()}-content .menu-items-list`);
-    if (menuItemsContainer) {
-        menuItemsContainer.innerHTML = '';
+    const dayLower = day.toLowerCase();
+    
+    // Try to find the menu items container
+    let menuItemsContainer;
+    const selectors = [
+        `.day-content#${dayLower}-content .menu-items-list`,
+        `#${dayLower}-items`,
+        `.menu-items-list`
+    ];
+    
+    // Try each selector
+    for (const selector of selectors) {
+        menuItemsContainer = document.querySelector(selector);
+        if (menuItemsContainer) break;
     }
     
-    // Load menu items for the selected day
+    // If container not found, show warning and exit
+    if (!menuItemsContainer) {
+        console.warn(`Menu items container for ${day} not found`);
+        return;
+    }
+    
+    // Clear previous items
+    menuItemsContainer.innerHTML = '';
+    
+    // Check if we have menu data for this day
     if (menuData[day] && menuData[day].items && menuData[day].items.length > 0) {
+        // Add each menu item
         menuData[day].items.forEach((item, index) => {
             const menuItem = document.createElement('div');
             menuItem.classList.add('menu-item');
@@ -182,7 +257,7 @@ function showMenuForDay(day) {
                 </div>
                 <div class="form-group">
                     <label for="menu-item-name-${index}">Nombre del plato</label>
-                    <input type="text" id="menu-item-name-${index}" class="form-control menu-item-name" value="${item.name}" required>
+                    <input type="text" id="menu-item-name-${index}" class="form-control menu-item-name" value="${item.name || ''}" required>
                 </div>
                 <div class="form-group">
                     <label for="menu-item-description-${index}">Descripción</label>
@@ -198,22 +273,38 @@ function showMenuForDay(day) {
                 removeButton.addEventListener('click', function() {
                     menuItemsContainer.removeChild(menuItem);
                     // Update menu item numbers
-                    updateMenuItemNumbers();
+                    updateMenuItemNumbers(menuItemsContainer);
                 });
             }
         });
     } else {
-        // Add an empty menu item if no items exist
-        addMenuItemField(day);
+        // Show empty state
+        menuItemsContainer.innerHTML = `
+            <div class="empty-state">
+                <p>No hay elementos en el menú para este día</p>
+                <button class="btn btn-primary add-menu-item" data-day="${dayLower}">Agregar Elemento</button>
+            </div>
+        `;
+        
+        // Add event listener to the new add button
+        const addButton = menuItemsContainer.querySelector('.add-menu-item');
+        if (addButton) {
+            addButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                addMenuItemField(day);
+            });
+        }
     }
 }
 
 // Load current menu for the week
 function loadCurrentMenu() {
     const weekStartStr = formatDate(currentWeekStartDate);
-    const menuHeaderDate = document.getElementById('menu-header-date');
-    if (menuHeaderDate) {
-        menuHeaderDate.textContent = `Semana del ${weekStartStr}`;
+    
+    // Update the week range display
+    const weekRange = document.getElementById('week-range');
+    if (weekRange) {
+        weekRange.textContent = `Semana del ${formatDateDisplay(currentWeekStartDate)}`;
     }
     
     // Reset menu data
@@ -241,8 +332,9 @@ function loadCurrentMenu() {
                 
                 // Set menu data
                 DAYS.forEach(day => {
-                    if (data[day.toLowerCase()]) {
-                        menuData[day] = data[day.toLowerCase()];
+                    const dayLower = day.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                    if (data[dayLower]) {
+                        menuData[day] = data[dayLower];
                     }
                 });
                 
@@ -274,41 +366,52 @@ async function saveMenu() {
     // Show loading state
     showLoadingState(true);
     
-    // Get menu items
-    const menuItems = [];
-    const menuItemElements = document.querySelectorAll('.menu-item');
-    
-    menuItemElements.forEach(item => {
-        const nameInput = item.querySelector('.menu-item-name');
-        const descriptionInput = item.querySelector('.menu-item-description');
-        
-        if (nameInput && nameInput.value.trim() !== '') {
-            menuItems.push({
-                name: nameInput.value.trim(),
-                description: descriptionInput ? descriptionInput.value.trim() : ''
-            });
-        }
-    });
-    
-    // Update menu data for current day
-    menuData[currentDay] = {
-        items: menuItems
-    };
-    
-    // Prepare data for Firestore
-    const weekStartStr = formatDate(currentWeekStartDate);
-    const menuDoc = {
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    };
-    
-    // Add menu data for each day
-    DAYS.forEach(day => {
-        if (menuData[day] && menuData[day].items) {
-            menuDoc[day.toLowerCase()] = menuData[day];
-        }
-    });
-    
     try {
+        // Get current day's menu items
+        const dayLower = currentDay.toLowerCase();
+        const menuItemsContainer = document.querySelector(`#${dayLower}-items`) || 
+                                   document.querySelector(`.day-content#${dayLower}-content .menu-items-list`) ||
+                                   document.querySelector('.menu-items-list');
+        
+        if (!menuItemsContainer) {
+            throw new Error(`Menu items container for ${currentDay} not found`);
+        }
+        
+        // Get menu items
+        const menuItems = [];
+        const menuItemElements = menuItemsContainer.querySelectorAll('.menu-item');
+        
+        menuItemElements.forEach(item => {
+            const nameInput = item.querySelector('.menu-item-name');
+            const descriptionInput = item.querySelector('.menu-item-description');
+            
+            if (nameInput && nameInput.value.trim() !== '') {
+                menuItems.push({
+                    name: nameInput.value.trim(),
+                    description: descriptionInput ? descriptionInput.value.trim() : ''
+                });
+            }
+        });
+        
+        // Update menu data for current day
+        menuData[currentDay] = {
+            items: menuItems
+        };
+        
+        // Prepare data for Firestore
+        const weekStartStr = formatDate(currentWeekStartDate);
+        const menuDoc = {
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        
+        // Add menu data for each day
+        DAYS.forEach(day => {
+            const dayKey = day.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            if (menuData[day] && menuData[day].items) {
+                menuDoc[dayKey] = menuData[day];
+            }
+        });
+        
         // Update or create menu document
         await menuCollection.doc(weekStartStr).set(menuDoc, { merge: true });
         
@@ -317,10 +420,10 @@ async function saveMenu() {
     } catch (error) {
         console.error("Error saving menu:", error);
         showErrorMessage("Error al guardar el menú. Por favor intente de nuevo.");
+    } finally {
+        // Hide loading state
+        showLoadingState(false);
     }
-    
-    // Hide loading state
-    showLoadingState(false);
 }
 
 // Publish menu
@@ -337,6 +440,9 @@ async function publishMenu() {
     try {
         const weekStartStr = formatDate(currentWeekStartDate);
         
+        // Save the current menu first to ensure all changes are saved
+        await saveMenu();
+        
         // Update menu status to published
         await menuCollection.doc(weekStartStr).update({
             status: 'published',
@@ -351,15 +457,26 @@ async function publishMenu() {
     } catch (error) {
         console.error("Error publishing menu:", error);
         showErrorMessage("Error al publicar el menú. Por favor intente de nuevo.");
+    } finally {
+        // Hide loading state
+        showLoadingState(false);
     }
-    
-    // Hide loading state
-    showLoadingState(false);
 }
 
 // Validate menu form
 function validateMenuForm() {
-    const menuItems = document.querySelectorAll('.menu-item');
+    // Find the current day's menu items container
+    const dayLower = currentDay.toLowerCase();
+    const menuItemsContainer = document.querySelector(`#${dayLower}-items`) || 
+                              document.querySelector(`.day-content#${dayLower}-content .menu-items-list`) ||
+                              document.querySelector('.menu-items-list');
+    
+    if (!menuItemsContainer) {
+        showErrorMessage(`No se encontró el contenedor de menú para ${currentDay}`);
+        return false;
+    }
+    
+    const menuItems = menuItemsContainer.querySelectorAll('.menu-item');
     
     if (menuItems.length === 0) {
         showErrorMessage("Debe agregar al menos un plato al menú.");
@@ -372,9 +489,11 @@ function validateMenuForm() {
         const nameInput = item.querySelector('.menu-item-name');
         
         if (!nameInput || nameInput.value.trim() === '') {
-            nameInput.classList.add('is-invalid');
+            if (nameInput) {
+                nameInput.classList.add('is-invalid');
+            }
             valid = false;
-        } else {
+        } else if (nameInput) {
             nameInput.classList.remove('is-invalid');
         }
     });
@@ -400,22 +519,26 @@ function validateAllDays() {
 // Update publish status UI
 function updatePublishStatus(isPublished) {
     const publishBtn = document.getElementById('publish-menu-btn');
-    const publishStatus = document.getElementById('publish-status');
+    const statusBadge = document.getElementById('menu-status-badge');
+    const statusText = document.getElementById('menu-status-text');
     
-    if (publishBtn && publishStatus) {
-        if (isPublished) {
-            publishBtn.disabled = true;
-            publishBtn.textContent = 'Menú Publicado';
-            publishStatus.textContent = 'Publicado';
-            publishStatus.classList.remove('text-warning');
-            publishStatus.classList.add('text-success');
-        } else {
-            publishBtn.disabled = false;
-            publishBtn.textContent = 'Publicar Menú';
-            publishStatus.textContent = 'Borrador';
-            publishStatus.classList.remove('text-success');
-            publishStatus.classList.add('text-warning');
-        }
+    if (publishBtn) {
+        publishBtn.disabled = isPublished;
+        publishBtn.innerHTML = isPublished ? 
+            '<i class="fas fa-check"></i> Menú Publicado' : 
+            '<i class="fas fa-upload"></i> Publicar Menú';
+    }
+    
+    if (statusBadge) {
+        statusBadge.textContent = isPublished ? 'Publicado' : 'Borrador';
+        statusBadge.className = 'badge';
+        statusBadge.classList.add(isPublished ? 'badge-success' : 'badge-warning');
+    }
+    
+    if (statusText) {
+        statusText.textContent = isPublished ? 
+            'Este menú está publicado y visible para los coordinadores' : 
+            'Este menú está en borrador y no es visible para los coordinadores';
     }
 }
 
@@ -489,65 +612,15 @@ function handleExcelFile(event) {
     }, 1000);
 }
 
-// Get Monday of the current week
-function getMonday(date) {
-    const day = date.getDay();
-    const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Sunday
-    return new Date(date.setDate(diff));
-}
-
-// Format date as YYYY-MM-DD
-function formatDate(date) {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-}
-
-// Show loading state
-function showLoadingState(isLoading) {
-    const loadingIndicator = document.getElementById('loading-indicator');
-    if (loadingIndicator) {
-        loadingIndicator.style.display = isLoading ? 'block' : 'none';
-    }
-    
-    // Disable buttons while loading
-    const buttons = document.querySelectorAll('button');
-    buttons.forEach(button => {
-        button.disabled = isLoading;
-    });
-}
-
-// Show error message
-function showErrorMessage(message) {
-    const errorAlert = document.getElementById('error-alert');
-    if (errorAlert) {
-        errorAlert.textContent = message;
-        errorAlert.style.display = 'block';
-        
-        // Hide after 5 seconds
-        setTimeout(() => {
-            errorAlert.style.display = 'none';
-        }, 5000);
-    }
-}
-
-// Show success message
-function showSuccessMessage(message) {
-    const successAlert = document.getElementById('success-alert');
-    if (successAlert) {
-        successAlert.textContent = message;
-        successAlert.style.display = 'block';
-        
-        // Hide after 5 seconds
-        setTimeout(() => {
-            successAlert.style.display = 'none';
-        }, 5000);
-    }
-}
-
 // Show New Menu Modal
 function showNewMenuModal() {
+    // Get the modal element
+    const modal = document.getElementById('new-menu-modal');
+    if (!modal) {
+        console.warn('New menu modal not found');
+        return;
+    }
+    
     // Reset form if needed
     const newMenuForm = document.getElementById('new-menu-form');
     if (newMenuForm) {
@@ -572,16 +645,18 @@ function showNewMenuModal() {
         });
     }
     
-    // Add event listener to create new menu form
+    // Set up the form submission handler
     if (newMenuForm) {
-        newMenuForm.addEventListener('submit', createNewMenu);
+        // Remove previous event listeners
+        const newForm = newMenuForm.cloneNode(true);
+        newMenuForm.parentNode.replaceChild(newForm, newMenuForm);
+        
+        // Add new event listener
+        newForm.addEventListener('submit', createNewMenu);
     }
     
     // Show the modal
-    const modal = document.getElementById('new-menu-modal');
-    if (modal) {
-        modal.style.display = 'block';
-    }
+    modal.style.display = 'block';
 }
 
 // Create new menu handler
@@ -613,10 +688,7 @@ async function createNewMenu(e) {
         const weekRange = document.getElementById('week-range');
         if (weekRange) {
             const weekStartStr = formatDate(currentWeekStartDate);
-            const weekEndDate = new Date(currentWeekStartDate);
-            weekEndDate.setDate(weekEndDate.getDate() + 4); // Friday is 4 days after Monday
-            const weekEndStr = formatDate(weekEndDate);
-            weekRange.textContent = `Semana del ${weekStartStr} al ${weekEndStr}`;
+            weekRange.textContent = `Semana del ${formatDateDisplay(currentWeekStartDate)}`;
         }
         
         // Update publish status
@@ -642,23 +714,32 @@ async function createNewMenu(e) {
 
 // Show Import Excel Modal
 function showImportExcelModal() {
+    // Get the modal element
+    const modal = document.getElementById('import-excel-modal');
+    if (!modal) {
+        console.warn('Import Excel modal not found');
+        return;
+    }
+    
     // Reset any previous file selection
     const fileInput = document.getElementById('excel-file');
     if (fileInput) {
         fileInput.value = '';
     }
     
-    // Add event listener to the form
+    // Set up the form submission handler
     const importForm = document.getElementById('import-excel-form');
     if (importForm) {
-        importForm.addEventListener('submit', importExcelFile);
+        // Remove previous event listeners
+        const newForm = importForm.cloneNode(true);
+        importForm.parentNode.replaceChild(newForm, importForm);
+        
+        // Add new event listener
+        newForm.addEventListener('submit', importExcelFile);
     }
     
     // Show the modal
-    const modal = document.getElementById('import-excel-modal');
-    if (modal) {
-        modal.style.display = 'block';
-    }
+    modal.style.display = 'block';
 }
 
 // Import Excel file handler
@@ -674,46 +755,14 @@ async function importExcelFile(e) {
     try {
         showLoadingState(true);
         
-        const file = fileInput.files[0];
+        // Use our handleExcelFile function for consistency
+        handleExcelFile({target: fileInput});
         
-        // Read Excel file
-        const reader = new FileReader();
-        reader.onload = async function(e) {
-            try {
-                const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, { type: 'array' });
-                
-                // Assuming first sheet contains the menu
-                const firstSheetName = workbook.SheetNames[0];
-                const worksheet = workbook.Sheets[firstSheetName];
-                
-                // Convert to JSON
-                const jsonData = XLSX.utils.sheet_to_json(worksheet);
-                
-                // Process Excel data to update menu
-                await processExcelData(jsonData);
-                
-                // Close modal
-                const modal = document.getElementById('import-excel-modal');
-                if (modal) {
-                    modal.style.display = 'none';
-                }
-                
-                showSuccessMessage('Menú importado correctamente.');
-            } catch (error) {
-                console.error('Error processing Excel file:', error);
-                showErrorMessage('Error al procesar archivo Excel: ' + error.message);
-            } finally {
-                showLoadingState(false);
-            }
-        };
-        
-        reader.onerror = function() {
-            showErrorMessage('Error al leer el archivo Excel.');
-            showLoadingState(false);
-        };
-        
-        reader.readAsArrayBuffer(file);
+        // Close modal
+        const modal = document.getElementById('import-excel-modal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
     } catch (error) {
         console.error('Error importing Excel file:', error);
         showErrorMessage('Error al importar archivo Excel: ' + error.message);
@@ -721,48 +770,15 @@ async function importExcelFile(e) {
     }
 }
 
-// Process Excel data to update menu
-async function processExcelData(jsonData) {
-    // This is a placeholder function - you need to adapt this to your Excel structure
-    // Example: if Excel has columns for Day, Item Name, Description, etc.
-    
-    // Reset menu data
-    menuData = {};
-    DAYS.forEach(day => {
-        menuData[day] = { items: [] };
-    });
-    
-    // Process each row in the Excel file
-    for (const row of jsonData) {
-        // Example mapping - adjust according to your Excel structure
-        const day = row.Dia; // Assuming "Dia" column in Excel
-        const itemName = row.Nombre; // Assuming "Nombre" column
-        const itemDescription = row.Descripcion; // Assuming "Descripcion" column
-        const itemType = row.Tipo; // Assuming "Tipo" column
-        
-        // Find the corresponding day in your DAYS array
-        const matchingDay = DAYS.find(d => d.toLowerCase() === day.toLowerCase());
-        
-        if (matchingDay && itemName) {
-            // Add item to the menu data
-            if (!menuData[matchingDay].items) {
-                menuData[matchingDay].items = [];
-            }
-            
-            menuData[matchingDay].items.push({
-                name: itemName,
-                description: itemDescription || '',
-                type: itemType || 'main'
-            });
-        }
-    }
-    
-    // Update UI
-    showMenuForDay(currentDay);
-}
-
 // Show Publish Menu Modal
 function showPublishMenuModal() {
+    // Get the modal element
+    const modal = document.getElementById('publish-menu-modal');
+    if (!modal) {
+        console.warn('Publish menu modal not found');
+        return;
+    }
+    
     // Check if there are menu items in all days
     const isValid = validateAllDays();
     
@@ -779,17 +795,19 @@ function showPublishMenuModal() {
             validationErrors.style.display = 'none';
         }
         
-        // Add event listener to confirm button
+        // Set up confirm button
         const confirmButton = document.getElementById('confirm-publish-menu-btn');
         if (confirmButton) {
-            confirmButton.onclick = publishMenu;
+            // Remove previous event listeners
+            const newButton = confirmButton.cloneNode(true);
+            confirmButton.parentNode.replaceChild(newButton, confirmButton);
+            
+            // Add new event listener
+            newButton.addEventListener('click', publishMenu);
         }
         
         // Show the modal
-        const modal = document.getElementById('publish-menu-modal');
-        if (modal) {
-            modal.style.display = 'block';
-        }
+        modal.style.display = 'block';
     }
 }
 
@@ -807,11 +825,7 @@ function navigateToPreviousWeek() {
     // Update UI and load menu
     const weekRange = document.getElementById('week-range');
     if (weekRange) {
-        const weekStartStr = formatDate(currentWeekStartDate);
-        const weekEndDate = new Date(currentWeekStartDate);
-        weekEndDate.setDate(weekEndDate.getDate() + 4); // Friday is 4 days after Monday
-        const weekEndStr = formatDate(weekEndDate);
-        weekRange.textContent = `Semana del ${weekStartStr} al ${weekEndStr}`;
+        weekRange.textContent = `Semana del ${formatDateDisplay(currentWeekStartDate)}`;
     }
     
     // Load menu for the new week
@@ -832,13 +846,118 @@ function navigateToNextWeek() {
     // Update UI and load menu
     const weekRange = document.getElementById('week-range');
     if (weekRange) {
-        const weekStartStr = formatDate(currentWeekStartDate);
-        const weekEndDate = new Date(currentWeekStartDate);
-        weekEndDate.setDate(weekEndDate.getDate() + 4); // Friday is 4 days after Monday
-        const weekEndStr = formatDate(weekEndDate);
-        weekRange.textContent = `Semana del ${weekStartStr} al ${weekEndStr}`;
+        weekRange.textContent = `Semana del ${formatDateDisplay(currentWeekStartDate)}`;
     }
     
     // Load menu for the new week
     loadCurrentMenu();
-} 
+}
+
+// Get Monday of the current week
+function getMonday(date) {
+    const day = date.getDay();
+    const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Sunday
+    return new Date(date.setDate(diff));
+}
+
+// Format date as YYYY-MM-DD
+function formatDate(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+// Format date for display (DD/MM/YYYY)
+function formatDateDisplay(date) {
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+}
+
+// Show loading state
+// Show loading state
+function showLoadingState(isLoading) {
+    const loadingIndicator = document.getElementById('loading-indicator');
+    if (loadingIndicator) {
+        loadingIndicator.style.display = isLoading ? 'block' : 'none';
+    }
+    
+    // Optional: Disable buttons while loading
+    if (isLoading) {
+        document.querySelectorAll('button:not(.close-modal)').forEach(button => {
+            button.disabled = true;
+        });
+    } else {
+        document.querySelectorAll('button').forEach(button => {
+            // Only enable non-publish buttons if menu is not published
+            if (button.id !== 'publish-menu-btn' || !menuData.status || menuData.status !== 'published') {
+                button.disabled = false;
+            }
+        });
+    }
+}
+
+// Show error message
+function showErrorMessage(message) {
+    const errorAlert = document.getElementById('error-alert');
+    if (errorAlert) {
+        errorAlert.textContent = message;
+        errorAlert.style.display = 'block';
+        
+        // Hide after 5 seconds
+        setTimeout(() => {
+            errorAlert.style.display = 'none';
+        }, 5000);
+    } else {
+        // Fallback to alert if element not found
+        alert("Error: " + message);
+    }
+}
+
+// Show success message
+function showSuccessMessage(message) {
+    const successAlert = document.getElementById('success-alert');
+    if (successAlert) {
+        successAlert.textContent = message;
+        successAlert.style.display = 'block';
+        
+        // Hide after 5 seconds
+        setTimeout(() => {
+            successAlert.style.display = 'none';
+        }, 5000);
+    } else {
+        // Fallback to alert if element not found
+        alert("Éxito: " + message);
+    }
+}
+
+// Handle modal close
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('close-modal') || 
+        e.target.classList.contains('cancel-modal')) {
+        // Find the parent modal
+        const modal = e.target.closest('.modal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
+});
+
+// Initialize modal close buttons
+document.querySelectorAll('.close-modal, .cancel-modal').forEach(button => {
+    button.addEventListener('click', function() {
+        const modal = this.closest('.modal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    });
+});
+
+// Close modal when clicking outside
+window.addEventListener('click', function(e) {
+    if (e.target.classList.contains('modal')) {
+        e.target.style.display = 'none';
+    }
+});
