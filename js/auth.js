@@ -1,7 +1,22 @@
-// Authentication module for Comedor Grupo Avika - Firebase v8 approach
+// Authentication module for Comedor Grupo Avika - Firebase v9 approach
+
+// Import Firebase services
+import { 
+    signInWithEmailAndPassword,
+    signOut,
+    onAuthStateChanged 
+} from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
+
+import {
+    doc,
+    getDoc,
+    collection
+} from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+
+import { auth, db } from './firebase-config.js';
 
 // User Roles
-const USER_ROLES = {
+export const USER_ROLES = {
     ADMIN: 'admin',
     COORDINATOR: 'coordinator'
 };
@@ -11,7 +26,7 @@ const USER_ROLES = {
  * @param {string} requiredRole - Role required for access
  * @returns {boolean} - Whether user has access
  */
-function checkAuth(requiredRole) {
+export function checkAuth(requiredRole) {
     const userRole = sessionStorage.getItem("userRole");
     const userId = sessionStorage.getItem("userId");
     
@@ -33,7 +48,7 @@ function checkAuth(requiredRole) {
  * Redirect user based on their role
  * @param {string} role - User role
  */
-function redirectBasedOnRole(role) {
+export function redirectBasedOnRole(role) {
     switch (role) {
         case USER_ROLES.ADMIN:
             window.location.href = "pages/admin/dashboard.html";
@@ -44,7 +59,7 @@ function redirectBasedOnRole(role) {
         default:
             showError("Rol de usuario no reconocido");
             // Sign out if role is invalid
-            firebase.auth().signOut();
+            signOut(auth);
     }
 }
 
@@ -68,11 +83,12 @@ export async function loginUser(email, password) {
         if (loginLoader) loginLoader.style.display = "block";
         
         // Attempt login
-        const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
         
         // Get additional user information from Firestore
-        const userDoc = await firebase.firestore().collection("users").doc(user.uid).get();
+        const userDocRef = doc(db, "users", user.uid);
+        const userDoc = await getDoc(userDocRef);
         
         if (userDoc.exists()) {
             const userData = userDoc.data();
@@ -157,7 +173,7 @@ export function clearError() {
  * Log out current user
  */
 export function logout() {
-    firebase.auth().signOut()
+    signOut(auth)
         .then(() => {
             // Clear session storage
             sessionStorage.clear();
@@ -169,12 +185,13 @@ export function logout() {
         });
 }
 
-// Check if user is already logged in when page loads
-firebase.auth().onAuthStateChanged(async (user) => {
+// Initialize auth state listener
+onAuthStateChanged(auth, async (user) => {
     if (user) {
         try {
             // Get user data including role
-            const userDoc = await firebase.firestore().collection("users").doc(user.uid).get();
+            const userDocRef = doc(db, "users", user.uid);
+            const userDoc = await getDoc(userDocRef);
             
             if (userDoc.exists()) {
                 const userData = userDoc.data();

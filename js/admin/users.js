@@ -1,4 +1,24 @@
-// Admin Users Management for Comedor Grupo Avika
+// Admin Users Management for Comedor Grupo Avika - Firebase v9 approach
+
+import { 
+    createUserWithEmailAndPassword,
+    updateProfile
+} from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
+
+import {
+    doc,
+    collection,
+    setDoc,
+    deleteDoc,
+    query,
+    where,
+    orderBy,
+    getDocs,
+    serverTimestamp
+} from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+
+import { auth, db } from '../firebase-config.js';
+import { checkAuth, USER_ROLES, logout } from '../auth.js';
 
 // Ensure admin only access
 document.addEventListener('DOMContentLoaded', () => {
@@ -27,12 +47,8 @@ document.addEventListener('DOMContentLoaded', () => {
     loadCoordinators();
 });
 
-// Firebase services
-const db = firebase.firestore();
-const auth = firebase.auth();
-
 // Collection references
-const usersCollection = db.collection('users');
+const usersCollection = collection(db, 'users');
 
 // Setup event listeners
 function setupEventListeners() {
@@ -70,10 +86,11 @@ async function loadCoordinators() {
         showLoadingState(true);
         
         // Get coordinators from Firestore
-        const snapshot = await usersCollection
-            .where('role', '==', 'coordinator')
-            .orderBy('createdAt', 'desc')
-            .get();
+        const q = query(usersCollection, 
+            where('role', '==', 'coordinator'),
+            orderBy('createdAt', 'desc')
+        );
+        const snapshot = await getDocs(q);
         
         const tableBody = document.getElementById('coordinators-table-body');
         if (tableBody) {
@@ -98,7 +115,7 @@ async function loadCoordinators() {
                             <td>${formattedDate}</td>
                             <td class="actions">
                                 <button class="btn btn-sm btn-warning reset-password" data-id="${doc.id}" data-name="${user.name}">
-                                    <i class="fas fa-key"></i> Reiniciar contraseña
+                                    <i class="fas fa-key"></i> Reiniciar
                                 </button>
                                 <button class="btn btn-sm btn-danger delete-user" data-id="${doc.id}" data-name="${user.name}">
                                     <i class="fas fa-trash"></i> Eliminar
@@ -177,28 +194,29 @@ async function createCoordinatorHandler(e) {
         }
         
         // Check if email already exists
-        const emailCheck = await usersCollection.where('email', '==', email).get();
+        const q = query(usersCollection, where('email', '==', email));
+        const emailCheck = await getDocs(q);
         if (!emailCheck.empty) {
             throw new Error('El correo electrónico ya está registrado');
         }
         
         // Create user in Firebase Auth
-        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
         
+        // Update display name
+        await updateProfile(user, {
+            displayName: name
+        });
+        
         // Add user to Firestore
-        await usersCollection.doc(user.uid).set({
+        await setDoc(doc(db, 'users', user.uid), {
             name: name,
             email: email,
             role: 'coordinator',
             branch: branch,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            createdAt: serverTimestamp(),
             createdBy: sessionStorage.getItem('userId')
-        });
-        
-        // Update display name
-        await user.updateProfile({
-            displayName: name
         });
         
         // Show success message
@@ -233,21 +251,12 @@ async function resetPasswordHandler(e) {
             throw new Error('La nueva contraseña debe tener al menos 8 caracteres');
         }
         
-        // Reset password using Firebase Admin SDK
-        // Note: This requires a Cloud Function or backend service
-        // Here's a placeholder for the actual implementation
-        /*
-        await firebase.functions().httpsCallable('resetUserPassword')({
-            uid: userId,
-            password: newPassword
-        });
-        */
+        // Reset password using Firebase Admin SDK (requires a cloud function)
+        // Para esta operación, necesitarías crear una función en Firebase Cloud Functions
+        // ya que desde el cliente no se puede cambiar la contraseña de otro usuario
         
-        // For demo purposes, we'll simulate a successful password reset
-        // In a real app, you would use Firebase Functions or a backend service
-        
-        // Show success message
-        showSuccessMessage('Contraseña reiniciada correctamente');
+        // Por ahora, mostramos un mensaje informativo
+        showSuccessMessage('Operación simulada: En producción se requiere una Cloud Function para resetear contraseñas');
         
         // Close modal
         document.getElementById('reset-password-modal').style.display = 'none';
@@ -274,32 +283,23 @@ async function deleteUserHandler() {
     try {
         showLoadingState(true);
         
-        // Delete user from Firestore
-        await usersCollection.doc(userId).delete();
+        // Eliminar usuario de Firestore
+        await deleteDoc(doc(db, 'users', userId));
         
-        // Delete user from Authentication
-        // Note: This requires a Cloud Function or backend service
-        // Here's a placeholder for the actual implementation
-        /*
-        await firebase.functions().httpsCallable('deleteUser')({
-            uid: userId
-        });
-        */
+        // Nota: Para eliminar también el usuario de Firebase Authentication 
+        // se necesita una Cloud Function, ya que desde el cliente no se pueden 
+        // eliminar otros usuarios.
         
-        // For demo purposes, we'll simulate a successful user deletion
-        // In a real app, you would use Firebase Functions or a backend service
+        showSuccessMessage('Usuario eliminado de Firestore. Para eliminar completamente el usuario de Authentication, se requiere una Cloud Function');
         
-        // Show success message
-        showSuccessMessage('Coordinador eliminado correctamente');
-        
-        // Close modal
+        // Cerrar modal
         document.getElementById('delete-user-modal').style.display = 'none';
         
-        // Reload coordinators list
+        // Recargar lista de coordinadores
         loadCoordinators();
     } catch (error) {
         console.error('Error deleting user:', error);
-        showErrorMessage('Error al eliminar coordinador: ' + error.message);
+        showErrorMessage('Error al eliminar usuario: ' + error.message);
     } finally {
         showLoadingState(false);
     }
