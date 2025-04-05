@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Menú - Administrador</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+    <link rel="stylesheet" href="../../css/admin.css">
+    <link rel="stylesheet" href="../../css/custom.css">
+    <link rel="icon" type="image/x-icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        /* Estilos específicos para esta página */
+        .day-tabs {
+            display: flex;
+            overflow-x: auto;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .day-tab {
+            padding: 12px 20px;
+            background: none;
+            border: none;
+            color: #6c757d;
+            font-weight: 500;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+        }
+        
+        .day-tab.active {
+            color: #3498db;
+            background-color: white;
+            border-bottom-color: #3498db;
+        }
+        
+        .meal-item {
+            background-color: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            position: relative;
+        }
+        
+        .meal-actions {
+            position: absolute;
+            right: 15px;
+            top: 15px;
+        }
+        
+        .day-content {
+            display: none;
+        }
+        
+        .day-content.active {
+            display: block;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border: 2px dashed #dee2e6;
+        }
+        
+        .meal-form {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .form-actions {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+        
+        .badge {
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .badge-warning {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        
+        .badge-success {
+            background-color: #28a745;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <img src="../../assets/img/logo-small.png" alt="Grupo Avika Logo">
+                <h3>Grupo Avika</h3>
+            </div>
+            <div class="sidebar-menu">
+                <ul>
+                    <li>
+                        <a href="dashboard.html">
+                            <i class="fas fa-tachometer-alt"></i> Dashboard
+                        </a>
+                    </li>
+                    <li>
+                        <a href="menu-simple.html" class="active">
+                            <i class="fas fa-utensils"></i> Menú
+                        </a>
+                    </li>
+                    <li>
+                        <a href="confirmations.html">
+                            <i class="fas fa-clipboard-check"></i> Confirmaciones
+                        </a>
+                    </li>
+                    <li>
+                        <a href="users-simple.html">
+                            <i class="fas fa-users-cog"></i> Usuarios
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" id="logout-btn">
+                            <i class="fas fa-sign-out-alt"></i> Cerrar sesión
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="content-header">
+                <h2>Gestión de Menú</h2>
+                <div class="user-info">
+                    <span id="user-name">Administrador</span>
+                </div>
+            </div>
+
+            <!-- Week Selection -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <h3>Menú Semanal</h3>
+                        <span class="badge badge-warning" id="menu-status">Borrador</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
+                        <div style="display: flex; align-items: center;">
+                            <button class="btn btn-icon" id="prev-week">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <span id="week-display" style="margin: 0 15px; font-weight: 500;">Semana del 31/03/2025</span>
+                            <button class="btn btn-icon" id="next-week">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                        <div>
+                            <button class="btn btn-primary" id="btn-new-menu">
+                                <i class="fas fa-plus"></i> Nuevo Menú
+                            </button>
+                            <button class="btn btn-success" id="btn-publish-menu">
+                                <i class="fas fa-check"></i> Publicar Menú
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Day Tabs -->
+                    <div class="day-tabs">
+                        <button class="day-tab active" data-day="lunes">Lunes</button>
+                        <button class="day-tab" data-day="martes">Martes</button>
+                        <button class="day-tab" data-day="miercoles">Miércoles</button>
+                        <button class="day-tab" data-day="jueves">Jueves</button>
+                        <button class="day-tab" data-day="viernes">Viernes</button>
+                        <button class="day-tab" data-day="sabado">Sábado</button>
+                        <button class="day-tab" data-day="domingo">Domingo</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Meal Form -->
+            <div class="meal-form" id="meal-form">
+                <h3 id="form-title">Agregar Plato</h3>
+                <div class="form-group">
+                    <label for="meal-name">Nombre del plato</label>
+                    <input type="text" id="meal-name" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="meal-description">Descripción</label>
+                    <textarea id="meal-description" class="form-control" rows="3"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-secondary" id="btn-cancel-meal">Cancelar</button>
+                    <button class="btn btn-primary" id="btn-save-meal">Guardar</button>
+                </div>
+            </div>
+
+            <!-- Day Content -->
+            <div class="card">
+                <div class="card-header">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <h3 id="day-title">Menú del Lunes</h3>
+                        <button class="btn btn-primary" id="btn-add-meal">
+                            <i class="fas fa-plus"></i> Agregar Plato
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Day Content Containers -->
+                    <div id="lunes-content" class="day-content active">
+                        <div class="empty-state">
+                            <p>No hay platos en el menú para este día</p>
+                            <button class="btn btn-primary btn-add-meal-empty" data-day="lunes">Agregar Plato</button>
+                        </div>
+                    </div>
+                    <div id="martes-content" class="day-content">
+                        <div class="empty-state">
+                            <p>No hay platos en el menú para este día</p>
+                            <button class="btn btn-primary btn-add-meal-empty" data-day="martes">Agregar Plato</button>
+                        </div>
+                    </div>
+                    <div id="miercoles-content" class="day-content">
+                        <div class="empty-state">
+                            <p>No hay platos en el menú para este día</p>
+                            <button class="btn btn-primary btn-add-meal-empty" data-day="miercoles">Agregar Plato</button>
+                        </div>
+                    </div>
+                    <div id="jueves-content" class="day-content">
+                        <div class="empty-state">
+                            <p>No hay platos en el menú para este día</p>
+                            <button class="btn btn-primary btn-add-meal-empty" data-day="jueves">Agregar Plato</button>
+                        </div>
+                    </div>
+                    <div id="viernes-content" class="day-content">
+                        <div class="empty-state">
+                            <p>No hay platos en el menú para este día</p>
+                            <button class="btn btn-primary btn-add-meal-empty" data-day="viernes">Agregar Plato</button>
+                        </div>
+                    </div>
+                    <div id="sabado-content" class="day-content">
+                        <div class="empty-state">
+                            <p>No hay platos en el menú para este día</p>
+                            <button class="btn btn-primary btn-add-meal-empty" data-day="sabado">Agregar Plato</button>
+                        </div>
+                    </div>
+                    <div id="domingo-content" class="day-content">
+                        <div class="empty-state">
+                            <p>No hay platos en el menú para este día</p>
+                            <button class="btn btn-primary btn-add-meal-empty" data-day="domingo">Agregar Plato</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loading-indicator" style="display: none;">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Alert Messages -->
+    <div id="error-alert" class="alert-message error-message" style="display: none;"></div>
+    <div id="success-alert" class="alert-message success-message" style="display: none;"></div>
+
+    <!-- Firebase Scripts -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    
+    <!-- Custom Scripts -->
+    <script src="../../js/firebase-config.js"></script>
+    <script src="../../js/auth.js"></script>
+    
+    <!-- Simple Menu Management Script -->
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // Check authentication
+        if (!window.checkAuth) {
+            alert('Error: la función de autenticación no está disponible');
+            return;
+        }
+        
+        if (!checkAuth('admin')) {
+            return;
+        }
+        
+        // Set user name
+        let userName = 'Administrador';
+        try {
+            const userJson = sessionStorage.getItem('user');
+            if (userJson) {
+                const userObj = JSON.parse(userJson);
+                userName = userObj.displayName || userName;
+            }
+        } catch (error) {
+            console.error('Error parsing user data:', error);
+        }
+        
+        const userNameElement = document.getElementById('user-name');
+        if (userNameElement) {
+            userNameElement.textContent = userName;
+        }
+        
+        // Setup logout button
+        const logoutBtn = document.getElementById('logout-btn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                window.logout();
+            });
+        }
+        
+        // Initialize menu functionality
+        initializeMenu();
+    });
+    
+    // Current state
+    let currentDay = 'lunes';
+    let currentWeekStart = getMonday(new Date());
+    let menuData = {
+        lunes: [],
+        martes: [],
+        miercoles: [],
+        jueves: [],
+        viernes: [],
+        sabado: [],
+        domingo: []
+    };
+    let isPublished = false;
+    let editingMealIndex = -1;
+    
+    // Initialize menu functionality
+    function initializeMenu() {
+        // Setup day tabs
+        document.querySelectorAll('.day-tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                const day = this.dataset.day;
+                changeActiveDay(day);
+            });
+        });
+        
+        // Setup add meal buttons
+        document.getElementById('btn-add-meal').addEventListener('click', showAddMealForm);
+        document.querySelectorAll('.btn-add-meal-empty').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const day = this.dataset.day;
+                changeActiveDay(day);
+                showAddMealForm();
+            });
+        });
+        
+        // Setup meal form buttons
+        document.getElementById('btn-save-meal').addEventListener('click', saveMeal);
+        document.getElementById('btn-cancel-meal').addEventListener('click', hideAddMealForm);
+        
+        // Setup week navigation
+        document.getElementById('prev-week').addEventListener('click', () => {
+            navigateWeek(-7);
+        });
+        document.getElementById('next-week').addEventListener('click', () => {
+            navigateWeek(7);
+        });
+        
+        // Setup publish button
+        document.getElementById('btn-publish-menu').addEventListener('click', publishMenu);
+        
+        // Setup new menu button
+        document.getElementById('btn-new-menu').addEventListener('click', () => {
+            if (confirm('¿Estás seguro de crear un nuevo menú? Los cambios no guardados se perderán.')) {
+                resetMenuData();
+                loadMenu();
+            }
+        });
+        
+        // Load initial menu
+        updateWeekDisplay();
+        loadMenu();
+    }
+    
+    // Change active day
+    function changeActiveDay(day) {
+        currentDay = day;
+        
+        // Update tabs
+        document.querySelectorAll('.day-tab').forEach(tab => {
+            if (tab.dataset.day === day) {
+                tab.classList.add('active');
+            } else {
+                tab.classList.remove('active');
+            }
+        });
+        
+        // Update day title
+        document.getElementById('day-title').textContent = `Menú del ${capitalize(day)}`;
+        
+        // Update content visibility
+        document.querySelectorAll('.day-content').forEach(content => {
+            content.classList.remove('active');
+        });
+        document.getElementById(`${day}-content`).classList.add('active');
+        
+        // Hide meal form
+        hideAddMealForm();
+    }
+    
+    // Show add meal form
+    function showAddMealForm() {
+        const form = document.getElementById('meal-form');
+        form.style.display = 'block';
+        document.getElementById('form-title').textContent = `Agregar Plato para ${capitalize(currentDay)}`;
+        document.getElementById('meal-name').value = '';
+        document.getElementById('meal-description').value = '';
+        editingMealIndex = -1; // New meal
+        
+        // Focus on name field
+        document.getElementById('meal-name').focus();
+    }
+    
+    // Hide add meal form
+    function hideAddMealForm() {
+        document.getElementById('meal-form').style.display = 'none';
+        editingMealIndex = -1;
+    }
+    
+    // Save meal
+    function saveMeal() {
+        const name = document.getElementById('meal-name').value.trim();
+        const description = document.getElementById('meal-description').value.trim();
+        
+        if (!name) {
+            showErrorMessage('El nombre del plato es obligatorio');
+            return;
+        }
+        
+        const meal = {
+            name: name,
+            description: description
+        };
+        
+        if (editingMealIndex >= 0) {
+            // Edit existing meal
+            menuData[currentDay][editingMealIndex] = meal;
+        } else {
+            // Add new meal
+            menuData[currentDay].push(meal);
+        }
+        
+        // Update UI
+        updateDayContent(currentDay);
+        
+        // Hide form
+        hideAddMealForm();
+        
+        // Save to Firebase
+        saveMenuToFirebase();
+    }
+    
+    // Edit meal
+    function editMeal(day, index) {
+        if (!menuData[day] || !menuData[day][index]) {
+            showErrorMessage('Plato no encontrado');
+            return;
+        }
+        
+        // Change to the right day if needed
+        if (day !== currentDay) {
+            changeActiveDay(day);
+        }
+        
+        const meal = menuData[day][index];
+        
+        // Show form with meal data
+        document.getElementById('form-title').textContent = `Editar Plato para ${capitalize(day)}`;
+        document.getElementById('meal-name').value = meal.name || '';
+        document.getElementById('meal-description').value = meal.description || '';
+        
+        // Set editing index
+        editingMealIndex = index;
+        
+        // Show form
+        document.getElementById('meal-form').style.display = 'block';
+    }
+    
+    // Delete meal
+    function deleteMeal(day, index) {
+        if (!menuData[day] || !menuData[day][index]) {
+            showErrorMessage('Plato no encontrado');
+            return;
+        }
+        
+        if (confirm('¿Estás seguro de eliminar este plato?')) {
+            // Remove meal
+            menuData[day].splice(index, 1);
+            
+            // Update UI
+            updateDayContent(day);
+            
+            // Save to Firebase
+            saveMenuToFirebase();
+        }
+    }
+    
+    // Update day content
+    function updateDayContent(day) {
+        const content = document.getElementById(`${day}-content`);
+        if (!content) return;
+        
+        const meals = menuData[day] || [];
+        
+        if (meals.length === 0) {
+            // Show empty state
+            content.innerHTML = `
+                <div class="empty-state">
+                    <p>No hay platos en el menú para este día</p>
+                    <button class="btn btn-primary btn-add-meal-empty" data-day="${day}">Agregar Plato</button>
+                </div>
+            `;
+            
+            // Re-add event listener
+            const addButton = content.querySelector('.btn-add-meal-empty');
+            if (addButton) {
+                addButton.addEventListener('click', function() {
+                    changeActiveDay(day);
+                    showAddMealForm();
+                });
+            }
+        } else {
+            // Show meals
+            content.innerHTML = '';
+            
+            meals.forEach((meal, index) => {
+                const mealElement = document.createElement('div');
+                mealElement.className = 'meal-item';
+                mealElement.innerHTML = `
+                    <div class="meal-actions">
+                        <button class="btn btn-sm btn-icon btn-secondary edit-meal" data-index="${index}">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-sm btn-icon btn-danger delete-meal" data-index="${index}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                    <h4>${meal.name}</h4>
+                    ${meal.description ? `<p class="text-muted">${meal.description}</p>` : ''}
+                `;
+                
+                content.appendChild(mealElement);
+            });
+            
+            // Add event listeners
+            content.querySelectorAll('.edit-meal').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const index = parseInt(this.dataset.index);
+                    editMeal(day, index);
+                });
+            });
+            
+            content.querySelectorAll('.delete-meal').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const index = parseInt(this.dataset.index);
+                    deleteMeal(day, index);
+                });
+            });
+        }
+    }
+    
+    // Save menu to Firebase
+    async function saveMenuToFirebase() {
+        try {
+            showLoadingState(true);
+            
+            if (!window.db) {
+                throw new Error('Firebase no está inicializado correctamente');
+            }
+            
+            const weekId = formatDate(currentWeekStart);
+            
+            // Prepare menu document
+            const menuDoc = {
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            
+            // Add day data
+            Object.keys(menuData).forEach(day => {
+                menuDoc[day] = {
+                    items: menuData[day]
+                };
+            });
+            
+            // Preserve published status if it exists
+            if (isPublished) {
+                menuDoc.status = 'published';
+            }
+            
+            // Save to Firestore
+            await window.db.collection('menus').doc(weekId).set(menuDoc, { merge: true });
+            
+            showSuccessMessage('Menú guardado correctamente');
+        } catch (error) {
+            console.error('Error saving menu:', error);
+            showErrorMessage('Error al guardar el menú: ' + error.message);
+        } finally {
+            showLoadingState(false);
+        }
+    }
+    
+    // Publish menu
+    async function publishMenu() {
+        // Check if all days have at least one meal
+        let missingDays = [];
+        Object.keys(menuData).forEach(day => {
+            if (!menuData[day] || menuData[day].length === 0) {
+                missingDays.push(capitalize(day));
+            }
+        });
+        
+        if (missingDays.length > 0) {
+            showErrorMessage(`Faltan platos para: ${missingDays.join(', ')}`);
+            return;
+        }
+        
+        // Confirm publish
+        if (!confirm('¿Estás seguro de publicar este menú? Una vez publicado, será visible para los coordinadores.')) {
+            return;
+        }
+        
+        try {
+            showLoadingState(true);
+            
+            if (!window.db) {
+                throw new Error('Firebase no está inicializado correctamente');
+            }
+            
+            const weekId = formatDate(currentWeekStart);
+            
+            // Update status
+            await window.db.collection('menus').doc(weekId).update({
+                status: 'published',
+                publishedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            
+            // Update local state
+            isPublished = true;
+            updatePublishStatus();
+            
+            showSuccessMessage('Menú publicado correctamente');
+        } catch (error) {
+            console.error('Error publishing menu:', error);
+            showErrorMessage('Error al publicar el menú: ' + error.message);
+        } finally {
+            showLoadingState(false);
+        }
+    }
+    
+    // Update publish status UI
+    function updatePublishStatus() {
+        const statusBadge = document.getElementById('menu-status');
+        const publishBtn = document.getElementById('btn-publish-menu');
+        
+        if (isPublished) {
+            statusBadge.textContent = 'Publicado';
+            statusBadge.className = 'badge badge-success';
+            publishBtn.disabled = true;
+        } else {
+            statusBadge.textContent = 'Borrador';
+            statusBadge.className = 'badge badge-warning';
+            publishBtn.disabled = false;
+        }
+    }
+    
+    // Navigate week
+    function navigateWeek(days) {
+        // Get new date
+        const newDate = new Date(currentWeekStart);
+        newDate.setDate(newDate.getDate() + days);
+        currentWeekStart = getMonday(newDate);
+        
+        // Update display
+        updateWeekDisplay();
+        
+        // Load menu for new week
+        loadMenu();
+    }
+    
+    // Update week display
+    function updateWeekDisplay() {
+        const display = document.getElementById('week-display');
+        display.textContent = `Semana del ${formatDateDisplay(currentWeekStart)}`;
+    }
+    
+    // Load menu
+    async function loadMenu() {
+        try {
+            showLoadingState(true);
+            
+            if (!window.db) {
+                throw new Error('Firebase no está inicializado correctamente');
+            }
+            
+            const weekId = formatDate(currentWeekStart);
+            
+            // Get menu from Firestore
+            const doc = await window.db.collection('menus').doc(weekId).get();
+            
+            if (doc.exists) {
+                const data = doc.data();
+                
+                // Update publish status
+                isPublished = data.status === 'published';
+                updatePublishStatus();
+                
+                // Update menu data
+                // Load menu
+                Object.keys(menuData).forEach(day => {
+                    if (data[day] && data[day].items) {
+                        menuData[day] = data[day].items;
+                    } else {
+                        menuData[day] = [];
+                    }
+                    
+                    // Update UI
+                    updateDayContent(day);
+                });
+            } else {
+                // Reset data
+                resetMenuData();
+                isPublished = false;
+                updatePublishStatus();
+                
+                // Update UI for all days
+                Object.keys(menuData).forEach(day => {
+                    updateDayContent(day);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading menu:', error);
+            showErrorMessage('Error al cargar el menú: ' + error.message);
+        } finally {
+            showLoadingState(false);
+        }
+    }
+    
+    // Reset menu data
+    function resetMenuData() {
+        Object.keys(menuData).forEach(day => {
+            menuData[day] = [];
+        });
+    }
+    
+    // Utility functions
+    function getMonday(date) {
+        const day = date.getDay();
+        const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Sunday
+        return new Date(date.setDate(diff));
+    }
+    
+    function formatDate(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+    
+    function formatDateDisplay(date) {
+        return date.toLocaleDateString('es-MX', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        });
+    }
+    
+    function capitalize(str) {
+        return str.charAt(0).toUpperCase() + str.slice(1);
+    }
+    
+    function showLoadingState(isLoading) {
+        const loadingIndicator = document.getElementById('loading-indicator');
+        if (loadingIndicator) {
+            loadingIndicator.style.display = isLoading ? 'block' : 'none';
+        }
+        
+        // Disable buttons while loading
+        document.querySelectorAll('button:not(.day-tab)').forEach(button => {
+            if (!(isPublished && button.id === 'btn-publish-menu')) {
+                button.disabled = isLoading;
+            }
+        });
+    }
+    
+    function showErrorMessage(message) {
+        const errorAlert = document.getElementById('error-alert');
+        if (errorAlert) {
+            errorAlert.textContent = message;
+            errorAlert.style.display = 'block';
+            
+            setTimeout(() => {
+                errorAlert.style.display = 'none';
+            }, 5000);
+        } else {
+            alert('Error: ' + message);
+        }
+    }
+    
+    function showSuccessMessage(message) {
+        const successAlert = document.getElementById('success-alert');
+        if (successAlert) {
+            successAlert.textContent = message;
+            successAlert.style.display = 'block';
+            
+            setTimeout(() => {
+                successAlert.style.display = 'none';
+            }, 5000);
+        } else {
+            alert('Éxito: ' + message);
+        }
+    }
+    </script>
+</body>
+</html>
