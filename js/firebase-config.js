@@ -12,8 +12,8 @@ const firebaseConfig = {
   measurementId: "G-P3ZDJJQVW9"
 };
 
-// Check if Firebase is already initialized
-if (typeof firebase !== 'undefined' && (!firebase.apps || !firebase.apps.length)) {
+// Initialize Firebase only if it hasn't been initialized already
+if (typeof firebase !== 'undefined' && !firebase.apps.length) {
   firebase.initializeApp(firebaseConfig);
 }
 
@@ -21,7 +21,7 @@ if (typeof firebase !== 'undefined' && (!firebase.apps || !firebase.apps.length)
 const db = firebase.firestore();
 const auth = firebase.auth();
 
-// Comprueba si el módulo analytics está disponible antes de usarlo
+// Initialize analytics if available
 let analytics = null;
 try {
   if (firebase.analytics) {
@@ -31,19 +31,15 @@ try {
   console.warn("Firebase analytics not available: ", e);
 }
 
-// Define las colecciones globalmente para que estén disponibles en todo el sistema
+// Make services and collections available globally
 window.db = db;
 window.auth = auth;
 window.analytics = analytics;
-
-// Define las referencias a colecciones como variables globales
 window.employeesCollection = db.collection("employees");
 window.confirmationsCollection = db.collection("confirmations");
 window.menuCollection = db.collection("menus");
 
-// También las exportamos como variables normales para compatibilidad
+// Also expose as variables for direct imports
 const employeesCollection = db.collection("employees");
 const confirmationsCollection = db.collection("confirmations");
 const menuCollection = db.collection("menus");
-
-// Remove the export statement completely to avoid syntax errors in non-module scripts

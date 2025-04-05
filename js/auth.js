@@ -34,12 +34,19 @@ function checkAuth(requiredRole) {
  * @param {string} role - User role
  */
 function redirectBasedOnRole(role) {
+    let basePath = "";
+    
+    // Determine if we're in a subfolder by checking the current path
+    if (window.location.pathname.includes('/pages/')) {
+        basePath = "../../";
+    }
+    
     switch (role) {
         case USER_ROLES.ADMIN:
-            window.location.href = "pages/admin/dashboard.html";
+            window.location.href = basePath + "pages/admin/dashboard.html";
             break;
         case USER_ROLES.COORDINATOR:
-            window.location.href = "pages/coordinator/dashboard.html";
+            window.location.href = basePath + "pages/coordinator/dashboard.html";
             break;
         default:
             showError("Rol de usuario no reconocido");
@@ -73,12 +80,28 @@ async function loginUser(email, password) {
         if (userDoc.exists) {
             const userData = userDoc.data();
             
-            // Save important information in sessionStorage
+            // Create a user object
+            const userObject = {
+                uid: user.uid,
+                email: user.email,
+                displayName: userData.name,
+                role: userData.role,
+                branch: userData.branch || "",
+                department: userData.department || "",
+                departmentId: userData.departmentId || ""
+            };
+            
+            // Save as JSON string
+            sessionStorage.setItem("user", JSON.stringify(userObject));
+            
+            // Also save individual properties for backwards compatibility
+            sessionStorage.setItem("userId", user.uid);
+            sessionStorage.setItem("userEmail", user.email);
+            sessionStorage.setItem("userName", userData.name);
             sessionStorage.setItem("userRole", userData.role);
             sessionStorage.setItem("userBranch", userData.branch || "");
-            sessionStorage.setItem("userName", userData.name);
-            sessionStorage.setItem("userEmail", user.email);
-            sessionStorage.setItem("userId", user.uid);
+            sessionStorage.setItem("userDepartment", userData.department || "");
+            sessionStorage.setItem("userDepartmentId", userData.departmentId || "");
             
             // Redirect based on role
             redirectBasedOnRole(userData.role);
@@ -177,11 +200,28 @@ firebase.auth().onAuthStateChanged(async (user) => {
                 
                 // Save user data to session storage if not already there
                 if (!sessionStorage.getItem("userRole")) {
+                    // Create a user object
+                    const userObject = {
+                        uid: user.uid,
+                        email: user.email,
+                        displayName: userData.name,
+                        role: userData.role,
+                        branch: userData.branch || "",
+                        department: userData.department || "",
+                        departmentId: userData.departmentId || ""
+                    };
+                    
+                    // Save as JSON string
+                    sessionStorage.setItem("user", JSON.stringify(userObject));
+                    
+                    // Also save individual properties
+                    sessionStorage.setItem("userId", user.uid);
+                    sessionStorage.setItem("userEmail", user.email);
+                    sessionStorage.setItem("userName", userData.name);
                     sessionStorage.setItem("userRole", userData.role);
                     sessionStorage.setItem("userBranch", userData.branch || "");
-                    sessionStorage.setItem("userName", userData.name);
-                    sessionStorage.setItem("userEmail", user.email);
-                    sessionStorage.setItem("userId", user.uid);
+                    sessionStorage.setItem("userDepartment", userData.department || "");
+                    sessionStorage.setItem("userDepartmentId", userData.departmentId || "");
                     
                     // Only redirect if we're on the login page
                     if (window.location.pathname.endsWith("index.html") || 
@@ -194,4 +234,4 @@ firebase.auth().onAuthStateChanged(async (user) => {
             console.error("Error checking user role:", error);
         }
     }
-}); 
+});

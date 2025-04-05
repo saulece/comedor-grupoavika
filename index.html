@@ -73,6 +73,15 @@
                 console.error("Login process error:", error);
             }
         });
+        
+        // Additional direct button handler for better responsiveness
+        document.getElementById("loginButton").addEventListener("click", function(e) {
+            // Only if not already part of form submission
+            if (e.target === this && !e.submitter) {
+                // Don't prevent default here, let the form submission handle it
+                // The form submit event handler above will take care of the auth process
+            }
+        });
     </script>
 </body>
 </html>
