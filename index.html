@@ -46,25 +46,108 @@
         </div>
     </div>
 
-    <!-- Import application scripts as modules -->
+    <!-- Firebase SDK -->
     <script type="module">
-        import { loginUser, clearError } from './js/auth.js';
+        // Importar la configuración de Firebase
+        import { auth } from './js/firebase-config.js';
+        import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
+        import { doc, getDoc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+        import { db } from './js/firebase-config.js';
         
-        // Handle form submission
+        // Variables para error y carga
+        const loginButton = document.getElementById("loginButton");
+        const loginLoader = document.getElementById("loginLoader");
+        const loginError = document.getElementById("loginError");
+        
+        // Función para mostrar error
+        function showError(message) {
+            if (loginError) {
+                loginError.textContent = message;
+                loginError.style.display = "block";
+            }
+        }
+        
+        // Función para limpiar error
+        function clearError() {
+            if (loginError) {
+                loginError.textContent = "";
+                loginError.style.display = "none";
+            }
+        }
+        
+        // Redireccionar según rol
+        function redirectBasedOnRole(role) {
+            switch (role) {
+                case 'admin':
+                    window.location.href = "pages/admin/dashboard.html";
+                    break;
+                case 'coordinator':
+                    window.location.href = "pages/coordinator/dashboard.html";
+                    break;
+                default:
+                    showError("Rol de usuario no reconocido");
+            }
+        }
+        
+        // Manejar envío del formulario
         document.getElementById("loginForm").addEventListener("submit", async (e) => {
             e.preventDefault();
             
-            // Clear previous error message
+            // Limpiar error previo
             clearError();
             
             const email = document.getElementById("email").value.trim();
             const password = document.getElementById("password").value;
             
+            // Mostrar cargando y deshabilitar botón
+            if (loginButton) loginButton.disabled = true;
+            if (loginLoader) loginLoader.style.display = "block";
+            
             try {
-                await loginUser(email, password);
+                // Intentar inicio de sesión
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+                
+                // Obtener información adicional del usuario
+                const userDocRef = doc(db, "users", user.uid);
+                const userDoc = await getDoc(userDocRef);
+                
+                if (userDoc.exists()) {
+                    const userData = userDoc.data();
+                    
+                    // Guardar información importante en sessionStorage
+                    sessionStorage.setItem("userRole", userData.role);
+                    sessionStorage.setItem("userBranch", userData.branch || "");
+                    sessionStorage.setItem("userName", userData.name);
+                    sessionStorage.setItem("userEmail", user.email);
+                    sessionStorage.setItem("userId", user.uid);
+                    
+                    // Redireccionar según rol
+                    redirectBasedOnRole(userData.role);
+                } else {
+                    throw new Error("No se encontró información del usuario");
+                }
             } catch (error) {
-                // Error handling is done in loginUser
-                console.error("Login process error:", error);
+                console.error("Error de autenticación:", error);
+                
+                // Manejar errores comunes
+                let errorMessage = "Error al iniciar sesión";
+                
+                if (error.code === "auth/user-not-found") {
+                    errorMessage = "Usuario no encontrado";
+                } else if (error.code === "auth/wrong-password") {
+                    errorMessage = "Contraseña incorrecta";
+                } else if (error.code === "auth/invalid-email") {
+                    errorMessage = "Correo electrónico inválido";
+                } else if (error.code === "auth/too-many-requests") {
+                    errorMessage = "Demasiados intentos fallidos. Intenta más tarde";
+                }
+                
+                showError(errorMessage);
+            } finally {
+                // Re-habilitar el botón y ocultar cargando
+                if (loginButton) loginButton.disabled = false;
+                if (loginLoader) loginLoader.style.display = "none";
             }
         });
     </script>
