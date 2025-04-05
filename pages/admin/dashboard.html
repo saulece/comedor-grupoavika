@@ -148,6 +148,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-analytics.js"></script>
     
     <!-- Custom Scripts -->
     <script src="../../js/firebase-config.js"></script>
@@ -389,6 +390,17 @@
                     errorAlert.style.display = 'none';
                 }, 5000);
             }
+        }
+
+        // Define collection variables if they don't exist
+        if (typeof employeesCollection === 'undefined') {
+            const employeesCollection = db.collection("employees");
+        }
+        if (typeof confirmationsCollection === 'undefined') {
+            const confirmationsCollection = db.collection("confirmations");
+        }
+        if (typeof menuCollection === 'undefined') {
+            const menuCollection = db.collection("menus");
         }
     </script>
 </body>

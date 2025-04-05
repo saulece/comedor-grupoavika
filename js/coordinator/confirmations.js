@@ -3,20 +3,17 @@
  * Manages the registration of daily meal confirmations for employees
  */
 
-// Import Firebase services and utilities
-import { db, auth } from '../firebase-config.js';
-import { collection, doc, addDoc, query, where, orderBy, getDocs, Timestamp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js';
-import { checkAuth } from '../auth.js';
-
 // Constants
 const USER_ROLES = {
     ADMIN: 'admin',
     COORDINATOR: 'coordinator'
 };
 
-// Firebase collections references
-const employeesCollection = collection(db, 'employees');
-const confirmationsCollection = collection(db, 'confirmations');
+// Referencias a servicios y colecciones de Firebase
+const db = window.db;
+const auth = window.auth;
+const employeesCollection = window.employeesCollection;
+const confirmationsCollection = window.confirmationsCollection;
 
 // Current user information
 let currentUser = null;
@@ -34,12 +31,24 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Get current user from session storage
     try {
-        currentUser = JSON.parse(sessionStorage.getItem('user'));
-        if (!currentUser || !currentUser.uid) {
+        // Usar sessionStorage para obtener el usuario actual
+        const userId = sessionStorage.getItem('userId');
+        const userName = sessionStorage.getItem('userName');
+        const userEmail = sessionStorage.getItem('userEmail');
+        const departmentId = sessionStorage.getItem('userDepartment');
+        
+        if (!userId) {
             console.error('User session data not found');
             window.location.href = '../../index.html';
             return;
         }
+        
+        currentUser = {
+            uid: userId,
+            displayName: userName,
+            email: userEmail,
+            departmentId: departmentId
+        };
     } catch (error) {
         console.error('Error parsing user data:', error);
         window.location.href = '../../index.html';
@@ -157,21 +166,18 @@ async function loadEmployees() {
             throw new Error('Department ID not found for current user');
         }
         
-        // Query employees for this department
-        const employeesQuery = query(
-            employeesCollection,
-            where('departmentId', '==', currentUser.departmentId),
-            where('active', '==', true),
-            orderBy('name')
-        );
-        
-        const querySnapshot = await getDocs(employeesQuery);
+        // Query employees for this department - adaptado a Firebase v8
+        const employeesSnapshot = await employeesCollection
+            .where('departmentId', '==', currentUser.departmentId)
+            .where('active', '==', true)
+            .orderBy('name')
+            .get();
         
         // Reset employee list
         employeeList = [];
         
         // Process query results
-        querySnapshot.forEach(doc => {
+        employeesSnapshot.forEach(doc => {
             const employee = doc.data();
             employee.id = doc.id;
             employeeList.push(employee);

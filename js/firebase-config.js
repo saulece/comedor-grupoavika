@@ -13,24 +13,37 @@ const firebaseConfig = {
 };
 
 // Check if Firebase is already initialized
-if (!window.firebase.apps || !window.firebase.apps.length) {
+if (typeof firebase !== 'undefined' && (!firebase.apps || !firebase.apps.length)) {
   firebase.initializeApp(firebaseConfig);
 }
 
 // Get Firebase services
 const db = firebase.firestore();
 const auth = firebase.auth();
-const analytics = firebase.analytics();
 
-// Collection references
-const usersCollection = db.collection("users");
-const employeesCollection = db.collection("employees");
-const confirmationsCollection = db.collection("confirmations");
-const menuCollection = db.collection("menus");
+// Comprueba si el módulo analytics está disponible antes de usarlo
+let analytics = null;
+try {
+  if (firebase.analytics) {
+    analytics = firebase.analytics();
+  }
+} catch (e) {
+  console.warn("Firebase analytics not available: ", e);
+}
 
-// Expose the Firebase services as global variables
+// Define las colecciones globalmente para que estén disponibles en todo el sistema
 window.db = db;
 window.auth = auth;
 window.analytics = analytics;
+
+// Define las referencias a colecciones como variables globales
+window.employeesCollection = db.collection("employees");
+window.confirmationsCollection = db.collection("confirmations");
+window.menuCollection = db.collection("menus");
+
+// También las exportamos como variables normales para compatibilidad
+const employeesCollection = db.collection("employees");
+const confirmationsCollection = db.collection("confirmations");
+const menuCollection = db.collection("menus");
 
 // Remove the export statement completely to avoid syntax errors in non-module scripts

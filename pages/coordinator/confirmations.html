@@ -197,16 +197,19 @@
     <div id="success-alert" class="alert-message success-message" style="display: none;"></div>
     <div id="info-alert" class="alert-message info-message" style="display: none;"></div>
 
-    <!-- Firebase Scripts -->
-    <script type="module" src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js"></script>
-    <script type="module" src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js"></script>
-    <script type="module" src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js"></script>
-    
+    <!-- Firebase Scripts - cambiar a v8 -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-analytics.js"></script>
+
     <!-- External Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
-    
-    <!-- Custom Scripts -->
-    <script type="module" src="../../js/coordinator/confirmations.js"></script>
+
+    <!-- Custom Scripts - quitar type="module" -->
+    <script src="../../js/firebase-config.js"></script>
+    <script src="../../js/auth.js"></script>
+    <script src="../../js/coordinator/confirmations.js"></script>
 </body>
 </html>

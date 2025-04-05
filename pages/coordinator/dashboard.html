@@ -144,10 +144,265 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-analytics.js"></script>
     
     <!-- Custom Scripts -->
     <script src="../../js/firebase-config.js"></script>
     <script src="../../js/auth.js"></script>
-    <script src="../../js/coordinator/dashboard.js"></script>
+    <script>
+        // Admin Dashboard JavaScript
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!checkAuth(USER_ROLES.ADMIN)) {
+                return;
+            }
+            
+            // Set user name
+            const user = JSON.parse(sessionStorage.getItem('user'));
+            const userNameElement = document.getElementById('user-name');
+            if (userNameElement && user) {
+                userNameElement.textContent = user.displayName || 'Administrador';
+            }
+            
+            // Setup logout button
+            const logoutBtn = document.getElementById('logout-btn');
+            if (logoutBtn) {
+                logoutBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    logout();
+                });
+            }
+            
+            // Load dashboard data
+            loadDashboardData();
+        });
+        
+        // Load dashboard data
+        async function loadDashboardData() {
+            try {
+                // Show loading state
+                showLoadingState(true);
+                
+                // Load stats data in parallel
+                await Promise.all([
+                    loadEmployeeStats(),
+                    loadConfirmationStats(),
+                    loadMenuStats(),
+                    loadRecentConfirmations()
+                ]);
+                
+                // Hide loading state
+                showLoadingState(false);
+            } catch (error) {
+                console.error("Error loading dashboard data:", error);
+                showErrorMessage("Error al cargar los datos del dashboard.");
+                showLoadingState(false);
+            }
+        }
+        
+        // Load employee stats
+        async function loadEmployeeStats() {
+            try {
+                // Get total employees
+                const employeesSnapshot = await employeesCollection.get();
+                document.getElementById('total-employees').textContent = employeesSnapshot.size;
+                
+                // Get total departments
+                const departmentsSet = new Set();
+                employeesSnapshot.forEach(doc => {
+                    const employee = doc.data();
+                    if (employee.departmentId) {
+                        departmentsSet.add(employee.departmentId);
+                    }
+                });
+                document.getElementById('total-departments').textContent = departmentsSet.size;
+            } catch (error) {
+                console.error("Error loading employee stats:", error);
+                throw error;
+            }
+        }
+        
+        // Load confirmation stats
+        async function loadConfirmationStats() {
+            try {
+                // Get today's date
+                const today = new Date();
+                const todayStr = formatDate(today);
+                
+                // Get today's confirmations
+                const confirmationsSnapshot = await confirmationsCollection
+                    .where('date', '==', todayStr)
+                    .get();
+                
+                let totalConfirmed = 0;
+                confirmationsSnapshot.forEach(doc => {
+                    const confirmation = doc.data();
+                    totalConfirmed += confirmation.confirmedCount || 0;
+                });
+                
+                document.getElementById('today-confirmations').textContent = totalConfirmed;
+            } catch (error) {
+                console.error("Error loading confirmation stats:", error);
+                throw error;
+            }
+        }
+        
+        // Load menu stats
+        async function loadMenuStats() {
+            try {
+                // Get published menus count
+                const menusSnapshot = await menuCollection
+                    .where('status', '==', 'published')
+                    .get();
+                
+                document.getElementById('published-menus').textContent = menusSnapshot.size;
+                
+                // Get current week's menu status
+                const currentWeek = getMonday(new Date());
+                const weekStartStr = formatDate(currentWeek);
+                
+                const menuDoc = await menuCollection.doc(weekStartStr).get();
+                const menuStatusContainer = document.getElementById('menu-status-container');
+                
+                if (menuStatusContainer) {
+                    if (menuDoc.exists) {
+                        const menuData = menuDoc.data();
+                        const isPublished = menuData.status === 'published';
+                        
+                        let statusClass = isPublished ? 'menu-status-published' : 'menu-status-draft';
+                        let statusText = isPublished ? 'Publicado' : 'Borrador';
+                        let publishedDate = '';
+                        
+                        if (isPublished && menuData.publishedAt) {
+                            const publishedAtDate = menuData.publishedAt.toDate();
+                            publishedDate = formatDateDisplay(publishedAtDate);
+                        }
+                        
+                        menuStatusContainer.innerHTML = `
+                            <div class="menu-status ${statusClass}">
+                                <h4>Menú de la semana del ${formatDateDisplay(currentWeek)}</h4>
+                                <p>Estado: ${statusText}</p>
+                                ${publishedDate ? `<p>Publicado el: ${publishedDate}</p>` : ''}
+                            </div>
+                        `;
+                    } else {
+                        menuStatusContainer.innerHTML = `
+                            <div class="menu-status menu-status-missing">
+                                <h4>Menú de la semana del ${formatDateDisplay(currentWeek)}</h4>
+                                <p>Estado: No creado</p>
+                                <p>No hay menú para esta semana</p>
+                            </div>
+                        `;
+                    }
+                }
+            } catch (error) {
+                console.error("Error loading menu stats:", error);
+                throw error;
+            }
+        }
+        
+        // Load recent confirmations
+        async function loadRecentConfirmations() {
+            try {
+                // Get recent confirmations
+                const confirmationsSnapshot = await confirmationsCollection
+                    .orderBy('createdAt', 'desc')
+                    .limit(5)
+                    .get();
+                
+                const tableBody = document.getElementById('recent-confirmations-table-body');
+                if (tableBody) {
+                    if (confirmationsSnapshot.empty) {
+                        tableBody.innerHTML = `
+                            <tr>
+                                <td colspan="4" class="text-center">No hay confirmaciones recientes</td>
+                            </tr>
+                        `;
+                        return;
+                    }
+                    
+                    let tableHTML = '';
+                    confirmationsSnapshot.forEach(doc => {
+                        const confirmation = doc.data();
+                        const formattedDate = formatDateDisplay(new Date(confirmation.date));
+                        
+                        tableHTML += `
+                            <tr>
+                                <td>${formattedDate}</td>
+                                <td>${confirmation.coordinatorName}</td>
+                                <td>${confirmation.department}</td>
+                                <td>${confirmation.confirmedCount}</td>
+                            </tr>
+                        `;
+                    });
+                    
+                    tableBody.innerHTML = tableHTML;
+                }
+            } catch (error) {
+                console.error("Error loading recent confirmations:", error);
+                throw error;
+            }
+        }
+        
+        // Format date as YYYY-MM-DD
+        function formatDate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+        
+        // Format date for display (DD/MM/YYYY)
+        function formatDateDisplay(date) {
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}/${month}/${year}`;
+        }
+        
+        // Get Monday of the current week
+        function getMonday(date) {
+            const day = date.getDay();
+            const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Sunday
+            return new Date(date.setDate(diff));
+        }
+        
+        // Show loading state
+        function showLoadingState(isLoading) {
+            const loadingIndicator = document.getElementById('loading-indicator');
+            if (loadingIndicator) {
+                loadingIndicator.style.display = isLoading ? 'flex' : 'none';
+            }
+        }
+        
+        // Show error message
+        function showErrorMessage(message) {
+            const errorAlert = document.getElementById('error-alert');
+            if (errorAlert) {
+                errorAlert.textContent = message;
+                errorAlert.style.display = 'block';
+                
+                // Hide after 5 seconds
+                setTimeout(() => {
+                    errorAlert.style.display = 'none';
+                }, 5000);
+            }
+        }
+
+        // Asegúrate de que las colecciones estén disponibles
+        if (typeof window.employeesCollection === 'undefined') {
+            window.employeesCollection = window.db.collection("employees");
+        }
+        if (typeof window.confirmationsCollection === 'undefined') {
+            window.confirmationsCollection = window.db.collection("confirmations");
+        }
+        if (typeof window.menuCollection === 'undefined') {
+            window.menuCollection = window.db.collection("menus");
+        }
+
+        // Referencias locales para este script
+        const employeesCollection = window.employeesCollection;
+        const confirmationsCollection = window.confirmationsCollection;
+        const menuCollection = window.menuCollection;
+    </script>
 </body>
-</html>
+</html> 

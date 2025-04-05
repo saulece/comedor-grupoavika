@@ -1,24 +1,4 @@
-// Admin Users Management for Comedor Grupo Avika - Firebase v9 approach
-
-import { 
-    createUserWithEmailAndPassword,
-    updateProfile
-} from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
-
-import {
-    doc,
-    collection,
-    setDoc,
-    deleteDoc,
-    query,
-    where,
-    orderBy,
-    getDocs,
-    serverTimestamp
-} from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
-
-import { auth, db } from '../firebase-config.js';
-import { checkAuth, USER_ROLES, logout } from '../auth.js';
+// Admin Users Management for Comedor Grupo Avika - Firebase v8 approach
 
 // Ensure admin only access
 document.addEventListener('DOMContentLoaded', () => {
@@ -47,8 +27,12 @@ document.addEventListener('DOMContentLoaded', () => {
     loadCoordinators();
 });
 
+// Firebase services
+const db = firebase.firestore();
+const auth = firebase.auth();
+
 // Collection references
-const usersCollection = collection(db, 'users');
+const usersCollection = db.collection('users');
 
 // Setup event listeners
 function setupEventListeners() {
@@ -80,17 +64,16 @@ function setupEventListeners() {
     });
 }
 
-// Load coordinators from Firestore
+// Load coordinators from Firestore - Convertido a Firebase v8
 async function loadCoordinators() {
     try {
         showLoadingState(true);
         
-        // Get coordinators from Firestore
-        const q = query(usersCollection, 
-            where('role', '==', 'coordinator'),
-            orderBy('createdAt', 'desc')
-        );
-        const snapshot = await getDocs(q);
+        // Get coordinators from Firestore (v8)
+        const snapshot = await usersCollection
+            .where('role', '==', 'coordinator')
+            .orderBy('createdAt', 'desc')
+            .get();
         
         const tableBody = document.getElementById('coordinators-table-body');
         if (tableBody) {
@@ -193,29 +176,28 @@ async function createCoordinatorHandler(e) {
             throw new Error('La contraseña debe tener al menos 8 caracteres');
         }
         
-        // Check if email already exists
-        const q = query(usersCollection, where('email', '==', email));
-        const emailCheck = await getDocs(q);
+        // Check if email already exists (v8)
+        const emailCheck = await usersCollection.where('email', '==', email).get();
         if (!emailCheck.empty) {
             throw new Error('El correo electrónico ya está registrado');
         }
         
-        // Create user in Firebase Auth
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        // Create user in Firebase Auth (v8)
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
         const user = userCredential.user;
         
-        // Update display name
-        await updateProfile(user, {
+        // Set display name (v8)
+        await user.updateProfile({
             displayName: name
         });
         
-        // Add user to Firestore
-        await setDoc(doc(db, 'users', user.uid), {
+        // Add user to Firestore (v8)
+        await usersCollection.doc(user.uid).set({
             name: name,
             email: email,
             role: 'coordinator',
             branch: branch,
-            createdAt: serverTimestamp(),
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             createdBy: sessionStorage.getItem('userId')
         });
         
@@ -225,8 +207,9 @@ async function createCoordinatorHandler(e) {
         // Reset form
         document.getElementById('create-coordinator-form').reset();
         
-        // Reload coordinators list
+        // Reload coordinators
         loadCoordinators();
+        
     } catch (error) {
         console.error('Error creating coordinator:', error);
         showErrorMessage('Error al crear coordinador: ' + error.message);
@@ -284,7 +267,7 @@ async function deleteUserHandler() {
         showLoadingState(true);
         
         // Eliminar usuario de Firestore
-        await deleteDoc(doc(db, 'users', userId));
+        await usersCollection.doc(userId).delete();
         
         // Nota: Para eliminar también el usuario de Firebase Authentication 
         // se necesita una Cloud Function, ya que desde el cliente no se pueden 
