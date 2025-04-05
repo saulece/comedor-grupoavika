@@ -464,27 +464,36 @@ async function saveMenu() {
 }
 
 // Publish menu
+// Publish menu
 async function publishMenu() {
-    // Validate all days have menu items
-    if (!validateAllDays()) {
-        showErrorMessage("Todos los días deben tener al menos un plato para publicar el menú.");
-        return;
-    }
-    
     // Show loading state
     showLoadingState(true);
     
     try {
+        console.log("Intentando publicar menú...");
         const weekStartStr = formatDate(currentWeekStartDate);
         
-        // Save the current menu first to ensure all changes are saved
-        await saveMenu();
+        // First, get the current data to preserve any fields
+        const menuDoc = await menuCollection.doc(weekStartStr).get();
         
-        // Update menu status to published
-        await menuCollection.doc(weekStartStr).update({
+        // Prepare the update data
+        let updateData = {
             status: 'published',
             publishedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
+        };
+        
+        // If document exists, merge with existing data
+        if (menuDoc.exists) {
+            const currentData = menuDoc.data();
+            // Update but don't overwrite existing fields
+            updateData = { ...currentData, ...updateData };
+        }
+        
+        // Update or create menu document
+        await menuCollection.doc(weekStartStr).set(updateData, { merge: true });
+        
+        // Log success
+        console.log("Menú publicado exitosamente");
         
         // Update publish status
         updatePublishStatus(true);
@@ -493,7 +502,7 @@ async function publishMenu() {
         showSuccessMessage('Menú publicado correctamente.');
     } catch (error) {
         console.error("Error publishing menu:", error);
-        showErrorMessage("Error al publicar el menú. Por favor intente de nuevo.");
+        showErrorMessage("Error al publicar el menú: " + error.message);
     } finally {
         // Hide loading state
         showLoadingState(false);
@@ -784,9 +793,49 @@ function showImportExcelModal() {
     }
 }
 
+// Show Publish Menu Modal
 function showPublishMenuModal() {
+    // Get the modal element
     const modal = document.getElementById('publish-menu-modal');
-    if (modal) {
+    if (!modal) {
+        console.warn('Publish menu modal not found');
+        return;
+    }
+    
+    // Check if there are menu items in all days
+    const isValid = validateAllDays();
+    
+    // Get validation errors container
+    const validationErrors = document.getElementById('publish-menu-validation-errors');
+    
+    if (!isValid) {
+        if (validationErrors) {
+            validationErrors.innerHTML = '<p>No se puede publicar el menú porque algunos días no tienen platos añadidos.</p>';
+            validationErrors.style.display = 'block';
+        }
+        showErrorMessage("Todos los días deben tener al menos un plato para publicar el menú.");
+        return;
+    } else {
+        if (validationErrors) {
+            validationErrors.style.display = 'none';
+        }
+        
+        // Set up confirm button
+        const confirmButton = document.querySelector('#publish-menu-modal button.btn-primary');
+        if (confirmButton) {
+            // Remove previous event listeners by cloning
+            const newButton = confirmButton.cloneNode(true);
+            confirmButton.parentNode.replaceChild(newButton, confirmButton);
+            
+            // Add new event listener
+            newButton.addEventListener('click', async function(e) {
+                e.preventDefault();
+                modal.style.display = 'none'; // Hide modal first
+                await publishMenu(); // Then publish menu
+            });
+        }
+        
+        // Show the modal
         modal.style.display = 'block';
     }
 }
