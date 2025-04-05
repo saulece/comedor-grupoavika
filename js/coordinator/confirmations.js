@@ -208,14 +208,11 @@ async function loadExistingConfirmations(dateString) {
     showLoadingState(true);
     
     try {
-        // Query existing confirmations for this date and department
-        const confirmationsQuery = query(
-            confirmationsCollection,
-            where('date', '==', dateString),
-            where('departmentId', '==', currentUser.departmentId)
-        );
-        
-        const querySnapshot = await getDocs(confirmationsQuery);
+        // Query existing confirmations for this date and department - convertido a v8
+        const querySnapshot = await confirmationsCollection
+            .where('date', '==', dateString)
+            .where('departmentId', '==', currentUser.departmentId)
+            .get();
         
         // If we have existing confirmations
         if (!querySnapshot.empty) {
@@ -398,14 +395,11 @@ async function saveConfirmation(event) {
             });
         });
         
-        // Check if we already have a confirmation for this date
-        const confirmationsQuery = query(
-            confirmationsCollection,
-            where('date', '==', date),
-            where('departmentId', '==', currentUser.departmentId)
-        );
-        
-        const querySnapshot = await getDocs(confirmationsQuery);
+        // Check if we already have a confirmation for this date - convertido a v8
+        const querySnapshot = await confirmationsCollection
+            .where('date', '==', date)
+            .where('departmentId', '==', currentUser.departmentId)
+            .get();
         
         // Prepare confirmation data
         const confirmationData = {
@@ -416,18 +410,18 @@ async function saveConfirmation(event) {
             coordinatorName: currentUser.displayName || currentUser.email,
             employees: selectedEmployees,
             comments: comments,
-            updatedAt: Timestamp.now()
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         
         if (querySnapshot.empty) {
-            // Create new confirmation
-            confirmationData.createdAt = Timestamp.now();
-            await addDoc(confirmationsCollection, confirmationData);
+            // Create new confirmation - convertido a v8
+            confirmationData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+            await confirmationsCollection.add(confirmationData);
             showSuccessMessage('Confirmación guardada correctamente.');
         } else {
-            // Update existing confirmation
-            const docRef = doc(db, 'confirmations', querySnapshot.docs[0].id);
-            await setDoc(docRef, confirmationData, { merge: true });
+            // Update existing confirmation - convertido a v8
+            const docRef = querySnapshot.docs[0].ref;
+            await docRef.set(confirmationData, { merge: true });
             showSuccessMessage('Confirmación actualizada correctamente.');
         }
         
