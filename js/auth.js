@@ -70,7 +70,7 @@ async function loginUser(email, password) {
         // Get additional user information from Firestore
         const userDoc = await firebase.firestore().collection("users").doc(user.uid).get();
         
-        if (userDoc.exists()) {
+        if (userDoc.exists) {
             const userData = userDoc.data();
             
             // Save important information in sessionStorage
@@ -172,7 +172,7 @@ firebase.auth().onAuthStateChanged(async (user) => {
             // Get user data including role
             const userDoc = await firebase.firestore().collection("users").doc(user.uid).get();
             
-            if (userDoc.exists()) {
+            if (userDoc.exists) {
                 const userData = userDoc.data();
                 
                 // Save user data to session storage if not already there
