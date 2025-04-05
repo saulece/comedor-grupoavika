@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirmaciones - Administrador</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+    <link rel="stylesheet" href="../../css/admin.css">
+    <link rel="icon" type="image/x-icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+</head>
+<body>
+    <div class="admin-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <img src="../../assets/img/logo-small.png" alt="Grupo Avika Logo">
+                <h3>Grupo Avika</h3>
+            </div>
+            <div class="sidebar-menu">
+                <ul>
+                    <li>
+                        <a href="dashboard.html">
+                            <i class="fas fa-tachometer-alt"></i> Dashboard
+                        </a>
+                    </li>
+                    <li>
+                        <a href="menu.html">
+                            <i class="fas fa-utensils"></i> Menú
+                        </a>
+                    </li>
+                    <li>
+                        <a href="confirmations.html" class="active">
+                            <i class="fas fa-clipboard-check"></i> Confirmaciones
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" id="logout-btn">
+                            <i class="fas fa-sign-out-alt"></i> Cerrar sesión
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="content-header">
+                <h2>Confirmaciones</h2>
+                <div class="user-info">
+                    <span id="user-name">Administrador</span>
+                </div>
+            </div>
+
+            <!-- Filter Controls -->
+            <div class="filter-controls">
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <label for="date-range">Rango de fechas</label>
+                        <div class="date-range-picker">
+                            <div class="input-with-icon">
+                                <i class="fas fa-calendar"></i>
+                                <input type="text" id="start-date" class="form-control date-input" placeholder="Fecha inicio">
+                            </div>
+                            <span class="date-separator">-</span>
+                            <div class="input-with-icon">
+                                <i class="fas fa-calendar"></i>
+                                <input type="text" id="end-date" class="form-control date-input" placeholder="Fecha fin">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label for="department-filter">Departamento</label>
+                        <select id="department-filter" class="form-control">
+                            <option value="">Todos los departamentos</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label for="coordinator-filter">Coordinador</label>
+                        <select id="coordinator-filter" class="form-control">
+                            <option value="">Todos los coordinadores</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="filter-actions">
+                    <button id="apply-filters-btn" class="btn btn-primary">
+                        <i class="fas fa-filter"></i> Aplicar Filtros
+                    </button>
+                    <button id="reset-filters-btn" class="btn btn-secondary">
+                        <i class="fas fa-undo"></i> Restablecer
+                    </button>
+                    <button id="export-csv-btn" class="btn btn-secondary">
+                        <i class="fas fa-file-csv"></i> Exportar a CSV
+                    </button>
+                </div>
+            </div>
+
+            <!-- Summary Cards -->
+            <div class="summary-cards">
+                <div class="summary-card">
+                    <div class="summary-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="summary-info">
+                        <h4>Total Confirmaciones</h4>
+                        <p id="total-confirmations">0</p>
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-icon">
+                        <i class="fas fa-user-check"></i>
+                    </div>
+                    <div class="summary-info">
+                        <h4>Empleados Confirmados</h4>
+                        <p id="total-employees-confirmed">0</p>
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-icon">
+                        <i class="fas fa-chart-pie"></i>
+                    </div>
+                    <div class="summary-info">
+                        <h4>Promedio por Día</h4>
+                        <p id="average-per-day">0</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Confirmations Table -->
+            <div class="card confirmations-table-card">
+                <div class="card-header">
+                    <h3>Lista de Confirmaciones</h3>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="data-table" id="confirmations-table">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Departamento</th>
+                                    <th>Coordinador</th>
+                                    <th>Empleados Confirmados</th>
+                                    <th>Fecha de Registro</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="confirmations-table-body">
+                                <tr>
+                                    <td colspan="6" class="text-center">Cargando confirmaciones...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="table-pagination" id="confirmations-pagination">
+                        <div class="pagination-info">
+                            Mostrando <span id="page-info">0-0 de 0</span> resultados
+                        </div>
+                        <div class="pagination-controls">
+                            <button id="prev-page" class="btn btn-icon pagination-btn" disabled>
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <span id="page-number">Página 1</span>
+                            <button id="next-page" class="btn btn-icon pagination-btn" disabled>
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Confirmation Details Modal -->
+    <div id="confirmation-details-modal" class="modal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h3>Detalles de Confirmación</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="confirmation-info">
+                    <div class="info-row">
+                        <div class="info-group">
+                            <label>Fecha:</label>
+                            <p id="detail-date"></p>
+                        </div>
+                        <div class="info-group">
+                            <label>Departamento:</label>
+                            <p id="detail-department"></p>
+                        </div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-group">
+                            <label>Coordinador:</label>
+                            <p id="detail-coordinator"></p>
+                        </div>
+                        <div class="info-group">
+                            <label>Empleados Confirmados:</label>
+                            <p id="detail-confirmed-count"></p>
+                        </div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-group">
+                            <label>Creado:</label>
+                            <p id="detail-created-at"></p>
+                        </div>
+                        <div class="info-group">
+                            <label>Última actualización:</label>
+                            <p id="detail-updated-at"></p>
+                        </div>
+                    </div>
+                </div>
+                
+                <h4>Lista de Empleados Confirmados</h4>
+                <div class="table-responsive">
+                    <table class="data-table" id="confirmed-employees-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Nombre</th>
+                                <th>Posición</th>
+                                <th>Email</th>
+                            </tr>
+                        </thead>
+                        <tbody id="confirmed-employees-table-body">
+                            <tr>
+                                <td colspan="4" class="text-center">Cargando empleados...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="form-group form-buttons mt-4">
+                    <button type="button" class="btn btn-secondary cancel-modal">Cerrar</button>
+                    <button type="button" class="btn btn-primary" id="export-employees-btn">
+                        <i class="fas fa-file-csv"></i> Exportar Lista
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loading-indicator" style="display: none;">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Alert Messages -->
+    <div id="error-alert" class="alert-message error-message" style="display: none;"></div>
+    <div id="success-alert" class="alert-message success-message" style="display: none;"></div>
+
+    <!-- Firebase Scripts -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    
+    <!-- External Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
+    
+    <!-- Custom Scripts -->
+    <script src="../../js/firebase-config.js"></script>
+    <script src="../../js/auth.js"></script>
+    <script src="../../js/utils/data-formatter.js"></script>
+    <script src="../../js/admin/confirmations.js"></script>
+</body>
+</html> 
