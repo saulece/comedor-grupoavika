@@ -1,8 +1,7 @@
 // Admin Menu Management for Comedor Grupo Avika
 
-// Firebase references
-// Use the db already defined in firebase-config.js
-const menuCollection = db.collection('menus');
+// Use global Firebase references from firebase-config.js
+// db and menuCollection are already defined
 
 // Global variables and constants
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
