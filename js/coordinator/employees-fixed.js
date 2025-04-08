@@ -44,8 +44,8 @@ function setupEventListeners() {
 
 // Load employees for the coordinator's department
 function loadEmployees() {
-    // Show loading state
-    showLoadingState(true);
+    // Usar el nuevo mu00f3dulo para mostrar el estado de carga
+    window.errorHandler.toggleLoadingIndicator(true);
     
     console.log('Cargando empleados...');
     console.log('Usuario actual:', currentUser);
@@ -56,17 +56,15 @@ function loadEmployees() {
     // Verificar si tenemos la informaciu00f3n del usuario actual
     if (!currentUser || !currentUser.departmentId) {
         console.error('No se encontru00f3 informaciu00f3n del usuario o departamento');
-        showErrorMessage("Error: No se pudo identificar su departamento. Por favor inicie sesiu00f3n nuevamente.");
-        showLoadingState(false);
+        window.errorHandler.showUIError("Error: No se pudo identificar su departamento. Por favor inicie sesiu00f3n nuevamente.");
+        window.errorHandler.toggleLoadingIndicator(false);
         return;
     }
     
     console.log('Buscando empleados para departamento:', currentUser.departmentId);
     
-    // Get employees from Firestore - Sin ordenamiento para evitar problemas de u00edndice
-    window.db.collection('employees')
-        .where('departmentId', '==', currentUser.departmentId)
-        .get()
+    // Usar el nuevo servicio de Firestore para obtener empleados
+    window.firestoreServices.employee.getEmployeesByDepartment(currentUser.departmentId)
         .then(querySnapshot => {
             console.log(`Se encontraron ${querySnapshot.size} empleados`);
             
@@ -86,22 +84,19 @@ function loadEmployees() {
             displayEmployees(currentEmployees);
             
             // Hide loading state
-            showLoadingState(false);
+            window.errorHandler.toggleLoadingIndicator(false);
         })
         .catch(error => {
             console.error("Error loading employees:", error);
-            let errorMessage = "Error al cargar la lista de empleados. ";
             
-            if (error.code === 'permission-denied') {
-                errorMessage += "No tiene permisos para acceder a esta informaciu00f3n.";
-            } else if (error.message && error.message.includes('index')) {
-                errorMessage += "Se requiere un u00edndice en la base de datos. Por favor contacte al administrador.";
-            } else {
-                errorMessage += "Por favor intente de nuevo.";
-            }
+            // Usar el nuevo mu00f3dulo de manejo de errores para mostrar un mensaje amigable
+            const errorMessage = window.errorHandler.handleFirestoreError(
+                error, 
+                "Error al cargar la lista de empleados. Por favor intente de nuevo."
+            );
             
-            showErrorMessage(errorMessage);
-            showLoadingState(false);
+            window.errorHandler.showUIError(errorMessage);
+            window.errorHandler.toggleLoadingIndicator(false);
         });
 }
 
@@ -285,8 +280,8 @@ async function saveEmployee(event) {
         return;
     }
     
-    // Show loading state
-    showLoadingState(true);
+    // Mostrar estado de carga usando el nuevo mu00f3dulo
+    window.errorHandler.toggleLoadingIndicator(true);
     
     // Get form values
     const name = document.getElementById('employee-name').value;
@@ -314,19 +309,20 @@ async function saveEmployee(event) {
     console.log('Objeto de empleado a guardar:', employee);
     
     try {
+        // Usar el nuevo servicio de Firestore para guardar el empleado
         if (employeeId) {
             // Update existing employee
             console.log('Actualizando empleado existente con ID:', employeeId);
-            await window.db.collection('employees').doc(employeeId).update(employee);
-            showSuccessMessage('Empleado actualizado correctamente.');
+            await window.firestoreServices.employee.saveEmployee(employeeId, employee);
+            window.errorHandler.showUISuccess('Empleado actualizado correctamente.');
         } else {
             // Add created timestamp for new employees
             employee.createdAt = firebase.firestore.FieldValue.serverTimestamp();
             
             // Create new employee
             console.log('Creando nuevo empleado');
-            await window.db.collection('employees').add(employee);
-            showSuccessMessage('Empleado agregado correctamente.');
+            await window.firestoreServices.employee.saveEmployee(null, employee);
+            window.errorHandler.showUISuccess('Empleado agregado correctamente.');
         }
         
         // Close modal
@@ -336,16 +332,15 @@ async function saveEmployee(event) {
         loadEmployees();
     } catch (error) {
         console.error("Error saving employee:", error);
-        let errorMessage = "Error al guardar el empleado. ";
         
-        if (error.code === 'permission-denied') {
-            errorMessage += "No tiene permisos para realizar esta acciu00f3n.";
-        } else {
-            errorMessage += "Por favor intente de nuevo.";
-        }
+        // Usar el nuevo mu00f3dulo de manejo de errores para mostrar un mensaje amigable
+        const errorMessage = window.errorHandler.handleFirestoreError(
+            error, 
+            "Error al guardar el empleado. Por favor intente de nuevo."
+        );
         
-        showErrorMessage(errorMessage);
-        showLoadingState(false);
+        window.errorHandler.showUIError(errorMessage);
+        window.errorHandler.toggleLoadingIndicator(false);
     }
 }
 
