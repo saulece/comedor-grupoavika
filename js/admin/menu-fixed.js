@@ -389,22 +389,32 @@ function loadCurrentMenu() {
 
 // Save menu to Firebase
 async function saveMenu() {
+    console.log('Iniciando guardado de menú...');
     // Show loading state
     showLoadingState(true);
     
     try {
         // Get current day's menu items
-        const menuItemsContainer = document.querySelector('.menu-items-list');
+        const menuItemsContainer = document.getElementById('menu-items-container');
         
         if (!menuItemsContainer) {
-            throw new Error(`Menu items container for ${currentDay} not found`);
+            throw new Error(`Contenedor principal de menú no encontrado`);
+        }
+        
+        // Buscar el contenedor de elementos del día actual
+        const dayItemsList = menuItemsContainer.querySelector('.menu-items-list');
+        
+        if (!dayItemsList) {
+            throw new Error(`Lista de elementos para ${currentDay} no encontrada`);
         }
         
         // Get menu items
         const menuItems = [];
-        const menuItemElements = menuItemsContainer.querySelectorAll('.menu-item');
+        const menuItemElements = dayItemsList.querySelectorAll('.menu-item');
         
-        menuItemElements.forEach(item => {
+        console.log(`Encontrados ${menuItemElements.length} elementos para el día ${currentDay}`);
+        
+        menuItemElements.forEach((item, index) => {
             const nameInput = item.querySelector('.menu-item-name');
             const descriptionInput = item.querySelector('.menu-item-description');
             
@@ -413,6 +423,7 @@ async function saveMenu() {
                     name: nameInput.value.trim(),
                     description: descriptionInput ? descriptionInput.value.trim() : ''
                 });
+                console.log(`Elemento ${index + 1} agregado: ${nameInput.value.trim()}`);
             }
         });
         
@@ -420,6 +431,8 @@ async function saveMenu() {
         menuData[currentDay] = {
             items: menuItems
         };
+        
+        console.log(`Menú actualizado para ${currentDay}:`, menuData[currentDay]);
         
         // Prepare data for Firestore
         const weekStartStr = formatDate(currentWeekStartDate);
@@ -435,14 +448,17 @@ async function saveMenu() {
             }
         });
         
+        console.log('Guardando en Firebase:', menuDoc);
+        
         // Update or create menu document
         await menuCollection.doc(weekStartStr).set(menuDoc, { merge: true });
         
         // Show success message
         showSuccessMessage('Menú guardado correctamente.');
+        console.log('Menú guardado con éxito');
     } catch (error) {
         console.error("Error saving menu:", error);
-        showErrorMessage("Error al guardar el menú. Por favor intente de nuevo.");
+        showErrorMessage("Error al guardar el menú: " + error.message);
     } finally {
         // Hide loading state
         showLoadingState(false);
