@@ -5,6 +5,16 @@
 
 // Global variables and constants
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+// Mapa para normalizar los nombres de los días (sin acentos)
+const DAYS_NORMALIZED = {
+    'Lunes': 'lunes',
+    'Martes': 'martes',
+    'Miércoles': 'miercoles',
+    'Jueves': 'jueves',
+    'Viernes': 'viernes',
+    'Sábado': 'sabado',
+    'Domingo': 'domingo'
+};
 let menuData = {};
 let currentDay = 'Lunes';
 let currentWeekStartDate = getMonday(new Date());
@@ -388,9 +398,9 @@ function loadCurrentMenu() {
                 
                 // Set menu data
                 DAYS.forEach(day => {
-                    const dayLower = day.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-                    if (data[dayLower]) {
-                        menuData[day] = data[dayLower];
+                    const normalizedDay = DAYS_NORMALIZED[day];
+                    if (data[normalizedDay]) {
+                        menuData[day] = data[normalizedDay];
                     }
                 });
                 
@@ -486,9 +496,9 @@ async function saveMenu() {
         
         // Añadir datos del menú para cada día
         DAYS.forEach(day => {
-            const dayKey = day.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            const normalizedDay = DAYS_NORMALIZED[day];
             if (menuData[day] && menuData[day].items) {
-                menuDoc[dayKey] = menuData[day];
+                menuDoc[normalizedDay] = menuData[day];
             }
         });
         
