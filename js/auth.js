@@ -16,7 +16,12 @@ function checkAuth(requiredRole) {
     const userId = sessionStorage.getItem("userId");
     
     if (!userId) {
-        window.location.href = "../../index.html";
+        // Redirect to login page
+        const currentPath = window.location.pathname;
+        // Check if we're not already on the login page to avoid redirect loop
+        if (!currentPath.includes('index.html') && currentPath !== '/') {
+            window.location.href = getBasePath() + "index.html";
+        }
         return false;
     }
     
@@ -30,16 +35,26 @@ function checkAuth(requiredRole) {
 }
 
 /**
- * Redirect user based on their role
- * @param {string} role - User role
+ * Get base path depending on current location
+ * @returns {string} - Base path to use for redirects
  */
-function redirectBasedOnRole(role) {
+function getBasePath() {
     let basePath = "";
     
     // Determine if we're in a subfolder by checking the current path
     if (window.location.pathname.includes('/pages/')) {
         basePath = "../../";
     }
+    
+    return basePath;
+}
+
+/**
+ * Redirect user based on their role
+ * @param {string} role - User role
+ */
+function redirectBasedOnRole(role) {
+    let basePath = getBasePath();
     
     switch (role) {
         case USER_ROLES.ADMIN:
@@ -79,6 +94,11 @@ async function loginUser(email, password) {
         
         if (userDoc.exists) {
             const userData = userDoc.data();
+            
+            // Validate user role
+            if (!userData.role || (userData.role !== USER_ROLES.ADMIN && userData.role !== USER_ROLES.COORDINATOR)) {
+                throw new Error("Invalid user role");
+            }
             
             // Create a user object
             const userObject = {
@@ -143,6 +163,10 @@ function handleAuthError(error) {
         errorMessage = "Correo electrónico inválido";
     } else if (error.code === "auth/too-many-requests") {
         errorMessage = "Demasiados intentos fallidos. Intenta más tarde";
+    } else if (error.code === "auth/network-request-failed") {
+        errorMessage = "Error de conexión. Verifica tu conexión a internet";
+    } else if (error.message) {
+        errorMessage = error.message;
     }
     
     // Show error message
@@ -158,6 +182,9 @@ function showError(message) {
     if (errorElement) {
         errorElement.textContent = message;
         errorElement.style.display = "block";
+    } else {
+        console.error(message);
+        alert("Error: " + message);
     }
 }
 
@@ -181,16 +208,21 @@ function logout() {
             // Clear session storage
             sessionStorage.clear();
             // Redirect to login page
-            window.location.href = "../../index.html";
+            window.location.href = getBasePath() + "index.html";
         })
         .catch((error) => {
             console.error("Logout error:", error);
+            alert("Error al cerrar sesión: " + error.message);
         });
 }
 
 // Check if user is already logged in when page loads
 firebase.auth().onAuthStateChanged(async (user) => {
-    if (user) {
+    // Only handle auth state if we're on the login page
+    const isLoginPage = window.location.pathname.endsWith("index.html") || 
+                        window.location.pathname === "/";
+                       
+    if (isLoginPage && user) {
         try {
             // Get user data including role
             const userDoc = await firebase.firestore().collection("users").doc(user.uid).get();
@@ -223,11 +255,8 @@ firebase.auth().onAuthStateChanged(async (user) => {
                     sessionStorage.setItem("userDepartment", userData.department || "");
                     sessionStorage.setItem("userDepartmentId", userData.departmentId || "");
                     
-                    // Only redirect if we're on the login page
-                    if (window.location.pathname.endsWith("index.html") || 
-                        window.location.pathname === "/") {
-                        redirectBasedOnRole(userData.role);
-                    }
+                    // Redirect to appropriate dashboard
+                    redirectBasedOnRole(userData.role);
                 }
             }
         } catch (error) {

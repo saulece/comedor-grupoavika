@@ -87,7 +87,7 @@ function loadConfirmations() {
     // Clear previous data
     const confirmationsTable = document.getElementById('confirmations-table-body');
     if (confirmationsTable) {
-        confirmationsTable.innerHTML = '';
+        confirmationsTable.innerHTML = '<tr><td colspan="7" class="text-center">Cargando datos...</td></tr>';
     }
     
     // Get date range
@@ -109,40 +109,46 @@ function loadConfirmations() {
     const endDateStr = formatDate(endDate);
     
     // Query Firestore for confirmations
-    confirmationsCollection
-        .where('date', '>=', startDateStr)
-        .where('date', '<=', endDateStr)
-        .orderBy('date')
-        .get()
-        .then(querySnapshot => {
-            // Group confirmations by date and coordinator
-            const confirmationsByDate = {};
-            
-            querySnapshot.forEach(doc => {
-                const confirmation = doc.data();
-                confirmation.id = doc.id;
+    try {
+        window.db.collection('confirmations')
+            .where('date', '>=', startDateStr)
+            .where('date', '<=', endDateStr)
+            .orderBy('date')
+            .get()
+            .then(querySnapshot => {
+                // Group confirmations by date and coordinator
+                const confirmationsByDate = {};
                 
-                if (!confirmationsByDate[confirmation.date]) {
-                    confirmationsByDate[confirmation.date] = [];
-                }
+                querySnapshot.forEach(doc => {
+                    const confirmation = doc.data();
+                    confirmation.id = doc.id;
+                    
+                    if (!confirmationsByDate[confirmation.date]) {
+                        confirmationsByDate[confirmation.date] = [];
+                    }
+                    
+                    confirmationsByDate[confirmation.date].push(confirmation);
+                });
                 
-                confirmationsByDate[confirmation.date].push(confirmation);
+                // Display confirmations
+                displayConfirmations(confirmationsByDate);
+                
+                // Update summary
+                updateSummary(confirmationsByDate);
+                
+                // Hide loading state
+                showLoadingState(false);
+            })
+            .catch(error => {
+                console.error("Error loading confirmations:", error);
+                showErrorMessage("Error al cargar las confirmaciones. Por favor intente de nuevo.");
+                showLoadingState(false);
             });
-            
-            // Display confirmations
-            displayConfirmations(confirmationsByDate);
-            
-            // Update summary
-            updateSummary(confirmationsByDate);
-            
-            // Hide loading state
-            showLoadingState(false);
-        })
-        .catch(error => {
-            console.error("Error loading confirmations:", error);
-            showErrorMessage("Error al cargar las confirmaciones. Por favor intente de nuevo.");
-            showLoadingState(false);
-        });
+    } catch (error) {
+        console.error("Error preparing query:", error);
+        showErrorMessage("Error al preparar la consulta de confirmaciones. Por favor intente de nuevo.");
+        showLoadingState(false);
+    }
 }
 
 // Display confirmations in the table

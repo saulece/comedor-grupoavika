@@ -9,6 +9,7 @@
     <link rel="icon" type="image/x-icon" href="../../favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <link rel="stylesheet" href="../../css/custom.css">
+    <link rel="stylesheet" href="../../css/fixes.css">
 </head>
 <body>
     <div class="admin-container">
@@ -399,16 +400,9 @@
             }
         }
 
-        // Define collection variables if they don't exist
-        if (typeof employeesCollection === 'undefined') {
-            const employeesCollection = db.collection("employees");
-        }
-        if (typeof confirmationsCollection === 'undefined') {
-            const confirmationsCollection = db.collection("confirmations");
-        }
-        if (typeof menuCollection === 'undefined') {
-            const menuCollection = db.collection("menus");
-        }
+        // Asegurarse de que las colecciones estén disponibles
+        // Estas colecciones ya están definidas globalmente en firebase-config.js
+        // Así que solo verificamos que existan y las usamos directamente
     </script>
 </body>
 </html> 

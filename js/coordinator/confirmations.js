@@ -153,13 +153,22 @@ datePicker.addEventListener('change', () => {
 
 // También muestra el día actual al cargar la página
 showDayOfWeek(formatDateInput(new Date()));
+/**
+ * Setup event listeners for interactive elements
+ */
 function setupEventListeners() {
     // Confirmation form submission
     const confirmationForm = document.getElementById('confirmation-form');
     if (confirmationForm) {
         confirmationForm.addEventListener('submit', saveConfirmation);
     } else {
-        console.warn('Confirmation form not found');
+        const submitBtn = document.getElementById('submit-confirmation-btn');
+        if (submitBtn) {
+            submitBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                saveConfirmation(e);
+            });
+        }
     }
     
     // Select/deselect all employees
@@ -167,132 +176,110 @@ function setupEventListeners() {
     if (selectAllCheckbox) {
         selectAllCheckbox.addEventListener('change', toggleAllEmployees);
     } else {
-        console.warn('Select all checkbox not found');
+        const selectAllBtn = document.getElementById('select-all-btn');
+        if (selectAllBtn) {
+            selectAllBtn.addEventListener('click', function() {
+                selectAllEmployees(true);
+            });
+        }
+    }
+    
+    // Clear selection button
+    const clearSelectionBtn = document.getElementById('clear-selection-btn');
+    if (clearSelectionBtn) {
+        clearSelectionBtn.addEventListener('click', function() {
+            selectAllEmployees(false);
+        });
     }
     
     // Search employees
-    const searchInput = document.getElementById('search-employees');
+    const searchInput = document.getElementById('employee-search');
     if (searchInput) {
         searchInput.addEventListener('input', filterEmployees);
-    } else {
-        console.warn('Search input not found');
+    }
+    
+    // Date picker
+    const datePicker = document.getElementById('confirmation-date');
+    if (datePicker) {
+        // Initialize Flatpickr if available
+        if (window.flatpickr) {
+            window.flatpickr(datePicker, {
+                dateFormat: 'Y-m-d',
+                minDate: 'today',
+                maxDate: new Date().fp_incr(14), // 14 days from now
+                locale: 'es',
+                onChange: function(selectedDates) {
+                    if (selectedDates && selectedDates[0]) {
+                        loadExistingConfirmations(formatDate(selectedDates[0]));
+                        showDayOfWeek(formatDate(selectedDates[0]));
+                    }
+                }
+            });
+        } else {
+            // Fallback to regular date input
+            datePicker.addEventListener('change', function() {
+                loadExistingConfirmations(this.value);
+                showDayOfWeek(this.value);
+            });
+        }
+        
+        // Set initial date value (today)
+        datePicker.value = formatDateInput(new Date());
+        showDayOfWeek(datePicker.value);
     }
     
     // Employee checkboxes - add event delegation to handle employee selection changes
-    const employeeListContainer = document.getElementById('employee-list');
+    const employeeListContainer = document.getElementById('employees-list');
     if (employeeListContainer) {
-        employeeListContainer.addEventListener('change', (event) => {
-            if (event.target.classList.contains('employee-select')) {
+        employeeListContainer.addEventListener('change', function(event) {
+            if (event.target.classList.contains('employee-select') || 
+                event.target.type === 'checkbox') {
                 updateEmployeeCount();
             }
         });
     }
-}
-
-/**
- * Load employees for the coordinator's department
- */
-async function loadEmployees() {
-    // Show loading state
-    showLoadingState(true);
     
-    try {
-        // Make sure we have the department ID
-        if (!currentUser.departmentId) {
-            throw new Error('Department ID not found for current user');
-        }
-        
-        // Query employees for this department - adaptado a Firebase v8
-        const employeesSnapshot = await employeesCollection
-            .where('departmentId', '==', currentUser.departmentId)
-            .where('active', '==', true)
-            .orderBy('name')
-            .get();
-        
-        // Reset employee list
-        employeeList = [];
-        
-        // Process query results
-        employeesSnapshot.forEach(doc => {
-            const employee = doc.data();
-            employee.id = doc.id;
-            employeeList.push(employee);
+    // Dashboard button in success modal
+    const viewDashboardBtn = document.getElementById('view-dashboard-btn');
+    if (viewDashboardBtn) {
+        viewDashboardBtn.addEventListener('click', function() {
+            window.location.href = 'dashboard.html';
         });
-        
-        // Display employees
-        displayEmployees(employeeList);
-    } catch (error) {
-        console.error("Error loading employees:", error);
-        showErrorMessage("Error al cargar la lista de empleados. Por favor intente de nuevo.");
-    } finally {
-        // Hide loading state
-        showLoadingState(false);
     }
 }
 
-/**
- * Load existing confirmations for a specific date
- * @param {string} dateString - Date in YYYY-MM-DD format
- */
-async function loadExistingConfirmations(dateString) {
-    if (!dateString || !isValidDateString(dateString)) {
-        console.warn('Invalid date provided:', dateString);
-        return;
-    }
+// Helper to select or deselect all employees
+function selectAllEmployees(select) {
+    const checkboxes = document.querySelectorAll('#employees-list input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = select;
+    });
+    updateEmployeeCount();
+}
+
+// Display day of week for selected date
+function showDayOfWeek(dateString) {
+    if (!dateString || !isValidDateString(dateString)) return;
     
-    // Show loading state
-    showLoadingState(true);
+    const date = new Date(dateString);
+    const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    const dayOfWeek = days[date.getDay()];
     
-    try {
-        // Query existing confirmations for this date and department - convertido a v8
-        const querySnapshot = await confirmationsCollection
-            .where('date', '==', dateString)
-            .where('departmentId', '==', currentUser.departmentId)
-            .get();
-        
-        // If we have existing confirmations
-        if (!querySnapshot.empty) {
-            const confirmationDoc = querySnapshot.docs[0];
-            const confirmationData = confirmationDoc.data();
-            
-            // Set form fields
-            const commentsField = document.getElementById('confirmation-comments');
-            if (commentsField && confirmationData.comments) {
-                commentsField.value = confirmationData.comments;
-            }
-            
-            // Set confirmed employees
-            if (confirmationData.employees && Array.isArray(confirmationData.employees)) {
-                const employeeIds = confirmationData.employees.map(emp => emp.id);
-                
-                // Check corresponding checkboxes
-                document.querySelectorAll('.employee-select').forEach(checkbox => {
-                    checkbox.checked = employeeIds.includes(checkbox.value);
-                });
-                
-                // Update count
-                updateEmployeeCount();
-            }
-            
-            // Show a notice that we're editing an existing confirmation
-            showInfoMessage('Editando confirmación existente para esta fecha.');
-        } else {
-            // Reset form for new confirmation
-            resetConfirmationForm();
+    const dayDisplay = document.getElementById('day-of-week-display');
+    if (dayDisplay) {
+        dayDisplay.textContent = dayOfWeek;
+    } else {
+        // Create the element if it doesn't exist
+        const dateContainer = document.querySelector('.date-selector');
+        if (dateContainer) {
+            const newDisplay = document.createElement('div');
+            newDisplay.id = 'day-of-week-display';
+            newDisplay.className = 'day-of-week';
+            newDisplay.textContent = dayOfWeek;
+            dateContainer.appendChild(newDisplay);
         }
-    } catch (error) {
-        console.error("Error loading existing confirmations:", error);
-        showErrorMessage("Error al cargar confirmaciones existentes.");
-    } finally {
-        // Hide loading state
-        showLoadingState(false);
     }
 }
-
-/**
- * Display employees in the list
- * @param {Array} employees - List of employee objects
- */
 function displayEmployees(employees) {
     const employeeListContainer = document.getElementById('employee-list');
     if (!employeeListContainer) {
