@@ -478,7 +478,10 @@ async function saveMenu() {
         // Preparar datos para Firestore
         const weekStartStr = formatDate(currentWeekStartDate);
         const menuDoc = {
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            // Marcar el menú como publicado automáticamente al guardar
+            status: 'published',
+            publishedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         
         // Añadir datos del menú para cada día
@@ -489,10 +492,13 @@ async function saveMenu() {
             }
         });
         
-        console.log('Guardando en Firebase:', menuDoc);
+        console.log('Guardando y publicando en Firebase:', menuDoc);
         
         // Actualizar o crear documento de menú
         await menuCollection.doc(weekStartStr).set(menuDoc, { merge: true });
+        
+        // Actualizar el estado de publicación en la UI
+        updatePublishStatus(true);
         
         // Mostrar mensaje de éxito
         showSuccessMessage('Menú guardado correctamente');

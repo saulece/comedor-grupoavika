@@ -6,6 +6,32 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
     
+    // Set user name
+    let userName = 'Coordinador';
+    try {
+        const userJson = sessionStorage.getItem('user');
+        if (userJson) {
+            const userObj = JSON.parse(userJson);
+            userName = userObj.displayName || userName;
+        }
+    } catch (error) {
+        console.error('Error parsing user data:', error);
+    }
+    
+    const userNameElement = document.getElementById('user-name');
+    if (userNameElement) {
+        userNameElement.textContent = userName;
+    }
+    
+    // Setup logout button
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            logout();
+        });
+    }
+    
     // Initialize the UI
     initializeWeekSelector();
     loadMenuForWeek();
@@ -22,13 +48,19 @@ document.addEventListener('DOMContentLoaded', () => {
 let currentWeek = getMonday(new Date()); // Default to current week
 
 // Days of the week in Spanish
-// Days of the week in Spanish
-const DAYS = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sabado', 'domingo'];
+const DAYS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
 const DAYS_DISPLAY = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+
+// Format day name nicely with proper accents and capitalization
+function formatDayDisplay(day) {
+    const index = DAYS.indexOf(day.toLowerCase());
+    return index >= 0 ? DAYS_DISPLAY[index] : day;
+}
+
+// Initialize week selector
 function initializeWeekSelector() {
     const prevWeekBtn = document.getElementById('prev-week-btn');
     const nextWeekBtn = document.getElementById('next-week-btn');
-    const currentWeekDisplay = document.getElementById('current-week-display');
     
     if (prevWeekBtn) {
         prevWeekBtn.addEventListener('click', () => {
@@ -78,31 +110,45 @@ function loadMenuForWeek() {
     const weekStartStr = formatDate(currentWeek);
     
     // Get menu from Firestore
-    menuCollection.doc(weekStartStr)
+    window.db.collection('menus').doc(weekStartStr)
         .get()
         .then(doc => {
-            if (doc.exists && doc.data().status === 'published') {
+            if (doc.exists) {
                 const menuData = doc.data();
+                console.log('Menú encontrado para la semana:', menuData);
                 
-                // Display menu for each day
-                DAYS.forEach((day, index) => {
-                    const dayData = menuData[day];
-                    displayDayMenu(day, dayData, index === 0); // Set first day as active
+                // Verificar si hay elementos en el menú para al menos un día
+                let hasMenuItems = false;
+                DAYS.forEach(day => {
+                    if (menuData[day] && menuData[day].items && menuData[day].items.length > 0) {
+                        hasMenuItems = true;
+                    }
                 });
                 
-                // Show menu container
-                const menuContainer = document.getElementById('weekly-menu');
-                if (menuContainer) {
-                    menuContainer.style.display = 'block';
-                }
-                
-                // Hide "no menu" message
-                const noMenuMessage = document.getElementById('no-menu-message');
-                if (noMenuMessage) {
-                    noMenuMessage.style.display = 'none';
+                if (hasMenuItems) {
+                    // Display menu for each day
+                    DAYS.forEach((day, index) => {
+                        const dayData = menuData[day];
+                        displayDayMenu(day, dayData, index === 0); // Set first day as active
+                    });
+                    
+                    // Show menu container
+                    const menuContainer = document.getElementById('weekly-menu');
+                    if (menuContainer) {
+                        menuContainer.style.display = 'block';
+                    }
+                    
+                    // Hide "no menu" message
+                    const noMenuMessage = document.getElementById('no-menu-message');
+                    if (noMenuMessage) {
+                        noMenuMessage.style.display = 'none';
+                    }
+                } else {
+                    // Menú existe pero no tiene elementos
+                    showNoMenuMessage();
                 }
             } else {
-                // No published menu for this week
+                // No hay menú para esta semana
                 showNoMenuMessage();
             }
             
@@ -138,6 +184,12 @@ function displayDayMenu(day, dayData, isActive) {
     
     // Check if day data exists
     if (dayData && dayData.items && dayData.items.length > 0) {
+        // Create day header
+        const dayHeader = document.createElement('div');
+        dayHeader.className = 'day-header';
+        dayHeader.innerHTML = `<h3>${formatDayDisplay(day)}</h3>`;
+        content.appendChild(dayHeader);
+        
         // Create menu items
         dayData.items.forEach(item => {
             const mealCard = document.createElement('div');
@@ -187,7 +239,13 @@ function showNoMenuMessage() {
     const noMenuMessage = document.getElementById('no-menu-message');
     if (noMenuMessage) {
         noMenuMessage.style.display = 'block';
-        noMenuMessage.textContent = 'No hay menú publicado para esta semana.';
+        noMenuMessage.innerHTML = `
+            <div class="card-body empty-state">
+                <i class="fas fa-utensils empty-icon"></i>
+                <p>No hay menú publicado para la semana del ${formatDateDisplay(currentWeek)}.</p>
+                <p>Por favor, contacte al administrador para más información.</p>
+            </div>
+        `;
     }
 }
 
@@ -220,6 +278,11 @@ function showLoadingState(isLoading) {
     if (loadingIndicator) {
         loadingIndicator.style.display = isLoading ? 'block' : 'none';
     }
+    
+    // Disable buttons while loading
+    document.querySelectorAll('button').forEach(button => {
+        button.disabled = isLoading;
+    });
 }
 
 // Show error message
@@ -233,5 +296,8 @@ function showErrorMessage(message) {
         setTimeout(() => {
             errorAlert.style.display = 'none';
         }, 5000);
+    } else {
+        console.error(message);
+        alert("Error: " + message);
     }
-} 
+}
