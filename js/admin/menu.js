@@ -167,8 +167,11 @@ function changeActiveDay(day) {
 
 // Display menu for current day
 function showMenuForDay(day) {
+    console.log(`Mostrando menú para ${day}`);
+    
     // Get menu items for this day
     const dayItems = menuData[day] && menuData[day].items ? menuData[day].items : [];
+    console.log(`${dayItems.length} elementos encontrados para ${day}:`, dayItems);
     
     // Obtener el contenedor de platillos - usamos el contenedor general que existe en el HTML
     const menuItemsContainer = document.getElementById('menu-items-container');
@@ -179,20 +182,25 @@ function showMenuForDay(day) {
     
     // Limpiar el contenedor
     menuItemsContainer.innerHTML = '';
+    console.log('Contenedor limpiado');
     
     // Crear un contenedor para los elementos del día actual
     const container = document.createElement('div');
     container.className = 'menu-items-list';
     container.setAttribute('data-day', day.toLowerCase());
     menuItemsContainer.appendChild(container);
+    console.log(`Contenedor para ${day} creado`);
     
     // Show menu items or empty state
     if (dayItems.length > 0) {
+        console.log(`Mostrando ${dayItems.length} elementos para ${day}`);
         // Show menu items
         dayItems.forEach((item, index) => {
+            console.log(`Agregando elemento ${index + 1}: ${item.name}`);
             addItemToContainer(container, item, index);
         });
     } else {
+        console.log(`No hay elementos para ${day}, mostrando estado vacío`);
         // Show empty state
         container.innerHTML = `
             <div class="empty-state">
@@ -204,7 +212,10 @@ function showMenuForDay(day) {
         // Add click handler for the add button
         const addButton = container.querySelector('.agregar-plato');
         if (addButton) {
+            console.log('Agregando manejador de eventos al botón de agregar plato');
             addButton.addEventListener('click', showAddItemModal);
+        } else {
+            console.error('Botón de agregar plato no encontrado');
         }
     }
 }
@@ -271,6 +282,8 @@ function updateItemIndexes(container) {
 
 // Función para mostrar el modal de añadir platillo
 function showAddItemModal() {
+    console.log('Mostrando modal para agregar platillo');
+    
     const modal = document.getElementById('menu-item-modal');
     if (!modal) {
         console.error('Modal para agregar platillo no encontrado');
@@ -280,6 +293,7 @@ function showAddItemModal() {
     // Reset form
     const form = document.getElementById('menu-item-form');
     if (form) {
+        console.log('Formulario encontrado, reseteando');
         form.reset();
         
         // Clear edit item ID if it exists
@@ -291,11 +305,14 @@ function showAddItemModal() {
         // Set form submission handler
         form.onsubmit = function(e) {
             e.preventDefault();
+            console.log('Formulario enviado');
             
             // Get form values
             const name = document.getElementById('item-name').value;
             const description = document.getElementById('item-description').value;
             const type = document.getElementById('item-type').value;
+            
+            console.log(`Valores del formulario: Nombre=${name}, Descripción=${description}, Tipo=${type}`);
             
             // Create new menu item
             const newItem = {
@@ -310,6 +327,11 @@ function showAddItemModal() {
             }
             
             menuData[currentDay].items.push(newItem);
+            console.log(`Platillo agregado a ${currentDay}:`, newItem);
+            console.log('Menú actualizado:', menuData);
+            
+            // Guardar inmediatamente el menú
+            saveMenu();
             
             // Refresh display
             showMenuForDay(currentDay);
@@ -317,8 +339,11 @@ function showAddItemModal() {
             // Close modal
             modal.style.display = 'none';
         };
+    } else {
+        console.error('Formulario no encontrado');
     }
     
+    console.log('Mostrando modal');
     modal.style.display = 'block';
 }
 
@@ -389,52 +414,74 @@ function loadCurrentMenu() {
 
 // Save menu to Firebase
 async function saveMenu() {
-    // Validate form
-    if (!validateMenuForm()) {
-        return;
-    }
+    console.log('Iniciando guardado de menú...');
     
     // Show loading state
     showLoadingState(true);
     
     try {
-        // Get current day's menu items
-        const dayLower = currentDay.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        const containerSelector = `#${dayLower}-items, #${dayLower}-content .menu-items-list, .menu-items-list`;
-        const menuItemsContainer = document.querySelector(containerSelector);
-        
+        // Obtener el contenedor principal del menú
+        const menuItemsContainer = document.getElementById('menu-items-container');
         if (!menuItemsContainer) {
-            throw new Error(`Menu items container for ${currentDay} not found`);
+            console.error('Contenedor de menú no encontrado');
+            throw new Error('Contenedor de menú no encontrado');
         }
         
-        // Get menu items
+        // Obtener todos los elementos del menú para el día actual
         const menuItems = [];
-        const menuItemElements = menuItemsContainer.querySelectorAll('.menu-item');
+        const menuItemElements = document.querySelectorAll('.menu-item');
         
-        menuItemElements.forEach(item => {
-            const nameInput = item.querySelector('.menu-item-name');
-            const descriptionInput = item.querySelector('.menu-item-description');
+        console.log(`Encontrados ${menuItemElements.length} elementos para el día ${currentDay}`);
+        
+        // Si no hay elementos, verificar si hay un formulario directo en la página
+        if (menuItemElements.length === 0) {
+            // Intentar obtener datos del formulario de platillo si está visible
+            const nombrePlatillo = document.querySelector('input[placeholder="Nombre del plato"]');
+            const descripcionPlatillo = document.querySelector('textarea[placeholder="Descripción (opcional)"]');
             
-            if (nameInput && nameInput.value.trim() !== '') {
+            if (nombrePlatillo && nombrePlatillo.value.trim() !== '') {
                 menuItems.push({
-                    name: nameInput.value.trim(),
-                    description: descriptionInput ? descriptionInput.value.trim() : ''
+                    name: nombrePlatillo.value.trim(),
+                    description: descripcionPlatillo ? descripcionPlatillo.value.trim() : ''
                 });
+                console.log(`Agregado platillo del formulario: ${nombrePlatillo.value.trim()}`);
             }
-        });
+        } else {
+            // Procesar los elementos encontrados
+            menuItemElements.forEach((item, index) => {
+                const nameInput = item.querySelector('.menu-item-name');
+                const descriptionInput = item.querySelector('.menu-item-description');
+                
+                if (nameInput && nameInput.value.trim() !== '') {
+                    menuItems.push({
+                        name: nameInput.value.trim(),
+                        description: descriptionInput ? descriptionInput.value.trim() : ''
+                    });
+                    console.log(`Elemento ${index + 1} agregado: ${nameInput.value.trim()}`);
+                }
+            });
+        }
         
-        // Update menu data for current day
-        menuData[currentDay] = {
-            items: menuItems
-        };
+        // Actualizar datos del menú para el día actual
+        if (!menuData[currentDay]) {
+            menuData[currentDay] = { items: [] };
+        }
         
-        // Prepare data for Firestore
+        // Si encontramos elementos, actualizamos el menú
+        if (menuItems.length > 0) {
+            menuData[currentDay].items = menuItems;
+            console.log(`Menú actualizado para ${currentDay}:`, menuData[currentDay]);
+        } else {
+            console.warn(`No se encontraron elementos para guardar en ${currentDay}`);
+        }
+        
+        // Preparar datos para Firestore
         const weekStartStr = formatDate(currentWeekStartDate);
         const menuDoc = {
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         
-        // Add menu data for each day
+        // Añadir datos del menú para cada día
         DAYS.forEach(day => {
             const dayKey = day.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
             if (menuData[day] && menuData[day].items) {
@@ -442,16 +489,24 @@ async function saveMenu() {
             }
         });
         
-        // Update or create menu document
+        console.log('Guardando en Firebase:', menuDoc);
+        
+        // Actualizar o crear documento de menú
         await menuCollection.doc(weekStartStr).set(menuDoc, { merge: true });
         
-        // Show success message
-        showSuccessMessage('Menú guardado correctamente.');
+        // Mostrar mensaje de éxito
+        showSuccessMessage('Menú guardado correctamente');
+        console.log('Menú guardado con éxito');
+        
+        // Recargar el menú para mostrar los cambios
+        setTimeout(() => {
+            loadCurrentMenu();
+        }, 1000);
     } catch (error) {
         console.error("Error saving menu:", error);
-        showErrorMessage("Error al guardar el menú. Por favor intente de nuevo.");
+        showErrorMessage("Error al guardar el menú: " + error.message);
     } finally {
-        // Hide loading state
+        // Ocultar estado de carga
         showLoadingState(false);
     }
 }
