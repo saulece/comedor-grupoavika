@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Configurar eventos de clic para los botones de agregar platillo
     document.body.addEventListener('click', function(e) {
-        // Botón agregar platillo
+        // Botón agregar plato
         if (e.target.matches('.agregar-plato, .agregar-plato *, #add-item-btn, #add-item-btn *')) {
             e.preventDefault();
             showAddItemModal();
@@ -55,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // Setup event listeners
 function setupButtonEvents() {
     // Botón de nuevo menú
-    const newMenuBtn = document.getElementById('nuevo-menu');
+    const newMenuBtn = document.getElementById('new-menu-btn');
     if (newMenuBtn) {
         newMenuBtn.addEventListener('click', function(e) {
             e.preventDefault();
@@ -64,7 +64,7 @@ function setupButtonEvents() {
     }
     
     // Botón de importar Excel
-    const importExcelBtn = document.getElementById('importar-excel');
+    const importExcelBtn = document.getElementById('import-excel-btn');
     if (importExcelBtn) {
         importExcelBtn.addEventListener('click', function(e) {
             e.preventDefault();
@@ -73,7 +73,7 @@ function setupButtonEvents() {
     }
     
     // Botón de publicar menú
-    const publishMenuBtn = document.getElementById('publicar-menu');
+    const publishMenuBtn = document.getElementById('publish-menu-btn');
     if (publishMenuBtn) {
         publishMenuBtn.addEventListener('click', function(e) {
             e.preventDefault();
@@ -82,7 +82,7 @@ function setupButtonEvents() {
     }
     
     // Botón guardar cambios
-    const saveChangesBtn = document.getElementById('guardar-cambios');
+    const saveChangesBtn = document.getElementById('save-menu-btn');
     if (saveChangesBtn) {
         saveChangesBtn.addEventListener('click', function(e) {
             e.preventDefault();
@@ -91,7 +91,7 @@ function setupButtonEvents() {
     }
     
     // Setup file input for Excel import
-    const excelFileInput = document.getElementById('excel-file-input');
+    const excelFileInput = document.getElementById('excel-file');
     if (excelFileInput) {
         excelFileInput.addEventListener('change', handleExcelFile);
     }
@@ -148,7 +148,7 @@ function changeActiveDay(day) {
     // Actualizar pestañas activas
     const tabs = document.querySelectorAll('.day-tab');
     tabs.forEach(tab => {
-        if (tab.getAttribute('data-day') === day) {
+        if (tab.getAttribute('data-day') === day.toLowerCase()) {
             tab.classList.add('active');
         } else {
             tab.classList.remove('active');
@@ -158,7 +158,7 @@ function changeActiveDay(day) {
     // Actualizar título del día
     const dayTitle = document.getElementById('day-title');
     if (dayTitle) {
-        dayTitle.textContent = `Menú del ${day.charAt(0).toUpperCase() + day.slice(1)}`;
+        dayTitle.textContent = `Menú del ${day}`;
     }
     
     // Show menu for current day
@@ -170,7 +170,7 @@ function showMenuForDay(day) {
     // Get menu items for this day
     const dayItems = menuData[day] && menuData[day].items ? menuData[day].items : [];
     
-    // Obtener el contenedor de platillos - usamos el contenedor general que existe en el HTML
+    // Obtener el contenedor principal de menú
     const menuItemsContainer = document.getElementById('menu-items-container');
     if (!menuItemsContainer) {
         console.error('Contenedor principal de menú no encontrado');
@@ -389,19 +389,12 @@ function loadCurrentMenu() {
 
 // Save menu to Firebase
 async function saveMenu() {
-    // Validate form
-    if (!validateMenuForm()) {
-        return;
-    }
-    
     // Show loading state
     showLoadingState(true);
     
     try {
         // Get current day's menu items
-        const dayLower = currentDay.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        const containerSelector = `#${dayLower}-items, #${dayLower}-content .menu-items-list, .menu-items-list`;
-        const menuItemsContainer = document.querySelector(containerSelector);
+        const menuItemsContainer = document.querySelector('.menu-items-list');
         
         if (!menuItemsContainer) {
             throw new Error(`Menu items container for ${currentDay} not found`);
@@ -481,20 +474,15 @@ async function publishMenu() {
             updateData = { ...currentData, ...updateData };
         }
         
-        // Update or create menu document
-        await menuCollection.doc(weekStartStr).set(updateData, { merge: true });
+        // Update the document
+        await menuCollection.doc(weekStartStr).set(updateData);
         
-        // Log success
-        console.log("Menú publicado exitosamente");
-        
-        // Update publish status
+        // Update UI
         updatePublishStatus(true);
-        
-        // Show success message
         showSuccessMessage('Menú publicado correctamente.');
     } catch (error) {
         console.error("Error publishing menu:", error);
-        showErrorMessage("Error al publicar el menú: " + error.message);
+        showErrorMessage("Error al publicar el menú. Por favor intente de nuevo.");
     } finally {
         // Hide loading state
         showLoadingState(false);
@@ -503,168 +491,154 @@ async function publishMenu() {
 
 // Validate menu form
 function validateMenuForm() {
-    // Find the current day's menu items container
-    const dayLower = currentDay.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    const containerSelector = `#${dayLower}-items, #${dayLower}-content .menu-items-list, .menu-items-list`;
-    const menuItemsContainer = document.querySelector(containerSelector);
+    // Get current day's menu items
+    const menuItemsContainer = document.querySelector('.menu-items-list');
     
     if (!menuItemsContainer) {
         showErrorMessage(`No se encontró el contenedor de menú para ${currentDay}`);
         return false;
     }
     
+    // Check if there are any menu items
     const menuItems = menuItemsContainer.querySelectorAll('.menu-item');
-    
     if (menuItems.length === 0) {
-        showErrorMessage("Debe agregar al menos un plato al menú.");
-        return false;
+        // It's valid to have no items, but we should warn the user
+        console.warn(`No hay platillos para ${currentDay}`);
     }
     
-    let valid = true;
-    
-    menuItems.forEach(item => {
+    // Check if all menu items have a name
+    let isValid = true;
+    menuItems.forEach((item, index) => {
         const nameInput = item.querySelector('.menu-item-name');
-        
         if (!nameInput || nameInput.value.trim() === '') {
-            if (nameInput) {
-                nameInput.classList.add('is-invalid');
-            }
-            valid = false;
-        } else if (nameInput) {
-            nameInput.classList.remove('is-invalid');
+            showErrorMessage(`El platillo ${index + 1} no tiene nombre`);
+            isValid = false;
         }
     });
     
-    if (!valid) {
-        showErrorMessage("Por favor complete los campos requeridos.");
-    }
-    
-    return valid;
+    return isValid;
 }
 
 // Validate all days have menu items
 function validateAllDays() {
-    for (const day of DAYS) {
+    let isValid = true;
+    let emptyDays = [];
+    
+    DAYS.forEach(day => {
         if (!menuData[day] || !menuData[day].items || menuData[day].items.length === 0) {
-            return false;
+            emptyDays.push(day);
+            isValid = false;
         }
+    });
+    
+    if (!isValid) {
+        showErrorMessage(`Los siguientes días no tienen platillos: ${emptyDays.join(', ')}`);
     }
     
-    return true;
+    return isValid;
 }
 
 // Update publish status UI
 function updatePublishStatus(isPublished) {
-    const publishBtn = document.getElementById('publish-menu-btn');
-    const statusBadge = document.getElementById('menu-status-badge');
-    const statusText = document.getElementById('menu-status-text');
-    
-    if (publishBtn) {
-        publishBtn.disabled = isPublished;
-        publishBtn.innerHTML = isPublished ? 
-            '<i class="fas fa-check"></i> Menú Publicado' : 
-            '<i class="fas fa-upload"></i> Publicar Menú';
-    }
-    
+    const statusBadge = document.getElementById('menu-status');
     if (statusBadge) {
-        statusBadge.textContent = isPublished ? 'Publicado' : 'Borrador';
-        statusBadge.className = 'badge';
-        statusBadge.classList.add(isPublished ? 'badge-success' : 'badge-warning');
+        if (isPublished) {
+            statusBadge.textContent = 'Publicado';
+            statusBadge.className = 'badge badge-success';
+        } else {
+            statusBadge.textContent = 'Borrador';
+            statusBadge.className = 'badge badge-warning';
+        }
     }
     
-    if (statusText) {
-        statusText.textContent = isPublished ? 
-            'Este menú está publicado y visible para los coordinadores' : 
-            'Este menú está en borrador y no es visible para los coordinadores';
+    // Update publish button state
+    const publishBtn = document.getElementById('publish-menu-btn');
+    if (publishBtn) {
+        if (isPublished) {
+            publishBtn.disabled = true;
+            publishBtn.title = 'Este menú ya está publicado';
+        } else {
+            publishBtn.disabled = false;
+            publishBtn.title = 'Publicar este menú';
+        }
     }
 }
 
 // Handle Excel file import
 function handleExcelFile(event) {
     const file = event.target.files[0];
-    if (!file) return;
+    if (!file) {
+        return;
+    }
     
     // Show loading state
     showLoadingState(true);
     
-    // Create a FormData object
-    const formData = new FormData();
-    formData.append('file', file);
+    // Use SheetJS to read Excel file
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, {type: 'array'});
+            
+            // Process each sheet (day)
+            DAYS.forEach(day => {
+                const dayLower = day.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                const sheetName = day;
+                
+                // Skip if sheet doesn't exist
+                if (!workbook.SheetNames.includes(sheetName)) {
+                    console.warn(`Sheet for ${day} not found in Excel file`);
+                    return;
+                }
+                
+                // Get sheet data
+                const sheet = workbook.Sheets[sheetName];
+                const json = XLSX.utils.sheet_to_json(sheet);
+                
+                // Process items
+                const items = json.map(row => {
+                    return {
+                        name: row.Nombre || row.nombre || row.Name || row.name || '',
+                        description: row.Descripcion || row.descripcion || row.Description || row.description || ''
+                    };
+                }).filter(item => item.name.trim() !== '');
+                
+                // Update menu data
+                menuData[day] = { items };
+            });
+            
+            // Show current day menu
+            showMenuForDay(currentDay);
+            
+            // Show success message
+            showSuccessMessage('Menú importado correctamente');
+        } catch (error) {
+            console.error('Error importing Excel file:', error);
+            showErrorMessage('Error al importar el archivo Excel. Asegúrate de que el formato sea correcto.');
+        } finally {
+            // Hide loading state
+            showLoadingState(false);
+            
+            // Reset file input
+            event.target.value = '';
+        }
+    };
     
-    // Use the Excel parser utility (in a real app, you would use a library like SheetJS)
-    // For simulation purposes, we'll create some sample data
-    setTimeout(() => {
-        const importedMenu = {
-            lunes: {
-                items: [
-                    { name: 'Arroz con pollo', description: 'Arroz con pollo y verduras' },
-                    { name: 'Sopa de verduras', description: 'Sopa casera con verduras de temporada' }
-                ]
-            },
-            martes: {
-                items: [
-                    { name: 'Pasta Bolognesa', description: 'Pasta con salsa de carne' },
-                    { name: 'Ensalada mixta', description: 'Ensalada fresca con lechuga, tomate y maíz' }
-                ]
-            },
-            miercoles: {
-                items: [
-                    { name: 'Pescado a la plancha', description: 'Filete de pescado con limón' },
-                    { name: 'Puré de papas', description: 'Puré de papas casero' }
-                ]
-            },
-            jueves: {
-                items: [
-                    { name: 'Lomo saltado', description: 'Lomo de res salteado con verduras' },
-                    { name: 'Arroz blanco', description: 'Arroz blanco cocido' }
-                ]
-            },
-            viernes: {
-                items: [
-                    { name: 'Pollo al horno', description: 'Pollo al horno con papas' },
-                    { name: 'Ensalada rusa', description: 'Ensalada de papa, zanahoria y arvejas' }
-                ]
-            },
-            sabado: {
-                items: [
-                    { name: 'Pizza casera', description: 'Pizza con queso y jamón' },
-                    { name: 'Ensalada César', description: 'Lechuga, croutones, parmesano y aderezo césar' }
-                ]
-            },
-            domingo: {
-                items: [
-                    { name: 'Asado de res', description: 'Carne asada con chimichurri' },
-                    { name: 'Papas fritas', description: 'Papas fritas caseras' }
-                ]
-            }
-        };
-        
-        // Update menu data
-        DAYS.forEach(day => {
-            const dayKey = day.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-            if (importedMenu[dayKey]) {
-                menuData[day] = importedMenu[dayKey];
-            }
-        });
-        
-        // Show menu for current day
-        showMenuForDay(currentDay);
-        
-        // Hide loading state
+    reader.onerror = function() {
+        console.error('Error reading Excel file');
+        showErrorMessage('Error al leer el archivo Excel');
         showLoadingState(false);
-        
-        // Show success message
-        showSuccessMessage('Menú importado correctamente.');
-        
-        // Reset file input
         event.target.value = '';
-    }, 1000);
+    };
+    
+    reader.readAsArrayBuffer(file);
 }
 
 // Get Monday of the current week
 function getMonday(date) {
     const day = date.getDay();
-    const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Sunday
+    const diff = date.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is Sunday
     return new Date(date.setDate(diff));
 }
 
@@ -673,6 +647,7 @@ function formatDate(date) {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
+    
     return `${year}-${month}-${day}`;
 }
 
@@ -681,6 +656,7 @@ function formatDateDisplay(date) {
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = date.getFullYear();
+    
     return `${day}/${month}/${year}`;
 }
 
@@ -688,22 +664,18 @@ function formatDateDisplay(date) {
 function showLoadingState(isLoading) {
     const loadingIndicator = document.getElementById('loading-indicator');
     if (loadingIndicator) {
-        loadingIndicator.style.display = isLoading ? 'block' : 'none';
+        if (isLoading) {
+            loadingIndicator.style.display = 'flex';
+        } else {
+            loadingIndicator.style.display = 'none';
+        }
     }
     
-    // Optional: Disable buttons while loading
-    if (isLoading) {
-        document.querySelectorAll('button:not(.close-modal)').forEach(button => {
-            button.disabled = true;
-        });
-    } else {
-        document.querySelectorAll('button').forEach(button => {
-            // Only enable non-publish buttons if menu is not published
-            if (button.id !== 'publish-menu-btn' || !menuData.status || menuData.status !== 'published') {
-                button.disabled = false;
-            }
-        });
-    }
+    // Disable buttons while loading
+    const buttons = document.querySelectorAll('button');
+    buttons.forEach(button => {
+        button.disabled = isLoading;
+    });
 }
 
 // Show error message
@@ -717,9 +689,6 @@ function showErrorMessage(message) {
         setTimeout(() => {
             errorAlert.style.display = 'none';
         }, 5000);
-    } else {
-        // Fallback to alert if element not found
-        alert("Error: " + message);
     }
 }
 
@@ -734,9 +703,6 @@ function showSuccessMessage(message) {
         setTimeout(() => {
             successAlert.style.display = 'none';
         }, 5000);
-    } else {
-        // Fallback to alert if element not found
-        alert("Éxito: " + message);
     }
 }
 
@@ -757,62 +723,47 @@ function showImportExcelModal() {
 
 // Show Publish Menu Modal
 function showPublishMenuModal() {
-    // Get the modal element
+    // Validate all days have menu items
+    if (!validateAllDays()) {
+        return;
+    }
+    
     const modal = document.getElementById('publish-menu-modal');
     if (!modal) {
-        console.warn('Publish menu modal not found');
+        console.error('Publish menu modal not found');
         return;
     }
     
-    // Check if there are menu items in all days
-    const isValid = validateAllDays();
-    
-    // Get validation errors container
+    // Reset validation errors
     const validationErrors = document.getElementById('publish-menu-validation-errors');
-    
-    if (!isValid) {
-        if (validationErrors) {
-            validationErrors.innerHTML = '<p>No se puede publicar el menú porque algunos días no tienen platos añadidos.</p>';
-            validationErrors.style.display = 'block';
-        }
-        showErrorMessage("Todos los días deben tener al menos un plato para publicar el menú.");
-        return;
-    } else {
-        if (validationErrors) {
-            validationErrors.style.display = 'none';
-        }
-        
-        // Set up confirm button
-        const confirmButton = document.querySelector('#publish-menu-modal button.btn-primary');
-        if (confirmButton) {
-            // Remove previous event listeners by cloning
-            const newButton = confirmButton.cloneNode(true);
-            confirmButton.parentNode.replaceChild(newButton, confirmButton);
-            
-            // Add new event listener
-            newButton.addEventListener('click', async function(e) {
-                e.preventDefault();
-                modal.style.display = 'none'; // Hide modal first
-                await publishMenu(); // Then publish menu
-            });
-        }
-        
-        // Show the modal
-        modal.style.display = 'block';
+    if (validationErrors) {
+        validationErrors.style.display = 'none';
+        validationErrors.innerHTML = '';
     }
+    
+    // Set confirm button handler
+    const confirmBtn = document.getElementById('confirm-publish-menu-btn');
+    if (confirmBtn) {
+        confirmBtn.onclick = function() {
+            modal.style.display = 'none';
+            publishMenu();
+        };
+    }
+    
+    modal.style.display = 'block';
 }
 
 // Navigation functions
 function navigateToPreviousWeek() {
-    const newDate = new Date(currentWeekStartDate);
-    newDate.setDate(newDate.getDate() - 7);
-    currentWeekStartDate = newDate;
+    const prevWeek = new Date(currentWeekStartDate);
+    prevWeek.setDate(prevWeek.getDate() - 7);
+    currentWeekStartDate = prevWeek;
     loadCurrentMenu();
 }
 
 function navigateToNextWeek() {
-    const newDate = new Date(currentWeekStartDate);
-    newDate.setDate(newDate.getDate() + 7);
-    currentWeekStartDate = newDate;
+    const nextWeek = new Date(currentWeekStartDate);
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    currentWeekStartDate = nextWeek;
     loadCurrentMenu();
 }
