@@ -46,8 +46,22 @@ document.addEventListener('DOMContentLoaded', () => {
     dayTabs.forEach(tab => {
         tab.addEventListener('click', function() {
             const day = this.getAttribute('data-day');
-            // Convertir primera letra a mayúscula para que coincida con el formato esperado
-            const formattedDay = day.charAt(0).toUpperCase() + day.slice(1);
+            
+            // Mapeo de nombres de días normalizados a nombres con acentos
+            const dayMapping = {
+                'lunes': 'Lunes',
+                'martes': 'Martes',
+                'miercoles': 'Miércoles',
+                'jueves': 'Jueves',
+                'viernes': 'Viernes',
+                'sabado': 'Sábado',
+                'domingo': 'Domingo'
+            };
+            
+            // Usar el nombre correcto del día con acento si existe en el mapeo
+            const formattedDay = dayMapping[day] || (day.charAt(0).toUpperCase() + day.slice(1));
+            
+            console.log(`Cambiando a día: ${day} -> ${formattedDay}`);
             changeActiveDay(formattedDay);
         });
     });
@@ -158,7 +172,11 @@ function changeActiveDay(day) {
     // Actualizar pestañas activas
     const tabs = document.querySelectorAll('.day-tab');
     tabs.forEach(tab => {
-        if (tab.getAttribute('data-day') === day) {
+        // Convertir el nombre del día a minúsculas para comparación
+        const tabDay = tab.getAttribute('data-day').toLowerCase();
+        const dayLower = day.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        
+        if (tabDay === dayLower) {
             tab.classList.add('active');
         } else {
             tab.classList.remove('active');
@@ -180,7 +198,13 @@ function showMenuForDay(day) {
     console.log(`Mostrando menú para ${day}`);
     
     // Get menu items for this day
-    const dayItems = menuData[day] && menuData[day].items ? menuData[day].items : [];
+    // Asegurarnos de que estamos usando el nombre del día con formato correcto
+    if (!menuData[day]) {
+        menuData[day] = { items: [] };
+        console.log(`Inicializando datos para ${day}`);
+    }
+    
+    const dayItems = menuData[day].items || [];
     console.log(`${dayItems.length} elementos encontrados para ${day}:`, dayItems);
     
     // Obtener el contenedor de platillos - usamos el contenedor general que existe en el HTML
@@ -331,9 +355,18 @@ function showAddItemModal() {
                 type: type
             };
             
+            console.log(`Intentando agregar platillo al día: ${currentDay}`);
+            
             // Add to current day's menu
             if (!menuData[currentDay]) {
+                console.log(`Inicializando datos para ${currentDay}`);
                 menuData[currentDay] = { items: [] };
+            }
+            
+            // Asegurarnos de que items sea un array
+            if (!Array.isArray(menuData[currentDay].items)) {
+                console.log(`Corrigiendo estructura de datos para ${currentDay}`);
+                menuData[currentDay].items = [];
             }
             
             menuData[currentDay].items.push(newItem);
