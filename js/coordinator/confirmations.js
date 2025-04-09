@@ -1,11 +1,10 @@
 /**
- * Coordinator Confirmations Module
- * Manages the registration of daily meal confirmations for employees
+ * Confirmaciones de comedor - Módulo para coordinadores
+ * Permite gestionar las confirmaciones diarias de comedor
  */
 
 // Referencias a servicios y colecciones de Firebase
-// Usar window para acceder a los objetos globales
-const db = window.db;
+// Acceder a los objetos globales sin redeclararlos
 const employeesCollection = window.employeesCollection;
 const confirmationsCollection = window.confirmationsCollection;
 
@@ -73,6 +72,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         console.log('Usuario cargado correctamente:', currentUser);
+        
+        // Initialize the application
+        initializeApp();
     } catch (error) {
         console.error('Error al procesar datos del usuario:', error);
         alert('Error al cargar los datos del usuario. Por favor inicie sesión nuevamente.');
@@ -81,12 +83,86 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 2000);
         return;
     }
-    
-    // Initialize components
-    setupEventListeners();
-    handleDatePicker();
-    loadEmployees();
 });
+
+/**
+ * Initialize the application after user data is loaded
+ */
+function initializeApp() {
+    console.log('Inicializando aplicación...');
+    
+    // Initialize date picker
+    initializeDatePicker();
+    
+    // Set up event listeners
+    setupEventListeners();
+    
+    // Load employees for the department
+    loadEmployees();
+}
+
+/**
+ * Initialize the date picker
+ */
+function initializeDatePicker() {
+    console.log("Inicializando selector de fecha...");
+    
+    const datePicker = document.getElementById('confirmation-date');
+    if (!datePicker) {
+        console.warn('Elemento de selector de fecha no encontrado');
+        return;
+    }
+    
+    // Set default to today
+    const today = new Date();
+    const formattedToday = formatDateInput(today);
+    
+    // Verificar si Flatpickr ya está inicializado
+    if (typeof flatpickr === 'function' && !datePicker._flatpickr) {
+        console.log("Inicializando Flatpickr desde confirmations.js");
+        try {
+            // Define day names with correct accents
+            const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Mi\u00e9rcoles', 'Jueves', 'Viernes', 'S\u00e1bado'];
+            
+            flatpickr(datePicker, {
+                dateFormat: "Y-m-d",
+                locale: {
+                    firstDayOfWeek: 1,
+                    weekdays: {
+                        shorthand: ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'],
+                        longhand: diasSemana
+                    }
+                },
+                defaultDate: formattedToday,
+                minDate: formattedToday,
+                maxDate: new Date().fp_incr(14), // 14 days from today
+                onChange: function(selectedDates, dateStr) {
+                    console.log("Fecha seleccionada:", dateStr);
+                    showDayOfWeek(dateStr);
+                    loadExistingConfirmations(dateStr);
+                }
+            });
+            console.log("Flatpickr inicializado correctamente");
+        } catch (error) {
+            console.error("Error al inicializar Flatpickr:", error);
+        }
+    } else {
+        console.log("Flatpickr ya está inicializado o no está disponible");
+        // Si ya está inicializado, solo agregar el evento change
+        if (datePicker._flatpickr) {
+            datePicker.addEventListener('change', function() {
+                const dateStr = this.value;
+                console.log("Fecha cambiada:", dateStr);
+                showDayOfWeek(dateStr);
+                loadExistingConfirmations(dateStr);
+            });
+        }
+    }
+    
+    // Trigger initial load with today's date
+    loadExistingConfirmations(formattedToday);
+    showDayOfWeek(formattedToday);
+}
 
 /**
  * Setup event listeners for interactive elements
@@ -134,95 +210,6 @@ function setupEventListeners() {
             window.location.href = '../../index.html';
         });
     }
-}
-
-/**
- * Handle the date picker initialization
- */
-function handleDatePicker() {
-    console.log("Inicializando selector de fecha...");
-    
-    const datePicker = document.getElementById('confirmation-date');
-    if (!datePicker) {
-        console.warn('Elemento de selector de fecha no encontrado');
-        return;
-    }
-    
-    // Set default to today
-    const today = new Date();
-    const formattedToday = formatDateInput(today);
-    
-    // Verificar si Flatpickr ya está inicializado
-    if (typeof flatpickr === 'function' && !datePicker._flatpickr) {
-        try {
-            // Define day names with correct accents
-            const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Mi\u00e9rcoles', 'Jueves', 'Viernes', 'S\u00e1bado'];
-            
-            flatpickr(datePicker, {
-                dateFormat: "Y-m-d",
-                locale: {
-                    firstDayOfWeek: 1,
-                    weekdays: {
-                        shorthand: ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'],
-                        longhand: diasSemana
-                    }
-                },
-                defaultDate: formattedToday,
-                minDate: formattedToday,
-                maxDate: new Date().fp_incr(14), // 14 days from today
-                disableMobile: true,
-                onChange: function(selectedDates, dateStr) {
-                    console.log('Fecha seleccionada:', dateStr);
-                    loadExistingConfirmations(dateStr);
-                    showDayOfWeek(dateStr);
-                }
-            });
-            
-            console.log('Flatpickr inicializado correctamente');
-        } catch (error) {
-            console.error('Error al inicializar Flatpickr:', error);
-            
-            // Fallback to native date input
-            datePicker.type = 'date';
-            datePicker.value = formattedToday;
-            datePicker.min = formattedToday;
-            datePicker.max = formatDateInput(new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000));
-            
-            datePicker.addEventListener('change', function() {
-                const selectedDate = this.value;
-                if (selectedDate) {
-                    loadExistingConfirmations(selectedDate);
-                    showDayOfWeek(selectedDate);
-                }
-            });
-        }
-    } else if (datePicker._flatpickr) {
-        console.log('Flatpickr ya inicializado, añadiendo manejador...');
-        const existingInstance = datePicker._flatpickr;
-        existingInstance.config.onChange.push((selectedDates, dateStr) => {
-            loadExistingConfirmations(dateStr);
-            showDayOfWeek(dateStr);
-        });
-    } else {
-        console.warn('Flatpickr no está disponible');
-        // Usar input nativo
-        datePicker.type = 'date';
-        datePicker.value = formattedToday;
-        datePicker.min = formattedToday;
-        datePicker.max = formatDateInput(new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000));
-        
-        datePicker.addEventListener('change', function() {
-            const selectedDate = this.value;
-            if (selectedDate) {
-                loadExistingConfirmations(selectedDate);
-                showDayOfWeek(selectedDate);
-            }
-        });
-    }
-    
-    // Trigger initial load with today's date
-    loadExistingConfirmations(formattedToday);
-    showDayOfWeek(formattedToday);
 }
 
 /**
@@ -469,9 +456,17 @@ function loadEmployees() {
     console.log('Cargando empleados para departamento:', currentUser.departmentId);
     
     try {
+        // Verificar que employeesCollection esté disponible
+        if (!window.employeesCollection) {
+            console.error('Error: employeesCollection no está disponible');
+            showErrorMessage('Error al cargar empleados: No se pudo conectar a la base de datos');
+            showLoadingState(false);
+            return;
+        }
+        
         // Use Firestore to get employees
         console.log('Intentando cargar empleados usando Firestore...');
-        employeesCollection
+        window.employeesCollection
             .where('departmentId', '==', currentUser.departmentId)
             .get()
             .then(querySnapshot => {
