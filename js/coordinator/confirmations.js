@@ -234,7 +234,7 @@ function toggleAllEmployees() {
             checkbox.checked = isChecked;
         });
         
-        // Update the count of selected employees
+        // Update employee count
         updateEmployeeCount();
     }
 }
@@ -258,7 +258,7 @@ function selectAllEmployees(select = true) {
         selectAllCheckbox.indeterminate = false;
     }
     
-    // Update the count of selected employees
+    // Update employee count
     updateEmployeeCount();
 }
 
@@ -267,51 +267,48 @@ function selectAllEmployees(select = true) {
  * @param {Array} employees - List of employee objects
  */
 function displayEmployees(employees) {
-    const employeeListContainer = document.getElementById('employee-list');
-    if (!employeeListContainer) return;
-    
-    // Clear existing content
-    employeeListContainer.innerHTML = '';
-    
-    if (employees.length === 0) {
-        employeeListContainer.innerHTML = '<div class="no-results">No se encontraron empleados</div>';
+    const employeeTableBody = document.getElementById('employees-table-body');
+    if (!employeeTableBody) {
+        console.error('No se encontró el elemento employees-table-body');
         return;
     }
     
-    // Create a select all checkbox at the top
-    const selectAllDiv = document.createElement('div');
-    selectAllDiv.className = 'employee-item select-all-item';
-    selectAllDiv.innerHTML = `
-        <label class="checkbox-container">
-            <input type="checkbox" id="select-all-employees" class="select-all-checkbox">
-            <span class="checkmark"></span>
-            <span class="employee-name"><strong>Seleccionar Todos</strong></span>
-        </label>
-    `;
-    employeeListContainer.appendChild(selectAllDiv);
+    // Clear existing content
+    employeeTableBody.innerHTML = '';
     
-    // Add event listener to the select all checkbox
-    const selectAllCheckbox = document.getElementById('select-all-employees');
-    if (selectAllCheckbox) {
-        selectAllCheckbox.addEventListener('change', toggleAllEmployees);
+    if (employees.length === 0) {
+        const emptyRow = document.createElement('tr');
+        emptyRow.innerHTML = `<td colspan="4" class="text-center">No hay empleados registrados</td>`;
+        employeeTableBody.appendChild(emptyRow);
+        return;
     }
     
-    // Add each employee to the list
+    // Store employees for later use
+    employeeList = employees;
+    
+    // Add each employee to the table
     employees.forEach(employee => {
-        const employeeDiv = document.createElement('div');
-        employeeDiv.className = 'employee-item';
-        employeeDiv.innerHTML = `
-            <label class="checkbox-container">
-                <input type="checkbox" class="employee-select" data-employee-id="${employee.id}">
-                <span class="checkmark"></span>
-                <span class="employee-name">${employee.name}</span>
-            </label>
+        const row = document.createElement('tr');
+        row.setAttribute('data-employee-id', employee.id);
+        
+        // Create the row content with all cells
+        row.innerHTML = `
+            <td class="select-column">
+                <label class="checkbox-container">
+                    <input type="checkbox" class="employee-select" data-employee-id="${employee.id}">
+                    <span class="checkmark"></span>
+                </label>
+            </td>
+            <td>${employee.name}</td>
+            <td>${employee.position || 'N/A'}</td>
+            <td>${employee.department || 'General'}</td>
         `;
-        employeeListContainer.appendChild(employeeDiv);
+        
+        employeeTableBody.appendChild(row);
     });
     
-    // Add change event listeners to all employee checkboxes
-    const employeeCheckboxes = document.querySelectorAll('.employee-select');
+    // Add event listeners to employee checkboxes
+    const employeeCheckboxes = employeeTableBody.querySelectorAll('.employee-select');
     employeeCheckboxes.forEach(checkbox => {
         checkbox.addEventListener('change', () => {
             updateSelectAllCheckboxState();
@@ -385,11 +382,118 @@ function updateEmployeeCount() {
 }
 
 /**
+ * Load employees for the coordinator's department
+ */
+function loadEmployees() {
+    showLoadingState(true);
+    
+    // Verificar si tenemos el departamento del coordinador
+    if (!currentUser || !currentUser.departmentId) {
+        console.error('No se pudo determinar el departamento del coordinador');
+        showErrorMessage('Error al cargar empleados: No se pudo determinar su departamento');
+        showLoadingState(false);
+        return;
+    }
+    
+    // Usar el servicio de Firebase para obtener empleados
+    window.firestoreServices.employee.getEmployeesByDepartment(currentUser.departmentId)
+        .then(employees => {
+            // Filtrar solo empleados activos
+            const activeEmployees = employees.filter(emp => emp.status === 'active');
+            
+            // Ordenar por nombre
+            activeEmployees.sort((a, b) => a.name.localeCompare(b.name));
+            
+            // Guardar la lista de empleados para uso posterior
+            employeeList = activeEmployees;
+            
+            // Mostrar empleados en la interfaz
+            displayEmployees(activeEmployees);
+            
+            // Ocultar estado de carga
+            showLoadingState(false);
+        })
+        .catch(error => {
+            console.error('Error al cargar empleados:', error);
+            showErrorMessage('Error al cargar la lista de empleados');
+            showLoadingState(false);
+        });
+}
+
+/**
+ * Load existing confirmations for a specific date
+ * @param {string} dateString - Date in YYYY-MM-DD format
+ */
+function loadExistingConfirmations(dateString) {
+    if (!dateString || !isValidDateString(dateString)) {
+        console.error('Fecha inválida para cargar confirmaciones');
+        return;
+    }
+    
+    showLoadingState(true);
+    
+    // Desmarcar todas las casillas primero
+    selectAllEmployees(false);
+    
+    // Consultar confirmaciones existentes para esta fecha y departamento
+    const query = confirmationsCollection
+        .where('date', '==', dateString)
+        .where('departmentId', '==', currentUser.departmentId);
+    
+    query.get()
+        .then(snapshot => {
+            if (snapshot.empty) {
+                console.log('No hay confirmaciones para esta fecha');
+                showInfoMessage('No hay confirmaciones registradas para esta fecha');
+                showLoadingState(false);
+                return;
+            }
+            
+            // Obtener la primera confirmación (debería haber solo una por fecha/departamento)
+            const confirmationDoc = snapshot.docs[0];
+            const confirmationData = confirmationDoc.data();
+            
+            // Cargar comentarios si existen
+            const commentsField = document.getElementById('confirmation-comments');
+            if (commentsField && confirmationData.comments) {
+                commentsField.value = confirmationData.comments;
+            }
+            
+            // Marcar los empleados confirmados
+            if (confirmationData.employees && confirmationData.employees.length > 0) {
+                const employeeCheckboxes = document.querySelectorAll('.employee-select');
+                
+                employeeCheckboxes.forEach(checkbox => {
+                    const employeeId = checkbox.getAttribute('data-employee-id');
+                    if (confirmationData.employees.includes(employeeId)) {
+                        checkbox.checked = true;
+                    }
+                });
+                
+                // Actualizar estado del checkbox "seleccionar todos"
+                updateSelectAllCheckboxState();
+                
+                // Actualizar contador de empleados
+                updateEmployeeCount();
+                
+                showInfoMessage(`Se cargó la confirmación existente con ${confirmationData.employees.length} empleados`);
+            }
+            
+            showLoadingState(false);
+        })
+        .catch(error => {
+            console.error('Error al cargar confirmaciones existentes:', error);
+            showErrorMessage('Error al cargar confirmaciones existentes');
+            showLoadingState(false);
+        });
+}
+
+/**
  * Save confirmation data to Firestore
  * @param {Event} event - Form submission event
  */
 async function saveConfirmation(event) {
-    event.preventDefault();
+    if (event) event.preventDefault();
     
     // Validate form
     if (!validateConfirmationForm()) {
@@ -410,17 +514,17 @@ async function saveConfirmation(event) {
         const comments = commentsInput ? commentsInput.value.trim() : '';
         
         // Get selected employees
-        const selectedEmployees = [];
+        const selectedEmployeeIds = [];
         const employeeCheckboxes = document.querySelectorAll('.employee-select:checked');
         
         employeeCheckboxes.forEach(checkbox => {
-            selectedEmployees.push({
-                id: checkbox.value,
-                name: checkbox.getAttribute('data-name') || 'Unknown Employee'
-            });
+            const employeeId = checkbox.getAttribute('data-employee-id');
+            if (employeeId) {
+                selectedEmployeeIds.push(employeeId);
+            }
         });
         
-        // Check if we already have a confirmation for this date - convertido a v8
+        // Check if we already have a confirmation for this date
         const querySnapshot = await confirmationsCollection
             .where('date', '==', date)
             .where('departmentId', '==', currentUser.departmentId)
@@ -433,18 +537,18 @@ async function saveConfirmation(event) {
             departmentName: currentUser.departmentName || 'Unknown Department',
             coordinatorId: currentUser.uid,
             coordinatorName: currentUser.displayName || currentUser.email,
-            employees: selectedEmployees,
+            employees: selectedEmployeeIds,
             comments: comments,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         
         if (querySnapshot.empty) {
-            // Create new confirmation - convertido a v8
+            // Create new confirmation
             confirmationData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
             await confirmationsCollection.add(confirmationData);
             showSuccessMessage('Confirmación guardada correctamente.');
         } else {
-            // Update existing confirmation - convertido a v8
+            // Update existing confirmation
             const docRef = querySnapshot.docs[0].ref;
             await docRef.set(confirmationData, { merge: true });
             showSuccessMessage('Confirmación actualizada correctamente.');

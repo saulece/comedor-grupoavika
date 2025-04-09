@@ -246,92 +246,43 @@ function loadEmployees() {
 
 // Display employees in the table
 function displayEmployees(employees) {
-    const employeeTableBody = document.getElementById('employee-table-body');
-    if (!employeeTableBody) return;
+    const employeeTableBody = document.getElementById('employees-table-body');
+    if (!employeeTableBody) {
+        console.error('No se encontró el elemento employees-table-body');
+        return;
+    }
     
     // Clear existing content
     employeeTableBody.innerHTML = '';
     
     if (employees.length === 0) {
         const emptyRow = document.createElement('tr');
-        emptyRow.innerHTML = `<td colspan="6" class="text-center">No hay empleados registrados</td>`;
+        emptyRow.innerHTML = `<td colspan="7" class="text-center">No hay empleados registrados</td>`;
         employeeTableBody.appendChild(emptyRow);
         updateEmployeeCount(0);
         return;
     }
     
-    // Add select all checkbox in table header if it doesn't exist
-    const tableHeader = document.querySelector('#employee-table thead tr');
-    if (tableHeader && !document.getElementById('select-all-employees')) {
-        // Create a new header cell for the checkbox
-        const selectAllHeader = document.createElement('th');
-        selectAllHeader.className = 'select-column';
-        selectAllHeader.innerHTML = `
-            <div class="checkbox-container">
-                <input type="checkbox" id="select-all-employees" class="select-all-checkbox">
-                <span class="checkmark"></span>
-            </div>
-        `;
-        
-        // Insert at the beginning of the header row
-        tableHeader.insertBefore(selectAllHeader, tableHeader.firstChild);
-        
-        // Add event listener to the select all checkbox
-        const selectAllCheckbox = document.getElementById('select-all-employees');
-        if (selectAllCheckbox) {
-            selectAllCheckbox.addEventListener('change', toggleAllEmployees);
-        }
-    }
-    
-    // Add buttons for bulk actions if they don't exist
-    const actionsContainer = document.querySelector('.table-actions');
-    if (actionsContainer && !document.getElementById('select-all-btn')) {
-        const bulkActionsDiv = document.createElement('div');
-        bulkActionsDiv.className = 'bulk-actions';
-        bulkActionsDiv.innerHTML = `
-            <button id="select-all-btn" class="btn btn-secondary btn-sm">
-                <i class="fas fa-check-square"></i> Seleccionar Todos
-            </button>
-            <button id="clear-selection-btn" class="btn btn-secondary btn-sm">
-                <i class="fas fa-times"></i> Limpiar Selección
-            </button>
-        `;
-        
-        actionsContainer.appendChild(bulkActionsDiv);
-        
-        // Add event listeners to the buttons
-        const selectAllBtn = document.getElementById('select-all-btn');
-        if (selectAllBtn) {
-            selectAllBtn.addEventListener('click', () => selectAllEmployees(true));
-        }
-        
-        const clearSelectionBtn = document.getElementById('clear-selection-btn');
-        if (clearSelectionBtn) {
-            clearSelectionBtn.addEventListener('click', () => selectAllEmployees(false));
-        }
-    }
+    // Store employees for later use
+    currentEmployees = employees;
     
     // Add each employee to the table
-    employees.forEach(employee => {
+    employees.forEach((employee, index) => {
         const row = document.createElement('tr');
         row.setAttribute('data-employee-id', employee.id);
         
-        // Add checkbox column
-        const checkboxCell = document.createElement('td');
-        checkboxCell.className = 'select-column';
-        checkboxCell.innerHTML = `
-            <div class="checkbox-container">
-                <input type="checkbox" class="employee-select" data-employee-id="${employee.id}">
-                <span class="checkmark"></span>
-            </div>
-        `;
-        row.appendChild(checkboxCell);
-        
-        // Add employee data columns
-        row.innerHTML += `
+        // Create the row content with all cells
+        row.innerHTML = `
+            <td class="select-column">
+                <label class="checkbox-container">
+                    <input type="checkbox" class="employee-select" data-employee-id="${employee.id}">
+                    <span class="checkmark"></span>
+                </label>
+            </td>
+            <td>${index + 1}</td>
             <td>${employee.name}</td>
-            <td>${employee.email || 'N/A'}</td>
             <td>${employee.position || 'N/A'}</td>
+            <td>${employee.email || 'N/A'}</td>
             <td>${employee.status === 'active' ? 'Activo' : 'Inactivo'}</td>
             <td class="actions">
                 <button class="btn btn-sm btn-primary edit-btn" data-employee-id="${employee.id}">
@@ -369,12 +320,10 @@ function displayEmployees(employees) {
         });
     });
     
-    // Add event listeners to checkboxes
+    // Add event listeners to employee checkboxes
     const employeeCheckboxes = employeeTableBody.querySelectorAll('.employee-select');
     employeeCheckboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', () => {
-            updateSelectAllCheckboxState();
-        });
+        checkbox.addEventListener('change', updateSelectAllCheckboxState);
     });
     
     // Update employee count
