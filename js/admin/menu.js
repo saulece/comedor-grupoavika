@@ -19,6 +19,28 @@ let menuData = {};
 let currentDay = 'Lunes';
 let currentWeekStartDate = getMonday(new Date());
 
+// Verificar que Firebase esté inicializado
+if (window.initializeFirebase) {
+    window.initializeFirebase();
+}
+
+// Definir la variable menuCollection
+let menuCollection = null;
+
+// Función para obtener la colección de menús
+function getMenuCollection() {
+    if (window.firestoreServices && window.firestoreServices.getCollection) {
+        return window.firestoreServices.getCollection('menus');
+    } else if (window.db) {
+        return window.db.collection('menus');
+    } else {
+        console.error('Error: La colección de menús no está disponible');
+        // Mostrar un mensaje de error en la interfaz
+        showErrorMessage('Error al conectar con la base de datos. Por favor recargue la página.');
+        return null;
+    }
+}
+
 // Ensure admin only access
 document.addEventListener('DOMContentLoaded', () => {
     if (!checkAuth(USER_ROLES.ADMIN)) {
@@ -415,6 +437,13 @@ function loadCurrentMenu() {
     // Show loading state
     showLoadingState(true);
     
+    // Obtener la colección de menús
+    menuCollection = getMenuCollection();
+    if (!menuCollection) {
+        showLoadingState(false);
+        return;
+    }
+    
     // Get menu from Firebase
     menuCollection.doc(weekStartStr)
         .get()
@@ -456,108 +485,62 @@ function loadCurrentMenu() {
 }
 
 // Save menu to Firebase
-async function saveMenu() {
-    console.log('Iniciando guardado de menú...');
+function saveMenu() {
+    // Validate menu form
+    if (!validateMenuForm()) {
+        return;
+    }
     
     // Show loading state
     showLoadingState(true);
     
-    try {
-        // Obtener el contenedor principal del menú
-        const menuItemsContainer = document.getElementById('menu-items-container');
-        if (!menuItemsContainer) {
-            console.error('Contenedor de menú no encontrado');
-            throw new Error('Contenedor de menú no encontrado');
-        }
-        
-        // Obtener todos los elementos del menú para el día actual
-        const menuItems = [];
-        const menuItemElements = document.querySelectorAll('.menu-item');
-        
-        console.log(`Encontrados ${menuItemElements.length} elementos para el día ${currentDay}`);
-        
-        // Si no hay elementos, verificar si hay un formulario directo en la página
-        if (menuItemElements.length === 0) {
-            // Intentar obtener datos del formulario de platillo si está visible
-            const nombrePlatillo = document.querySelector('input[placeholder="Nombre del plato"]');
-            const descripcionPlatillo = document.querySelector('textarea[placeholder="Descripción (opcional)"]');
-            
-            if (nombrePlatillo && nombrePlatillo.value.trim() !== '') {
-                menuItems.push({
-                    name: nombrePlatillo.value.trim(),
-                    description: descripcionPlatillo ? descripcionPlatillo.value.trim() : ''
-                });
-                console.log(`Agregado platillo del formulario: ${nombrePlatillo.value.trim()}`);
-            }
-        } else {
-            // Procesar los elementos encontrados
-            menuItemElements.forEach((item, index) => {
-                const nameInput = item.querySelector('.menu-item-name');
-                const descriptionInput = item.querySelector('.menu-item-description');
-                
-                if (nameInput && nameInput.value.trim() !== '') {
-                    menuItems.push({
-                        name: nameInput.value.trim(),
-                        description: descriptionInput ? descriptionInput.value.trim() : ''
-                    });
-                    console.log(`Elemento ${index + 1} agregado: ${nameInput.value.trim()}`);
-                }
-            });
-        }
-        
-        // Actualizar datos del menú para el día actual
-        if (!menuData[currentDay]) {
-            menuData[currentDay] = { items: [] };
-        }
-        
-        // Si encontramos elementos, actualizamos el menú
-        if (menuItems.length > 0) {
-            menuData[currentDay].items = menuItems;
-            console.log(`Menú actualizado para ${currentDay}:`, menuData[currentDay]);
-        } else {
-            console.warn(`No se encontraron elementos para guardar en ${currentDay}`);
-        }
-        
-        // Preparar datos para Firestore
-        const weekStartStr = formatDate(currentWeekStartDate);
-        const menuDoc = {
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            // Marcar el menú como publicado automáticamente al guardar
-            status: 'published',
-            publishedAt: firebase.firestore.FieldValue.serverTimestamp()
-        };
-        
-        // Añadir datos del menú para cada día
-        DAYS.forEach(day => {
-            const normalizedDay = DAYS_NORMALIZED[day];
-            if (menuData[day] && menuData[day].items) {
-                menuDoc[normalizedDay] = menuData[day];
-            }
-        });
-        
-        console.log('Guardando y publicando en Firebase:', menuDoc);
-        
-        // Actualizar o crear documento de menú
-        await menuCollection.doc(weekStartStr).set(menuDoc, { merge: true });
-        
-        // Actualizar el estado de publicación en la UI
-        updatePublishStatus(true);
-        
-        // Mostrar mensaje de éxito
-        showSuccessMessage('Menú guardado correctamente');
-        console.log('Menú guardado con éxito');
-        
-        // Recargar el menú para mostrar los cambios
-        setTimeout(() => {
-            loadCurrentMenu();
-        }, 1000);
-    } catch (error) {
-        console.error("Error saving menu:", error);
-        showErrorMessage("Error al guardar el menú: " + error.message);
-    } finally {
-        // Ocultar estado de carga
-        showLoadingState(false);
+    // Format date for Firestore
+    const weekStartStr = formatDate(currentWeekStartDate);
+    
+    // Prepare data for Firestore
+    const firestoreData = {};
+    
+    // Add each day's menu items
+    DAYS.forEach(day => {
+        const normalizedDay = DAYS_NORMALIZED[day];
+        firestoreData[normalizedDay] = menuData[day];
+    });
+    
+    // Add metadata
+    firestoreData.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+    
+    // If it's a new menu, add creation date
+    if (!menuData.createdAt) {
+        firestoreData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
     }
+    
+    // If menu was published, keep status
+    if (menuData.status === 'published') {
+        firestoreData.status = 'published';
+    } else {
+        firestoreData.status = 'draft';
+    }
+    
+    // Obtener la colección de menús
+    menuCollection = getMenuCollection();
+    if (!menuCollection) {
+        showLoadingState(false);
+        return;
+    }
+    
+    // Save to Firestore
+    menuCollection.doc(weekStartStr)
+        .set(firestoreData, { merge: true })
+        .then(() => {
+            console.log("Menu saved successfully");
+            showSuccessMessage("Menú guardado correctamente");
+            showLoadingState(false);
+        })
+        .catch(error => {
+            console.error("Error saving menu:", error);
+            showErrorMessage("Error al guardar el menú: " + error.message);
+            showLoadingState(false);
+        });
 }
 
 // Publish menu to Firebase
@@ -568,6 +551,13 @@ async function publishMenu() {
     try {
         console.log("Intentando publicar menú...");
         const weekStartStr = formatDate(currentWeekStartDate);
+        
+        // Obtener la colección de menús
+        menuCollection = getMenuCollection();
+        if (!menuCollection) {
+            showLoadingState(false);
+            return;
+        }
         
         // First, get the current data to preserve any fields
         const menuDoc = await menuCollection.doc(weekStartStr).get();
