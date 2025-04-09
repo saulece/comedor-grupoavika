@@ -65,7 +65,7 @@
                     <label for="confirmation-date">Fecha de Confirmación</label>
                     <div class="input-with-icon">
                         <i class="fas fa-calendar"></i>
-                        <input type="text" id="confirmation-date" class="form-control" placeholder="Selecciona una fecha" readonly>
+                        <input type="text" id="confirmation-date" class="form-control" placeholder="Selecciona una fecha">
                     </div>
                 </div>
             </div>
@@ -123,14 +123,6 @@
                     </div>
                     
                     <div class="selection-controls">
-                        <div class="bulk-actions">
-                            <button id="select-all-btn" class="btn btn-secondary btn-sm">
-                                <i class="fas fa-check-square"></i> Seleccionar Todos
-                            </button>
-                            <button id="clear-selection-btn" class="btn btn-secondary btn-sm">
-                                <i class="fas fa-times"></i> Limpiar Selección
-                            </button>
-                        </div>
                         <div id="selected-employee-count" class="selection-count">0 de 0 seleccionados</div>
                     </div>
                     
@@ -240,6 +232,51 @@
     <!-- External Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
+    <script>
+        // Asegurarse de que Flatpickr esté disponible y configurado correctamente
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof flatpickr === 'function') {
+                console.log('Flatpickr está disponible');
+                
+                // Inicializar directamente el selector de fecha
+                const datePicker = document.getElementById('confirmation-date');
+                if (datePicker) {
+                    // Definir nombres de días con acentos correctos
+                    const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+                    
+                    // Obtener la fecha actual
+                    const today = new Date();
+                    const year = today.getFullYear();
+                    const month = String(today.getMonth() + 1).padStart(2, '0');
+                    const day = String(today.getDate()).padStart(2, '0');
+                    const formattedToday = `${year}-${month}-${day}`;
+                    
+                    // Inicializar flatpickr directamente aquí
+                    flatpickr(datePicker, {
+                        dateFormat: "Y-m-d",
+                        locale: {
+                            firstDayOfWeek: 1,
+                            weekdays: {
+                                shorthand: ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'],
+                                longhand: diasSemana
+                            }
+                        },
+                        defaultDate: formattedToday,
+                        minDate: formattedToday,
+                        maxDate: new Date(today.setDate(today.getDate() + 14)), // 14 días desde hoy
+                        disableMobile: true,
+                        onChange: function(selectedDates, dateStr) {
+                            console.log('Fecha seleccionada:', dateStr);
+                        }
+                    });
+                    
+                    console.log('Flatpickr inicializado directamente en HTML');
+                }
+            } else {
+                console.error('Flatpickr no está disponible');
+            }
+        });
+    </script>
 
     <!-- Firebase Config - Debe cargarse después de Firebase pero antes de los módulos de utilidad -->
     <script src="../../js/firebase-config.js"></script>

@@ -9,6 +9,11 @@ const USER_ROLES = {
     COORDINATOR: 'coordinator'
 };
 
+// Constantes para nombres de días con acentos correctos
+const DATE_FORMATS = {
+    ADMIN: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+};
+
 // Referencias a servicios y colecciones de Firebase
 const db = window.db;
 const auth = window.auth;
@@ -74,16 +79,42 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /**
- * Validate if a string is a valid date format (YYYY-MM-DD)
+ * Format date object to YYYY-MM-DD string
+ * @param {Date} date - Date object to format
+ * @returns {string} Formatted date string
+ */
+function formatDateInput(date) {
+    if (!date || !(date instanceof Date)) return '';
+    
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}`;
+}
+
+/**
+ * Check if a string is a valid date in YYYY-MM-DD format
  * @param {string} dateString - Date string to validate
- * @returns {boolean} - Whether the date string is valid
+ * @returns {boolean} Whether the string is a valid date
  */
 function isValidDateString(dateString) {
+    if (!dateString || typeof dateString !== 'string') return false;
+    
+    // Check format (YYYY-MM-DD)
     const regex = /^\d{4}-\d{2}-\d{2}$/;
     if (!regex.test(dateString)) return false;
     
-    const date = new Date(dateString);
-    return date instanceof Date && !isNaN(date);
+    // Check if it's a valid date
+    const parts = dateString.split('-');
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed in JS Date
+    const day = parseInt(parts[2], 10);
+    
+    const date = new Date(year, month, day);
+    return date.getFullYear() === year &&
+           date.getMonth() === month &&
+           date.getDate() === day;
 }
 
 /**
@@ -92,19 +123,37 @@ function isValidDateString(dateString) {
 function initializeDatePickers() {
     const datePicker = document.getElementById('confirmation-date');
     
-    if (datePicker) {
-        // Set default to today
-        const today = new Date();
-        
-        // Inicializar flatpickr en lugar de usar el input nativo
+    if (!datePicker) {
+        console.warn('Date picker element not found');
+        return;
+    }
+    
+    // Set default to today
+    const today = new Date();
+    const formattedToday = formatDateInput(today);
+    
+    console.log('Inicializando datepicker con fecha por defecto:', formattedToday);
+    
+    // Definir nombres de días con acentos correctos
+    const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    
+    try {
+        // Inicializar flatpickr de manera simple
         flatpickr(datePicker, {
             dateFormat: "Y-m-d",
-            locale: "es",
-            defaultDate: today,
-            minDate: today,
+            locale: {
+                firstDayOfWeek: 1,
+                weekdays: {
+                    shorthand: ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'],
+                    longhand: diasSemana
+                }
+            },
+            defaultDate: formattedToday,
+            minDate: formattedToday,
             maxDate: new Date().fp_incr(14), // 14 días desde hoy
-            disableMobile: true, // Evitar problemas en dispositivos móviles
+            disableMobile: true,
             onChange: function(selectedDates, dateStr) {
+                console.log('Fecha seleccionada:', dateStr);
                 // Cargar confirmaciones existentes para esta fecha
                 loadExistingConfirmations(dateStr);
                 // Mostrar el día de la semana
@@ -113,9 +162,26 @@ function initializeDatePickers() {
         });
         
         // Mostrar el día de la semana para la fecha actual
-        showDayOfWeek(formatDateInput(today));
-    } else {
-        console.warn('Date picker element not found');
+        showDayOfWeek(formattedToday);
+        
+        // Cargar confirmaciones existentes para la fecha actual
+        loadExistingConfirmations(formattedToday);
+        
+        console.log('Flatpickr inicializado correctamente');
+    } catch (error) {
+        console.error('Error al inicializar Flatpickr:', error);
+        // Fallback a input de fecha nativo si Flatpickr falla
+        datePicker.type = 'date';
+        datePicker.value = formattedToday;
+        datePicker.min = formattedToday;
+        datePicker.max = formatDateInput(new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000));
+        datePicker.addEventListener('change', function() {
+            const selectedDate = this.value;
+            if (selectedDate) {
+                loadExistingConfirmations(selectedDate);
+                showDayOfWeek(selectedDate);
+            }
+        });
     }
 }
 
@@ -129,11 +195,11 @@ function showDayOfWeek(dateString) {
     const date = new Date(dateString);
     const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
     
-    // Adjust for JavaScript's Sunday-first indexing (we want Monday = 0)
-    const adjustedDayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    // Nombres de días con acentos correctos
+    const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    const dayName = dayNames[dayOfWeek];
     
-    // Get the day name in Spanish with proper accents
-    const dayName = DATE_FORMATS.ADMIN[adjustedDayIndex];
+    console.log(`Día seleccionado: ${dayName} (índice: ${dayOfWeek})`);
     
     // Display the day name
     const dayDisplay = document.createElement('div');
@@ -620,18 +686,6 @@ function resetConfirmationForm() {
     
     // Update employee count
     updateEmployeeCount();
-}
-
-/**
- * Format date for input elements (YYYY-MM-DD)
- * @param {Date} date - Date object to format
- * @returns {string} - Formatted date string
- */
-function formatDateInput(date) {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
 }
 
 /**
