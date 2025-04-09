@@ -122,11 +122,32 @@
                         </div>
                     </div>
                     
-                    <div id="employees-list" class="employees-checkboxes">
-                        <!-- Employee checkboxes will be loaded here -->
-                        <div class="empty-state">
-                            <p>Cargando empleados...</p>
-                        </div>
+                    <div class="table-responsive">
+                        <table class="data-table" id="employees-table">
+                            <thead>
+                                <tr>
+                                    <th class="select-column">
+                                        <label class="checkbox-container">
+                                            <input type="checkbox" id="select-all-employees">
+                                            <span class="checkmark"></span>
+                                        </label>
+                                    </th>
+                                    <th>Nombre</th>
+                                    <th>Posición</th>
+                                    <th>Departamento</th>
+                                </tr>
+                            </thead>
+                            <tbody id="employees-table-body">
+                                <tr>
+                                    <td colspan="4" class="text-center">Cargando empleados...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="confirmation-comments">Comentarios (opcional)</label>
+                        <textarea id="confirmation-comments" class="form-control" rows="3" placeholder="Agregar comentarios sobre esta confirmación..."></textarea>
                     </div>
                     
                     <div class="form-actions">

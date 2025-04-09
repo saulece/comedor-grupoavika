@@ -89,33 +89,36 @@ function isValidDateString(dateString) {
 /**
  * Initialize date picker with appropriate constraints
  */
-/**
- * Initialize date picker with appropriate constraints
- */
 function initializeDatePickers() {
     const datePicker = document.getElementById('confirmation-date');
     
     if (datePicker) {
         // Set default to today
         const today = new Date();
-        datePicker.value = formatDateInput(today);
         
-        // Set min to today
-        datePicker.min = formatDateInput(today);
-        
-        // Set max to 14 days from now (aumentado a 14 días para dar más flexibilidad)
-        const maxDate = new Date();
-        maxDate.setDate(maxDate.getDate() + 14);
-        datePicker.max = formatDateInput(maxDate);
-        
-        // Add change event listener to load existing confirmations
-        datePicker.addEventListener('change', () => {
-            loadExistingConfirmations(datePicker.value);
+        // Inicializar flatpickr en lugar de usar el input nativo
+        flatpickr(datePicker, {
+            dateFormat: "Y-m-d",
+            locale: "es",
+            defaultDate: today,
+            minDate: today,
+            maxDate: new Date().fp_incr(14), // 14 días desde hoy
+            disableMobile: true, // Evitar problemas en dispositivos móviles
+            onChange: function(selectedDates, dateStr) {
+                // Cargar confirmaciones existentes para esta fecha
+                loadExistingConfirmations(dateStr);
+                // Mostrar el día de la semana
+                showDayOfWeek(dateStr);
+            }
         });
+        
+        // Mostrar el día de la semana para la fecha actual
+        showDayOfWeek(formatDateInput(today));
     } else {
         console.warn('Date picker element not found');
     }
 }
+
 /**
  * Display day of week for selected date
  * @param {string} dateString - Date in YYYY-MM-DD format
@@ -124,207 +127,230 @@ function showDayOfWeek(dateString) {
     if (!dateString || !isValidDateString(dateString)) return;
     
     const date = new Date(dateString);
-    const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-    const dayOfWeek = days[date.getDay()];
+    const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
     
-    const dayDisplay = document.getElementById('day-of-week-display');
-    if (dayDisplay) {
-        dayDisplay.textContent = dayOfWeek;
-    } else {
-        // Create the element if it doesn't exist
-        const dateContainer = document.querySelector('.date-selector');
-        if (dateContainer) {
-            const newDisplay = document.createElement('div');
-            newDisplay.id = 'day-of-week-display';
-            newDisplay.className = 'day-of-week';
-            newDisplay.textContent = dayOfWeek;
-            dateContainer.appendChild(newDisplay);
-        }
+    // Adjust for JavaScript's Sunday-first indexing (we want Monday = 0)
+    const adjustedDayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    
+    // Get the day name in Spanish with proper accents
+    const dayName = DATE_FORMATS.ADMIN[adjustedDayIndex];
+    
+    // Display the day name
+    const dayDisplay = document.createElement('div');
+    dayDisplay.className = 'day-of-week';
+    dayDisplay.textContent = dayName;
+    
+    // Find the date selector container
+    const dateContainer = document.querySelector('.date-selector');
+    
+    // Remove any existing day display
+    const existingDayDisplay = document.querySelector('.day-of-week');
+    if (existingDayDisplay) {
+        existingDayDisplay.remove();
+    }
+    
+    // Add the day display after the date input
+    if (dateContainer) {
+        dateContainer.appendChild(dayDisplay);
     }
 }
-/**
- * Setup event listeners for interactive elements
- */
-// Add change event listener to load existing confirmations
-datePicker.addEventListener('change', () => {
-    loadExistingConfirmations(datePicker.value);
-    showDayOfWeek(datePicker.value);
-});
 
-// También muestra el día actual al cargar la página
-showDayOfWeek(formatDateInput(new Date()));
 /**
  * Setup event listeners for interactive elements
  */
 function setupEventListeners() {
-    // Confirmation form submission
-    const confirmationForm = document.getElementById('confirmation-form');
-    if (confirmationForm) {
-        confirmationForm.addEventListener('submit', saveConfirmation);
-    } else {
-        const submitBtn = document.getElementById('submit-confirmation-btn');
-        if (submitBtn) {
-            submitBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                saveConfirmation(e);
-            });
-        }
+    // Save confirmation button
+    const saveButton = document.getElementById('submit-confirmation-btn');
+    if (saveButton) {
+        saveButton.addEventListener('click', saveConfirmation);
     }
     
-    // Select/deselect all employees
-    const selectAllCheckbox = document.getElementById('select-all-employees');
-    if (selectAllCheckbox) {
-        selectAllCheckbox.addEventListener('change', toggleAllEmployees);
-    } else {
-        const selectAllBtn = document.getElementById('select-all-btn');
-        if (selectAllBtn) {
-            selectAllBtn.addEventListener('click', function() {
-                selectAllEmployees(true);
-            });
-        }
+    // Select all employees button
+    const selectAllButton = document.getElementById('select-all-btn');
+    if (selectAllButton) {
+        selectAllButton.addEventListener('click', () => selectAllEmployees(true));
     }
     
     // Clear selection button
-    const clearSelectionBtn = document.getElementById('clear-selection-btn');
-    if (clearSelectionBtn) {
-        clearSelectionBtn.addEventListener('click', function() {
-            selectAllEmployees(false);
-        });
+    const clearSelectionButton = document.getElementById('clear-selection-btn');
+    if (clearSelectionButton) {
+        clearSelectionButton.addEventListener('click', () => selectAllEmployees(false));
     }
     
-    // Search employees
+    // Select all checkbox
+    const selectAllCheckbox = document.getElementById('select-all-employees');
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', toggleAllEmployees);
+    }
+    
+    // Employee search input
     const searchInput = document.getElementById('employee-search');
     if (searchInput) {
         searchInput.addEventListener('input', filterEmployees);
     }
     
-    // Date picker
-    const datePicker = document.getElementById('confirmation-date');
-    if (datePicker) {
-        // Initialize Flatpickr if available
-        if (window.flatpickr) {
-            window.flatpickr(datePicker, {
-                dateFormat: 'Y-m-d',
-                minDate: 'today',
-                maxDate: new Date().fp_incr(14), // 14 days from now
-                locale: 'es',
-                onChange: function(selectedDates) {
-                    if (selectedDates && selectedDates[0]) {
-                        loadExistingConfirmations(formatDate(selectedDates[0]));
-                        showDayOfWeek(formatDate(selectedDates[0]));
-                    }
-                }
-            });
-        } else {
-            // Fallback to regular date input
-            datePicker.addEventListener('change', function() {
-                loadExistingConfirmations(this.value);
-                showDayOfWeek(this.value);
-            });
-        }
-        
-        // Set initial date value (today)
-        datePicker.value = formatDateInput(new Date());
-        showDayOfWeek(datePicker.value);
-    }
-    
-    // Employee checkboxes - add event delegation to handle employee selection changes
-    const employeeListContainer = document.getElementById('employees-list');
-    if (employeeListContainer) {
-        employeeListContainer.addEventListener('change', function(event) {
-            if (event.target.classList.contains('employee-select') || 
-                event.target.type === 'checkbox') {
-                updateEmployeeCount();
+    // Close modal buttons
+    const closeModalButtons = document.querySelectorAll('.close-modal');
+    closeModalButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const modal = document.getElementById('confirmation-success-modal');
+            if (modal) {
+                modal.style.display = 'none';
             }
         });
-    }
+    });
     
-    // Dashboard button in success modal
-    const viewDashboardBtn = document.getElementById('view-dashboard-btn');
-    if (viewDashboardBtn) {
-        viewDashboardBtn.addEventListener('click', function() {
+    // View dashboard button in success modal
+    const viewDashboardButton = document.getElementById('view-dashboard-btn');
+    if (viewDashboardButton) {
+        viewDashboardButton.addEventListener('click', () => {
             window.location.href = 'dashboard.html';
         });
     }
+    
+    // Logout button
+    const logoutButton = document.getElementById('logout-btn');
+    if (logoutButton) {
+        logoutButton.addEventListener('click', () => {
+            // Clear session data
+            sessionStorage.clear();
+            // Redirect to login page
+            window.location.href = '../../index.html';
+        });
+    }
 }
 
-// Helper to select or deselect all employees
-function selectAllEmployees(select) {
-    const checkboxes = document.querySelectorAll('#employees-list input[type="checkbox"]');
-    checkboxes.forEach(checkbox => {
+/**
+ * Toggle all employees selection
+ */
+function toggleAllEmployees() {
+    const selectAllCheckbox = document.getElementById('select-all-employees');
+    const employeeCheckboxes = document.querySelectorAll('.employee-select');
+    
+    if (selectAllCheckbox) {
+        // Apply the select-all checkbox state to all employee checkboxes
+        const isChecked = selectAllCheckbox.checked;
+        employeeCheckboxes.forEach(checkbox => {
+            checkbox.checked = isChecked;
+        });
+        
+        // Update the count of selected employees
+        updateEmployeeCount();
+    }
+}
+
+/**
+ * Select all employees
+ * @param {boolean} select - Whether to select or deselect all employees
+ */
+function selectAllEmployees(select = true) {
+    const employeeCheckboxes = document.querySelectorAll('.employee-select');
+    const selectAllCheckbox = document.getElementById('select-all-employees');
+    
+    // Set all checkboxes to the specified state
+    employeeCheckboxes.forEach(checkbox => {
         checkbox.checked = select;
     });
+    
+    // Update the select-all checkbox state
+    if (selectAllCheckbox) {
+        selectAllCheckbox.checked = select;
+        selectAllCheckbox.indeterminate = false;
+    }
+    
+    // Update the count of selected employees
     updateEmployeeCount();
 }
 
-// Display day of week for selected date
-function showDayOfWeek(dateString) {
-    if (!dateString || !isValidDateString(dateString)) return;
-    
-    const date = new Date(dateString);
-    const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-    const dayOfWeek = days[date.getDay()];
-    
-    const dayDisplay = document.getElementById('day-of-week-display');
-    if (dayDisplay) {
-        dayDisplay.textContent = dayOfWeek;
-    } else {
-        // Create the element if it doesn't exist
-        const dateContainer = document.querySelector('.date-selector');
-        if (dateContainer) {
-            const newDisplay = document.createElement('div');
-            newDisplay.id = 'day-of-week-display';
-            newDisplay.className = 'day-of-week';
-            newDisplay.textContent = dayOfWeek;
-            dateContainer.appendChild(newDisplay);
-        }
-    }
-}
+/**
+ * Display employees in the selection list
+ * @param {Array} employees - List of employee objects
+ */
 function displayEmployees(employees) {
     const employeeListContainer = document.getElementById('employee-list');
-    if (!employeeListContainer) {
-        console.warn('Employee list container not found');
-        return;
-    }
+    if (!employeeListContainer) return;
     
-    // Clear previous list
+    // Clear existing content
     employeeListContainer.innerHTML = '';
     
-    // Check if there are any employees
     if (employees.length === 0) {
-        const emptyMessage = document.createElement('div');
-        emptyMessage.classList.add('empty-list-message');
-        emptyMessage.textContent = 'No hay empleados activos asignados a su departamento.';
-        
-        employeeListContainer.appendChild(emptyMessage);
+        employeeListContainer.innerHTML = '<div class="no-results">No se encontraron empleados</div>';
         return;
     }
     
-    // Create employee checkboxes
+    // Create a select all checkbox at the top
+    const selectAllDiv = document.createElement('div');
+    selectAllDiv.className = 'employee-item select-all-item';
+    selectAllDiv.innerHTML = `
+        <label class="checkbox-container">
+            <input type="checkbox" id="select-all-employees" class="select-all-checkbox">
+            <span class="checkmark"></span>
+            <span class="employee-name"><strong>Seleccionar Todos</strong></span>
+        </label>
+    `;
+    employeeListContainer.appendChild(selectAllDiv);
+    
+    // Add event listener to the select all checkbox
+    const selectAllCheckbox = document.getElementById('select-all-employees');
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', toggleAllEmployees);
+    }
+    
+    // Add each employee to the list
     employees.forEach(employee => {
-        const employeeItem = document.createElement('div');
-        employeeItem.classList.add('employee-item');
-        
-        employeeItem.innerHTML = `
-            <label class="employee-checkbox">
-                <input type="checkbox" class="employee-select" value="${employee.id}" data-name="${employee.name}">
+        const employeeDiv = document.createElement('div');
+        employeeDiv.className = 'employee-item';
+        employeeDiv.innerHTML = `
+            <label class="checkbox-container">
+                <input type="checkbox" class="employee-select" data-employee-id="${employee.id}">
+                <span class="checkmark"></span>
                 <span class="employee-name">${employee.name}</span>
-                ${employee.position ? `<span class="employee-position">${employee.position}</span>` : ''}
             </label>
         `;
-        
-        employeeListContainer.appendChild(employeeItem);
+        employeeListContainer.appendChild(employeeDiv);
     });
     
-    // Update employee count
+    // Add change event listeners to all employee checkboxes
+    const employeeCheckboxes = document.querySelectorAll('.employee-select');
+    employeeCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', () => {
+            updateSelectAllCheckboxState();
+            updateEmployeeCount();
+        });
+    });
+    
+    // Initialize the employee count
     updateEmployeeCount();
+}
+
+/**
+ * Update the state of the select-all checkbox based on individual selections
+ */
+function updateSelectAllCheckboxState() {
+    const selectAllCheckbox = document.getElementById('select-all-employees');
+    const employeeCheckboxes = document.querySelectorAll('.employee-select');
+    
+    if (selectAllCheckbox && employeeCheckboxes.length > 0) {
+        const checkedCount = Array.from(employeeCheckboxes).filter(cb => cb.checked).length;
+        
+        if (checkedCount === 0) {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = false;
+        } else if (checkedCount === employeeCheckboxes.length) {
+            selectAllCheckbox.checked = true;
+            selectAllCheckbox.indeterminate = false;
+        } else {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = true;
+        }
+    }
 }
 
 /**
  * Filter employees by search term
  */
 function filterEmployees() {
-    const searchInput = document.getElementById('search-employees');
+    const searchInput = document.getElementById('employee-search');
     if (!searchInput) return;
     
     const searchTerm = searchInput.value.toLowerCase().trim();
@@ -346,23 +372,6 @@ function filterEmployees() {
 }
 
 /**
- * Toggle all employees selection
- */
-function toggleAllEmployees() {
-    const selectAllCheckbox = document.getElementById('select-all-employees');
-    if (!selectAllCheckbox) return;
-    
-    const employeeCheckboxes = document.querySelectorAll('.employee-select');
-    
-    employeeCheckboxes.forEach(checkbox => {
-        checkbox.checked = selectAllCheckbox.checked;
-    });
-    
-    // Update employee count
-    updateEmployeeCount();
-}
-
-/**
  * Update selected employee count
  */
 function updateEmployeeCount() {
@@ -372,13 +381,6 @@ function updateEmployeeCount() {
     const countDisplay = document.getElementById('selected-employee-count');
     if (countDisplay) {
         countDisplay.textContent = `${selectedCount} de ${totalCount} seleccionados`;
-    }
-    
-    // Update select all checkbox state
-    const selectAllCheckbox = document.getElementById('select-all-employees');
-    if (selectAllCheckbox && totalCount > 0) {
-        selectAllCheckbox.checked = selectedCount === totalCount;
-        selectAllCheckbox.indeterminate = selectedCount > 0 && selectedCount < totalCount;
     }
 }
 

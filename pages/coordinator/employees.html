@@ -70,6 +70,12 @@
                     <button id="add-employee-btn" class="btn btn-primary">
                         <i class="fas fa-user-plus"></i> Agregar Empleado
                     </button>
+                    <button id="select-all-btn" class="btn btn-secondary">
+                        <i class="fas fa-check-square"></i> Seleccionar Todos
+                    </button>
+                    <button id="clear-selection-btn" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Limpiar Selección
+                    </button>
                     <button id="import-employees-btn" class="btn btn-secondary">
                         <i class="fas fa-file-import"></i> Importar Excel
                     </button>
@@ -94,6 +100,12 @@
                         <table class="data-table" id="employees-table">
                             <thead>
                                 <tr>
+                                    <th class="select-column">
+                                        <label class="checkbox-container">
+                                            <input type="checkbox" id="select-all-employees">
+                                            <span class="checkmark"></span>
+                                        </label>
+                                    </th>
                                     <th>#</th>
                                     <th>Nombre</th>
                                     <th>Posición</th>
@@ -104,7 +116,7 @@
                             </thead>
                             <tbody id="employees-table-body">
                                 <tr>
-                                    <td colspan="6" class="text-center">Cargando empleados...</td>
+                                    <td colspan="7" class="text-center">Cargando empleados...</td>
                                 </tr>
                             </tbody>
                         </table>

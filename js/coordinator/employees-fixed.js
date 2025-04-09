@@ -69,6 +69,24 @@ function setupEventListeners() {
         searchInput.addEventListener('input', filterEmployees);
     }
     
+    // Select all employees button
+    const selectAllBtn = document.getElementById('select-all-btn');
+    if (selectAllBtn) {
+        selectAllBtn.addEventListener('click', () => selectAllEmployees(true));
+    }
+    
+    // Clear selection button
+    const clearSelectionBtn = document.getElementById('clear-selection-btn');
+    if (clearSelectionBtn) {
+        clearSelectionBtn.addEventListener('click', () => selectAllEmployees(false));
+    }
+    
+    // Select all checkbox in table header
+    const selectAllCheckbox = document.getElementById('select-all-employees');
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', toggleAllEmployees);
+    }
+    
     // Import employees button
     const importBtn = document.getElementById('import-employees-btn');
     if (importBtn) {
@@ -228,58 +246,135 @@ function loadEmployees() {
 
 // Display employees in the table
 function displayEmployees(employees) {
-    const employeesTable = document.getElementById('employees-table-body');
-    if (!employeesTable) {
-        console.error('No se encontru00f3 la tabla de empleados');
-        return;
-    }
+    const employeeTableBody = document.getElementById('employee-table-body');
+    if (!employeeTableBody) return;
     
-    // Clear table
-    employeesTable.innerHTML = '';
+    // Clear existing content
+    employeeTableBody.innerHTML = '';
     
-    // Check if there are any employees
     if (employees.length === 0) {
         const emptyRow = document.createElement('tr');
-        emptyRow.innerHTML = `
-            <td colspan="5" class="text-center">No hay empleados asignados a su departamento.</td>
-        `;
-        employeesTable.appendChild(emptyRow);
+        emptyRow.innerHTML = `<td colspan="6" class="text-center">No hay empleados registrados</td>`;
+        employeeTableBody.appendChild(emptyRow);
+        updateEmployeeCount(0);
         return;
     }
     
-    // Display each employee
+    // Add select all checkbox in table header if it doesn't exist
+    const tableHeader = document.querySelector('#employee-table thead tr');
+    if (tableHeader && !document.getElementById('select-all-employees')) {
+        // Create a new header cell for the checkbox
+        const selectAllHeader = document.createElement('th');
+        selectAllHeader.className = 'select-column';
+        selectAllHeader.innerHTML = `
+            <div class="checkbox-container">
+                <input type="checkbox" id="select-all-employees" class="select-all-checkbox">
+                <span class="checkmark"></span>
+            </div>
+        `;
+        
+        // Insert at the beginning of the header row
+        tableHeader.insertBefore(selectAllHeader, tableHeader.firstChild);
+        
+        // Add event listener to the select all checkbox
+        const selectAllCheckbox = document.getElementById('select-all-employees');
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', toggleAllEmployees);
+        }
+    }
+    
+    // Add buttons for bulk actions if they don't exist
+    const actionsContainer = document.querySelector('.table-actions');
+    if (actionsContainer && !document.getElementById('select-all-btn')) {
+        const bulkActionsDiv = document.createElement('div');
+        bulkActionsDiv.className = 'bulk-actions';
+        bulkActionsDiv.innerHTML = `
+            <button id="select-all-btn" class="btn btn-secondary btn-sm">
+                <i class="fas fa-check-square"></i> Seleccionar Todos
+            </button>
+            <button id="clear-selection-btn" class="btn btn-secondary btn-sm">
+                <i class="fas fa-times"></i> Limpiar Selección
+            </button>
+        `;
+        
+        actionsContainer.appendChild(bulkActionsDiv);
+        
+        // Add event listeners to the buttons
+        const selectAllBtn = document.getElementById('select-all-btn');
+        if (selectAllBtn) {
+            selectAllBtn.addEventListener('click', () => selectAllEmployees(true));
+        }
+        
+        const clearSelectionBtn = document.getElementById('clear-selection-btn');
+        if (clearSelectionBtn) {
+            clearSelectionBtn.addEventListener('click', () => selectAllEmployees(false));
+        }
+    }
+    
+    // Add each employee to the table
     employees.forEach(employee => {
         const row = document.createElement('tr');
+        row.setAttribute('data-employee-id', employee.id);
         
-        row.innerHTML = `
-            <td>${employee.name || 'Sin nombre'}</td>
-            <td>${employee.position || 'Sin posiciu00f3n'}</td>
-            <td>${employee.email || 'Sin correo'}</td>
-            <td>${employee.active ? '<span class="badge badge-success">Activo</span>' : '<span class="badge badge-danger">Inactivo</span>'}</td>
-            <td>
-                <div class="actions">
-                    <button class="btn btn-sm btn-primary edit-employee" data-id="${employee.id}">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button class="btn btn-sm btn-danger delete-employee" data-id="${employee.id}">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
+        // Add checkbox column
+        const checkboxCell = document.createElement('td');
+        checkboxCell.className = 'select-column';
+        checkboxCell.innerHTML = `
+            <div class="checkbox-container">
+                <input type="checkbox" class="employee-select" data-employee-id="${employee.id}">
+                <span class="checkmark"></span>
+            </div>
+        `;
+        row.appendChild(checkboxCell);
+        
+        // Add employee data columns
+        row.innerHTML += `
+            <td>${employee.name}</td>
+            <td>${employee.email || 'N/A'}</td>
+            <td>${employee.position || 'N/A'}</td>
+            <td>${employee.status === 'active' ? 'Activo' : 'Inactivo'}</td>
+            <td class="actions">
+                <button class="btn btn-sm btn-primary edit-btn" data-employee-id="${employee.id}">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="btn btn-sm btn-danger delete-btn" data-employee-id="${employee.id}">
+                    <i class="fas fa-trash"></i>
+                </button>
             </td>
         `;
         
-        employeesTable.appendChild(row);
-        
-        // Add event listeners for edit and delete buttons
-        const editBtn = row.querySelector('.edit-employee');
-        if (editBtn) {
-            editBtn.addEventListener('click', () => editEmployee(employee));
-        }
-        
-        const deleteBtn = row.querySelector('.delete-employee');
-        if (deleteBtn) {
-            deleteBtn.addEventListener('click', () => confirmDeleteEmployee(employee));
-        }
+        employeeTableBody.appendChild(row);
+    });
+    
+    // Add event listeners to edit and delete buttons
+    const editButtons = employeeTableBody.querySelectorAll('.edit-btn');
+    editButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const employeeId = button.getAttribute('data-employee-id');
+            const employee = employees.find(emp => emp.id === employeeId);
+            if (employee) {
+                editEmployee(employee);
+            }
+        });
+    });
+    
+    const deleteButtons = employeeTableBody.querySelectorAll('.delete-btn');
+    deleteButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const employeeId = button.getAttribute('data-employee-id');
+            const employee = employees.find(emp => emp.id === employeeId);
+            if (employee) {
+                confirmDeleteEmployee(employee);
+            }
+        });
+    });
+    
+    // Add event listeners to checkboxes
+    const employeeCheckboxes = employeeTableBody.querySelectorAll('.employee-select');
+    employeeCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', () => {
+            updateSelectAllCheckboxState();
+        });
     });
     
     // Update employee count
@@ -424,8 +519,8 @@ async function saveEmployee(event) {
     // Create employee object
     const employee = {
         name: name,
-        position: position,
         email: email,
+        position: position,
         active: active,
         departmentId: currentUser.departmentId,
         department: currentUser.department,
@@ -940,11 +1035,6 @@ async function saveEmployeesToFirestore(employees) {
         
         // Process each employee
         for (const employee of employees) {
-            // Asegurarse de que cada empleado tenga la información del departamento
-            employee.departmentId = currentUser.departmentId;
-            employee.department = currentUser.department || sessionStorage.getItem('userDepartmentName');
-            employee.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
-            
             // Check if employee with this email already exists
             if (existingEmails[employee.email]) {
                 // Update existing employee
@@ -952,7 +1042,6 @@ async function saveEmployeesToFirestore(employees) {
                 batch.update(docRef, employee);
             } else {
                 // Add new employee
-                employee.createdAt = firebase.firestore.FieldValue.serverTimestamp();
                 const docRef = window.db.collection('employees').doc();
                 batch.set(docRef, employee);
             }
@@ -1141,4 +1230,63 @@ async function saveEmployeesToFirestore(employees) {
     
     // Commit the batch
     return batch.commit();
+}
+
+/**
+ * Toggle all employees selection
+ */
+function toggleAllEmployees() {
+    const selectAllCheckbox = document.getElementById('select-all-employees');
+    const employeeCheckboxes = document.querySelectorAll('.employee-select');
+    
+    if (selectAllCheckbox) {
+        // Apply the select-all checkbox state to all employee checkboxes
+        const isChecked = selectAllCheckbox.checked;
+        employeeCheckboxes.forEach(checkbox => {
+            checkbox.checked = isChecked;
+        });
+    }
+}
+
+/**
+ * Select all employees
+ * @param {boolean} select - Whether to select or deselect all employees
+ */
+function selectAllEmployees(select = true) {
+    const employeeCheckboxes = document.querySelectorAll('.employee-select');
+    const selectAllCheckbox = document.getElementById('select-all-employees');
+    
+    // Set all checkboxes to the specified state
+    employeeCheckboxes.forEach(checkbox => {
+        checkbox.checked = select;
+    });
+    
+    // Update the select-all checkbox state
+    if (selectAllCheckbox) {
+        selectAllCheckbox.checked = select;
+        selectAllCheckbox.indeterminate = false;
+    }
+}
+
+/**
+ * Update the state of the select-all checkbox based on individual selections
+ */
+function updateSelectAllCheckboxState() {
+    const selectAllCheckbox = document.getElementById('select-all-employees');
+    const employeeCheckboxes = document.querySelectorAll('.employee-select');
+    
+    if (selectAllCheckbox && employeeCheckboxes.length > 0) {
+        const checkedCount = Array.from(employeeCheckboxes).filter(cb => cb.checked).length;
+        
+        if (checkedCount === 0) {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = false;
+        } else if (checkedCount === employeeCheckboxes.length) {
+            selectAllCheckbox.checked = true;
+            selectAllCheckbox.indeterminate = false;
+        } else {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = true;
+        }
+    }
 }

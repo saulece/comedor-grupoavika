@@ -73,6 +73,103 @@ body {
 
 /* ---- CORRECCIONES ESPECÍFICAS ---- */
 
+/* Estilos para selección múltiple de empleados */
+.select-column {
+    width: 40px;
+    text-align: center;
+}
+
+.checkbox-container {
+    position: relative;
+    padding-left: 25px;
+    cursor: pointer;
+    display: inline-block;
+}
+
+.checkbox-container input {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    height: 0;
+    width: 0;
+}
+
+.checkmark {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 18px;
+    width: 18px;
+    background-color: #fff;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+}
+
+.checkbox-container:hover input ~ .checkmark {
+    background-color: #f0f0f0;
+}
+
+.checkbox-container input:checked ~ .checkmark {
+    background-color: #3498db;
+    border-color: #3498db;
+}
+
+.checkbox-container input:indeterminate ~ .checkmark {
+    background-color: #3498db;
+    border-color: #3498db;
+}
+
+.checkmark:after {
+    content: "";
+    position: absolute;
+    display: none;
+}
+
+.checkbox-container input:checked ~ .checkmark:after {
+    display: block;
+}
+
+.checkbox-container .checkmark:after {
+    left: 6px;
+    top: 2px;
+    width: 5px;
+    height: 10px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+.checkbox-container input:indeterminate ~ .checkmark:after {
+    left: 4px;
+    top: 8px;
+    width: 10px;
+    height: 2px;
+    border: none;
+    background-color: white;
+    transform: none;
+}
+
+.select-all-item {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    padding: 10px;
+    font-weight: bold;
+}
+
+.bulk-actions {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
+}
+
+/* Estilos para el día de la semana en el selector de fecha */
+.day-of-week {
+    margin-top: 5px;
+    font-weight: 600;
+    color: #3498db;
+    font-size: 1.1rem;
+}
+
 /* Mejorar visualización de tarjetas de menú */
 .meal-card {
     position: relative;
