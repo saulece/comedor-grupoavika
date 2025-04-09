@@ -294,6 +294,10 @@
     overflow-y: auto;
 }
 
+.modal-content.modal-lg {
+    width: 800px;
+}
+
 .modal-header {
     padding: 1.25rem;
     border-bottom: 1px solid var(--border-color);
@@ -324,6 +328,80 @@
     display: flex;
     justify-content: flex-end;
     gap: 1rem;
+}
+
+/* Import Employees Modal Styles */
+.import-instructions {
+    margin-bottom: 1.5rem;
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 0.25rem;
+    border-left: 4px solid var(--primary-color);
+}
+
+.import-instructions h4 {
+    margin-top: 0;
+    color: var(--primary-color);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.import-instructions ol {
+    padding-left: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.import-instructions li {
+    margin-bottom: 0.5rem;
+}
+
+.alert {
+    padding: 0.75rem 1rem;
+    border-radius: 0.25rem;
+    margin-top: 1rem;
+}
+
+.alert-info {
+    background-color: #e3f2fd;
+    border: 1px solid #bbdefb;
+    color: #0d47a1;
+}
+
+.template-example {
+    margin-bottom: 1.5rem;
+}
+
+.template-example h4 {
+    margin-top: 0;
+    color: var(--primary-color);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.example-table {
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+}
+
+.example-table th {
+    background-color: #f1f8e9;
+    color: #33691e;
+}
+
+.small-text {
+    font-size: 0.8rem;
+    color: #6c757d;
+    font-style: italic;
+}
+
+.template-download {
+    margin: 1.5rem 0;
+    padding: 1rem;
+    background-color: #f8f9fa;
+    border-radius: 0.25rem;
+    text-align: center;
 }
 
 /* Responsive coordinator panel */

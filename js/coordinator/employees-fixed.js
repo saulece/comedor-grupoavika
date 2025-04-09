@@ -30,13 +30,31 @@ function setupEventListeners() {
     }
     
     // Search employees
-    const searchInput = document.getElementById('search-employees');
+    const searchInput = document.getElementById('employee-search');
     if (searchInput) {
         searchInput.addEventListener('input', filterEmployees);
     }
     
+    // Import employees button
+    const importBtn = document.getElementById('import-employees-btn');
+    if (importBtn) {
+        importBtn.addEventListener('click', showImportModal);
+    }
+    
+    // Download template button
+    const downloadTemplateBtn = document.getElementById('download-template-btn');
+    if (downloadTemplateBtn) {
+        downloadTemplateBtn.addEventListener('click', downloadExcelTemplate);
+    }
+    
+    // Import form submit
+    const importForm = document.getElementById('import-form');
+    if (importForm) {
+        importForm.addEventListener('submit', importEmployeesFromExcel);
+    }
+    
     // Close modal buttons
-    const closeModalButtons = document.querySelectorAll('.modal-close, .close-modal-btn');
+    const closeModalButtons = document.querySelectorAll('.close-modal, .cancel-modal');
     closeModalButtons.forEach(button => {
         button.addEventListener('click', closeModal);
     });
@@ -492,4 +510,209 @@ function showSuccessMessage(message) {
             successAlert.style.display = 'none';
         }, 5000);
     }
+}
+
+// Show import employees modal
+function showImportModal() {
+    const modal = document.getElementById('import-employees-modal');
+    if (modal) {
+        modal.classList.add('active');
+    }
+}
+
+// Download Excel template for employee import
+function downloadExcelTemplate() {
+    // Define the template structure
+    const templateData = [
+        ['Nombre Completo*', 'Correo Electrónico*', 'Teléfono', 'Puesto', 'Estado*'],
+        ['Juan Pérez López', 'juan.perez@ejemplo.com', '5512345678', 'Operador', 'active'],
+        ['María González Ruiz', 'maria.gonzalez@ejemplo.com', '5587654321', 'Supervisor', 'active']
+    ];
+    
+    // Create a new workbook
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.aoa_to_sheet(templateData);
+    
+    // Add the worksheet to the workbook
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Empleados');
+    
+    // Generate Excel file and trigger download
+    XLSX.writeFile(workbook, 'plantilla_importacion_empleados.xlsx');
+    
+    showSuccessMessage('Plantilla descargada correctamente.');
+}
+
+// Import employees from Excel file
+async function importEmployeesFromExcel(event) {
+    event.preventDefault();
+    
+    const fileInput = document.getElementById('import-file');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        showErrorMessage('Por favor selecciona un archivo Excel.');
+        return;
+    }
+    
+    // Check file extension
+    const fileExt = file.name.split('.').pop().toLowerCase();
+    if (fileExt !== 'xlsx' && fileExt !== 'xls') {
+        showErrorMessage('El archivo debe ser un documento Excel (.xlsx, .xls).');
+        return;
+    }
+    
+    // Show loading state
+    showLoadingState(true);
+    
+    try {
+        // Read the Excel file
+        const data = await readExcelFile(file);
+        
+        if (!data || data.length <= 1) {
+            showErrorMessage('El archivo está vacío o no contiene datos válidos.');
+            showLoadingState(false);
+            return;
+        }
+        
+        // Validate headers
+        const headers = data[0];
+        const requiredHeaders = ['Nombre Completo*', 'Correo Electrónico*', 'Estado*'];
+        
+        for (const header of requiredHeaders) {
+            if (!headers.includes(header)) {
+                showErrorMessage(`El archivo no tiene el formato correcto. Falta la columna "${header}".`);
+                showLoadingState(false);
+                return;
+            }
+        }
+        
+        // Process employees data (skip header row)
+        const employees = [];
+        const errors = [];
+        
+        for (let i = 1; i < data.length; i++) {
+            const row = data[i];
+            const nameIndex = headers.indexOf('Nombre Completo*');
+            const emailIndex = headers.indexOf('Correo Electrónico*');
+            const phoneIndex = headers.indexOf('Teléfono');
+            const positionIndex = headers.indexOf('Puesto');
+            const statusIndex = headers.indexOf('Estado*');
+            
+            // Skip empty rows
+            if (!row[nameIndex] && !row[emailIndex]) continue;
+            
+            // Validate required fields
+            if (!row[nameIndex]) {
+                errors.push(`Fila ${i+1}: Falta el nombre del empleado.`);
+                continue;
+            }
+            
+            if (!row[emailIndex]) {
+                errors.push(`Fila ${i+1}: Falta el correo electrónico del empleado.`);
+                continue;
+            }
+            
+            if (!row[statusIndex] || (row[statusIndex] !== 'active' && row[statusIndex] !== 'inactive')) {
+                errors.push(`Fila ${i+1}: El estado debe ser 'active' o 'inactive'.`);
+                continue;
+            }
+            
+            // Create employee object
+            const employee = {
+                name: row[nameIndex],
+                email: row[emailIndex],
+                phone: row[phoneIndex] || '',
+                position: row[positionIndex] || '',
+                status: row[statusIndex],
+                departmentId: currentUser.departmentId
+            };
+            
+            employees.push(employee);
+        }
+        
+        // Show errors if any
+        if (errors.length > 0) {
+            showErrorMessage(`Se encontraron ${errors.length} errores en el archivo. Por favor corrige los errores y vuelve a intentarlo.`);
+            console.error('Errores de importación:', errors);
+            showLoadingState(false);
+            return;
+        }
+        
+        // Save employees to Firestore
+        await saveEmployeesToFirestore(employees);
+        
+        // Close modal and show success message
+        closeModal();
+        showSuccessMessage(`Se importaron ${employees.length} empleados correctamente.`);
+        
+        // Reload employees list
+        loadEmployees();
+        
+    } catch (error) {
+        console.error('Error importing employees:', error);
+        showErrorMessage('Error al importar empleados. ' + error.message);
+        showLoadingState(false);
+    }
+}
+
+// Read Excel file and return data as array
+function readExcelFile(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+            try {
+                const data = e.target.result;
+                const workbook = XLSX.read(data, { type: 'binary' });
+                
+                // Get first sheet
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                
+                // Convert to array of arrays
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                resolve(jsonData);
+            } catch (error) {
+                reject(error);
+            }
+        };
+        
+        reader.onerror = function(error) {
+            reject(error);
+        };
+        
+        reader.readAsBinaryString(file);
+    });
+}
+
+// Save employees to Firestore
+async function saveEmployeesToFirestore(employees) {
+    // Get existing employees to check for duplicates
+    const existingEmployees = await window.firestoreServices.employee.getEmployeesByDepartment(currentUser.departmentId);
+    const existingEmails = {};
+    
+    existingEmployees.forEach(doc => {
+        const employee = doc.data();
+        existingEmails[employee.email] = doc.id;
+    });
+    
+    // Create batch for Firestore operations
+    const batch = window.db.batch();
+    
+    // Process each employee
+    for (const employee of employees) {
+        // Check if employee with this email already exists
+        if (existingEmails[employee.email]) {
+            // Update existing employee
+            const docRef = window.db.collection('employees').doc(existingEmails[employee.email]);
+            batch.update(docRef, employee);
+        } else {
+            // Add new employee
+            const docRef = window.db.collection('employees').doc();
+            batch.set(docRef, employee);
+        }
+    }
+    
+    // Commit the batch
+    return batch.commit();
 }

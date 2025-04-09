@@ -71,7 +71,7 @@
                         <i class="fas fa-user-plus"></i> Agregar Empleado
                     </button>
                     <button id="import-employees-btn" class="btn btn-secondary">
-                        <i class="fas fa-file-import"></i> Importar
+                        <i class="fas fa-file-import"></i> Importar Excel
                     </button>
                     <button id="export-employees-btn" class="btn btn-secondary">
                         <i class="fas fa-file-export"></i> Exportar
@@ -193,16 +193,65 @@
 
     <!-- Import Employees Modal -->
     <div id="import-employees-modal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content modal-lg">
             <div class="modal-header">
-                <h3>Importar Empleados</h3>
+                <h3>Importar Empleados desde Excel</h3>
                 <button class="close-modal">&times;</button>
             </div>
             <div class="modal-body">
+                <div class="import-instructions">
+                    <h4><i class="fas fa-info-circle"></i> Instrucciones para importar empleados</h4>
+                    <ol>
+                        <li>Descarga la plantilla Excel haciendo clic en el botón "Descargar Plantilla".</li>
+                        <li>Completa la información de los empleados en la plantilla siguiendo el formato establecido.</li>
+                        <li>No modifiques los encabezados de las columnas ni elimines ninguna columna.</li>
+                        <li>Guarda el archivo Excel una vez completado.</li>
+                        <li>Haz clic en "Seleccionar archivo" y elige el archivo Excel que acabas de completar.</li>
+                        <li>Haz clic en "Importar" para cargar los empleados al sistema.</li>
+                    </ol>
+                    <div class="alert alert-info">
+                        <p><strong>Nota:</strong> Los empleados con correo electrónico duplicado serán actualizados en lugar de crear nuevos registros.</p>
+                    </div>
+                </div>
+
+                <div class="template-example">
+                    <h4><i class="fas fa-table"></i> Estructura de la plantilla</h4>
+                    <div class="table-responsive">
+                        <table class="data-table example-table">
+                            <thead>
+                                <tr>
+                                    <th>Nombre Completo*</th>
+                                    <th>Correo Electrónico*</th>
+                                    <th>Teléfono</th>
+                                    <th>Puesto</th>
+                                    <th>Estado*</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Juan Pérez López</td>
+                                    <td>juan.perez@ejemplo.com</td>
+                                    <td>5512345678</td>
+                                    <td>Operador</td>
+                                    <td>active</td>
+                                </tr>
+                                <tr>
+                                    <td>María González Ruiz</td>
+                                    <td>maria.gonzalez@ejemplo.com</td>
+                                    <td>5587654321</td>
+                                    <td>Supervisor</td>
+                                    <td>active</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="small-text">* Campos obligatorios. Para el campo Estado, use "active" para activo o "inactive" para inactivo.</p>
+                </div>
+
                 <form id="import-form">
                     <div class="form-group">
-                        <label for="import-file">Selecciona un archivo CSV o Excel</label>
-                        <input type="file" id="import-file" name="import-file" class="form-control" accept=".csv, .xlsx, .xls">
+                        <label for="import-file"><i class="fas fa-file-excel"></i> Selecciona un archivo Excel (.xlsx, .xls)</label>
+                        <input type="file" id="import-file" name="import-file" class="form-control" accept=".xlsx, .xls">
                     </div>
                     
                     <div class="template-download">
