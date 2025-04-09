@@ -9,12 +9,7 @@ const USER_ROLES = {
     COORDINATOR: 'coordinator'
 };
 
-// Constantes para nombres de días con acentos correctos
-const DATE_FORMATS = {
-    ADMIN: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
-};
-
-// Referencias a servicios y colecciones de Firebase
+// References a servicios y colecciones de Firebase
 const db = window.db;
 const auth = window.auth;
 const employeesCollection = window.employeesCollection;
@@ -23,6 +18,7 @@ const confirmationsCollection = window.confirmationsCollection;
 // Current user information
 let currentUser = null;
 let employeeList = []; // Store employee list for the coordinator
+let selectedEmployeeIds = []; // Track selected employee IDs for easier operations
 
 /**
  * Initialize the module when DOM is ready
@@ -36,14 +32,16 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Get current user from session storage
     try {
-        // Usar sessionStorage para obtener el usuario actual
-        const userId = sessionStorage.getItem('userId');
-        const userName = sessionStorage.getItem('userName');
-        const userEmail = sessionStorage.getItem('userEmail');
-        const departmentId = sessionStorage.getItem('userDepartment');
+        // Extract all possible user data from sessionStorage
+        const user = JSON.parse(sessionStorage.getItem('user') || '{}');
+        const userId = user.uid || sessionStorage.getItem('userId');
+        const userName = user.displayName || sessionStorage.getItem('userName');
+        const userEmail = user.email || sessionStorage.getItem('userEmail');
+        const departmentId = user.departmentId || sessionStorage.getItem('userDepartmentId') || sessionStorage.getItem('userDepartment');
+        const departmentName = user.department || sessionStorage.getItem('userDepartment');
         
-        if (!userId) {
-            console.error('User session data not found');
+        if (!userId || !departmentId) {
+            console.error('User session data incomplete');
             window.location.href = '../../index.html';
             return;
         }
@@ -52,10 +50,20 @@ document.addEventListener('DOMContentLoaded', () => {
             uid: userId,
             displayName: userName,
             email: userEmail,
-            departmentId: departmentId
+            departmentId: departmentId,
+            departmentName: departmentName
         };
+        
+        // Set user name in UI
+        const userNameElement = document.getElementById('user-name');
+        if (userNameElement) {
+            userNameElement.textContent = userName || 'Coordinador';
+        }
+        
+        // Log successful user load
+        console.log('Usuario cargado correctamente:', currentUser);
     } catch (error) {
-        console.error('Error parsing user data:', error);
+        console.error('Error al procesar datos del usuario:', error);
         window.location.href = '../../index.html';
         return;
     }
@@ -71,9 +79,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (dateParam) {
         const datePicker = document.getElementById('confirmation-date');
         if (datePicker && isValidDateString(dateParam)) {
-            datePicker.value = dateParam;
-            // Load existing confirmations for this date
-            loadExistingConfirmations(dateParam);
+            // If Flatpickr is initialized, use its API
+            if (datePicker._flatpickr) {
+                datePicker._flatpickr.setDate(dateParam);
+            } else {
+                // Fallback to standard input
+                datePicker.value = dateParam;
+                // Load existing confirmations for this date
+                loadExistingConfirmations(dateParam);
+            }
         }
     }
 });
@@ -132,13 +146,38 @@ function initializeDatePickers() {
     const today = new Date();
     const formattedToday = formatDateInput(today);
     
-    console.log('Inicializando datepicker con fecha por defecto:', formattedToday);
+    // Check if Flatpickr is already initialized from HTML
+    if (datePicker._flatpickr) {
+        console.log('Flatpickr ya está inicializado en HTML, usando instancia existente');
+        
+        // Add our custom onChange handler to existing instance
+        const existingInstance = datePicker._flatpickr;
+        const existingOnChange = existingInstance.config.onChange;
+        
+        existingInstance.config.onChange = function(selectedDates, dateStr, instance) {
+            // Call original onChange if it exists
+            if (existingOnChange) {
+                existingOnChange.call(this, selectedDates, dateStr, instance);
+            }
+            
+            console.log('Fecha seleccionada (handler añadido):', dateStr);
+            loadExistingConfirmations(dateStr);
+            showDayOfWeek(dateStr);
+        };
+        
+        // Trigger initial load
+        showDayOfWeek(formattedToday);
+        loadExistingConfirmations(formattedToday);
+        return;
+    }
     
-    // Definir nombres de días con acentos correctos
+    console.log('Inicializando nuevo Flatpickr desde JS');
+    
+    // Define day names with correct accents
     const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
     
     try {
-        // Inicializar flatpickr de manera simple
+        // Initialize flatpickr
         flatpickr(datePicker, {
             dateFormat: "Y-m-d",
             locale: {
@@ -150,31 +189,31 @@ function initializeDatePickers() {
             },
             defaultDate: formattedToday,
             minDate: formattedToday,
-            maxDate: new Date().fp_incr(14), // 14 días desde hoy
+            maxDate: new Date().fp_incr(14), // 14 days from today
             disableMobile: true,
             onChange: function(selectedDates, dateStr) {
                 console.log('Fecha seleccionada:', dateStr);
-                // Cargar confirmaciones existentes para esta fecha
                 loadExistingConfirmations(dateStr);
-                // Mostrar el día de la semana
                 showDayOfWeek(dateStr);
             }
         });
         
-        // Mostrar el día de la semana para la fecha actual
+        // Show day of week for initial date
         showDayOfWeek(formattedToday);
         
-        // Cargar confirmaciones existentes para la fecha actual
+        // Load existing confirmations for initial date
         loadExistingConfirmations(formattedToday);
         
         console.log('Flatpickr inicializado correctamente');
     } catch (error) {
         console.error('Error al inicializar Flatpickr:', error);
-        // Fallback a input de fecha nativo si Flatpickr falla
+        
+        // Fallback to native date input if Flatpickr fails
         datePicker.type = 'date';
         datePicker.value = formattedToday;
         datePicker.min = formattedToday;
         datePicker.max = formatDateInput(new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000));
+        
         datePicker.addEventListener('change', function() {
             const selectedDate = this.value;
             if (selectedDate) {
@@ -182,6 +221,10 @@ function initializeDatePickers() {
                 showDayOfWeek(selectedDate);
             }
         });
+        
+        // Trigger initial load
+        loadExistingConfirmations(formattedToday);
+        showDayOfWeek(formattedToday);
     }
 }
 
@@ -195,7 +238,7 @@ function showDayOfWeek(dateString) {
     const date = new Date(dateString);
     const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
     
-    // Nombres de días con acentos correctos
+    // Day names with correct accents
     const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
     const dayName = dayNames[dayOfWeek];
     
@@ -296,6 +339,21 @@ function toggleAllEmployees() {
     if (selectAllCheckbox) {
         // Apply the select-all checkbox state to all employee checkboxes
         const isChecked = selectAllCheckbox.checked;
+        
+        // Clear or populate the selectedEmployeeIds array
+        if (!isChecked) {
+            selectedEmployeeIds = [];
+        } else {
+            selectedEmployeeIds = [];
+            employeeCheckboxes.forEach(checkbox => {
+                const employeeId = checkbox.getAttribute('data-employee-id');
+                if (employeeId) {
+                    selectedEmployeeIds.push(employeeId);
+                }
+            });
+        }
+        
+        // Update UI checkboxes
         employeeCheckboxes.forEach(checkbox => {
             checkbox.checked = isChecked;
         });
@@ -313,6 +371,20 @@ function selectAllEmployees(select = true) {
     const employeeCheckboxes = document.querySelectorAll('.employee-select');
     const selectAllCheckbox = document.getElementById('select-all-employees');
     
+    // Clear the selected employees array
+    if (!select) {
+        selectedEmployeeIds = [];
+    } else {
+        selectedEmployeeIds = [];
+        // Add all visible employee IDs to the selected array
+        employeeCheckboxes.forEach(checkbox => {
+            const employeeId = checkbox.getAttribute('data-employee-id');
+            if (employeeId) {
+                selectedEmployeeIds.push(employeeId);
+            }
+        });
+    }
+    
     // Set all checkboxes to the specified state
     employeeCheckboxes.forEach(checkbox => {
         checkbox.checked = select;
@@ -329,64 +401,6 @@ function selectAllEmployees(select = true) {
 }
 
 /**
- * Display employees in the selection list
- * @param {Array} employees - List of employee objects
- */
-function displayEmployees(employees) {
-    const employeeTableBody = document.getElementById('employees-table-body');
-    if (!employeeTableBody) {
-        console.error('No se encontró el elemento employees-table-body');
-        return;
-    }
-    
-    // Clear existing content
-    employeeTableBody.innerHTML = '';
-    
-    if (employees.length === 0) {
-        const emptyRow = document.createElement('tr');
-        emptyRow.innerHTML = `<td colspan="4" class="text-center">No hay empleados registrados</td>`;
-        employeeTableBody.appendChild(emptyRow);
-        return;
-    }
-    
-    // Store employees for later use
-    employeeList = employees;
-    
-    // Add each employee to the table
-    employees.forEach(employee => {
-        const row = document.createElement('tr');
-        row.setAttribute('data-employee-id', employee.id);
-        
-        // Create the row content with all cells
-        row.innerHTML = `
-            <td class="select-column">
-                <label class="checkbox-container">
-                    <input type="checkbox" class="employee-select" data-employee-id="${employee.id}">
-                    <span class="checkmark"></span>
-                </label>
-            </td>
-            <td>${employee.name}</td>
-            <td>${employee.position || 'N/A'}</td>
-            <td>${employee.department || 'General'}</td>
-        `;
-        
-        employeeTableBody.appendChild(row);
-    });
-    
-    // Add event listeners to employee checkboxes
-    const employeeCheckboxes = employeeTableBody.querySelectorAll('.employee-select');
-    employeeCheckboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', () => {
-            updateSelectAllCheckboxState();
-            updateEmployeeCount();
-        });
-    });
-    
-    // Initialize the employee count
-    updateEmployeeCount();
-}
-
-/**
  * Update the state of the select-all checkbox based on individual selections
  */
 function updateSelectAllCheckboxState() {
@@ -394,7 +408,7 @@ function updateSelectAllCheckboxState() {
     const employeeCheckboxes = document.querySelectorAll('.employee-select');
     
     if (selectAllCheckbox && employeeCheckboxes.length > 0) {
-        const checkedCount = Array.from(employeeCheckboxes).filter(cb => cb.checked).length;
+        const checkedCount = selectedEmployeeIds.length;
         
         if (checkedCount === 0) {
             selectAllCheckbox.checked = false;
@@ -426,7 +440,7 @@ function filterEmployees() {
     
     // Filter employees by name or position
     const filteredEmployees = employeeList.filter(employee => 
-        employee.name.toLowerCase().includes(searchTerm) || 
+        (employee.name && employee.name.toLowerCase().includes(searchTerm)) || 
         (employee.position && employee.position.toLowerCase().includes(searchTerm))
     );
     
@@ -438,12 +452,18 @@ function filterEmployees() {
  * Update selected employee count
  */
 function updateEmployeeCount() {
-    const selectedCount = document.querySelectorAll('.employee-select:checked').length;
+    const selectedCount = selectedEmployeeIds.length;
     const totalCount = document.querySelectorAll('.employee-select').length;
     
     const countDisplay = document.getElementById('selected-employee-count');
     if (countDisplay) {
         countDisplay.textContent = `${selectedCount} de ${totalCount} seleccionados`;
+    }
+    
+    // Update confirmed count display
+    const confirmedCountDisplay = document.getElementById('confirmed-count');
+    if (confirmedCountDisplay) {
+        confirmedCountDisplay.textContent = selectedCount;
     }
 }
 
@@ -453,7 +473,7 @@ function updateEmployeeCount() {
 function loadEmployees() {
     showLoadingState(true);
     
-    // Verificar si tenemos el departamento del coordinador
+    // Verify we have the coordinator's department
     if (!currentUser || !currentUser.departmentId) {
         console.error('No se pudo determinar el departamento del coordinador');
         showErrorMessage('Error al cargar empleados: No se pudo determinar su departamento');
@@ -461,29 +481,122 @@ function loadEmployees() {
         return;
     }
     
-    // Usar el servicio de Firebase para obtener empleados
-    window.firestoreServices.employee.getEmployeesByDepartment(currentUser.departmentId)
-        .then(employees => {
-            // Filtrar solo empleados activos
-            const activeEmployees = employees.filter(emp => emp.status === 'active');
+    console.log('Cargando empleados para departamento:', currentUser.departmentId);
+    
+    // Use Firestore to get employees
+    employeesCollection
+        .where('departmentId', '==', currentUser.departmentId)
+        .where('status', '==', 'active')  // Only get active employees
+        .get()
+        .then(querySnapshot => {
+            console.log(`Se encontraron ${querySnapshot.size} empleados`);
             
-            // Ordenar por nombre
-            activeEmployees.sort((a, b) => a.name.localeCompare(b.name));
+            const employees = [];
+            querySnapshot.forEach(doc => {
+                const employee = doc.data();
+                employee.id = doc.id;
+                employees.push(employee);
+            });
             
-            // Guardar la lista de empleados para uso posterior
-            employeeList = activeEmployees;
+            // Sort employees by name
+            employees.sort((a, b) => {
+                return (a.name || '').localeCompare(b.name || '');
+            });
             
-            // Mostrar empleados en la interfaz
-            displayEmployees(activeEmployees);
+            // Store for later use
+            employeeList = employees;
             
-            // Ocultar estado de carga
+            // Display employees in UI
+            displayEmployees(employees);
+            
+            // Update total employees count
+            const totalEmployeesCount = document.getElementById('total-employees-count');
+            if (totalEmployeesCount) {
+                totalEmployeesCount.textContent = employees.length;
+            }
+            
+            // Hide loading state
             showLoadingState(false);
         })
         .catch(error => {
-            console.error('Error al cargar empleados:', error);
-            showErrorMessage('Error al cargar la lista de empleados');
+            console.error("Error loading employees:", error);
+            showErrorMessage("Error al cargar la lista de empleados. Por favor intente de nuevo.");
             showLoadingState(false);
         });
+}
+
+/**
+ * Display employees in the selection list
+ * @param {Array} employees - List of employee objects
+ */
+function displayEmployees(employees) {
+    const employeeTableBody = document.getElementById('employees-table-body');
+    if (!employeeTableBody) {
+        console.error('No se encontró el elemento employees-table-body');
+        return;
+    }
+    
+    // Clear existing content
+    employeeTableBody.innerHTML = '';
+    
+    if (employees.length === 0) {
+        const emptyRow = document.createElement('tr');
+        emptyRow.innerHTML = `<td colspan="4" class="text-center">No hay empleados registrados</td>`;
+        employeeTableBody.appendChild(emptyRow);
+        return;
+    }
+    
+    // Add each employee to the table
+    employees.forEach(employee => {
+        const row = document.createElement('tr');
+        row.setAttribute('data-employee-id', employee.id);
+        
+        // Check if this employee is selected
+        const isChecked = selectedEmployeeIds.includes(employee.id);
+        
+        // Create the row content with all cells
+        row.innerHTML = `
+            <td class="select-column">
+                <label class="checkbox-container">
+                    <input type="checkbox" class="employee-select" data-employee-id="${employee.id}" ${isChecked ? 'checked' : ''}>
+                    <span class="checkmark"></span>
+                </label>
+            </td>
+            <td>${employee.name || 'N/A'}</td>
+            <td>${employee.position || 'N/A'}</td>
+            <td>${employee.department || 'General'}</td>
+        `;
+        
+        employeeTableBody.appendChild(row);
+    });
+    
+    // Add event listeners to employee checkboxes
+    const employeeCheckboxes = employeeTableBody.querySelectorAll('.employee-select');
+    employeeCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', () => {
+            const employeeId = checkbox.getAttribute('data-employee-id');
+            
+            if (checkbox.checked) {
+                // Add to selected list if not already there
+                if (!selectedEmployeeIds.includes(employeeId)) {
+                    selectedEmployeeIds.push(employeeId);
+                }
+            } else {
+                // Remove from selected list
+                const index = selectedEmployeeIds.indexOf(employeeId);
+                if (index !== -1) {
+                    selectedEmployeeIds.splice(index, 1);
+                }
+            }
+            
+            updateSelectAllCheckboxState();
+            updateEmployeeCount();
+        });
+    });
+    
+    // Update employee count
+    updateEmployeeCount();
+    updateSelectAllCheckboxState();
 }
 
 /**
@@ -498,51 +611,79 @@ function loadExistingConfirmations(dateString) {
     
     showLoadingState(true);
     
-    // Desmarcar todas las casillas primero
-    selectAllEmployees(false);
+    // Clear existing selected employees
+    selectedEmployeeIds = [];
     
-    // Consultar confirmaciones existentes para esta fecha y departamento
-    const query = confirmationsCollection
+    // Update status indicator
+    const statusElement = document.getElementById('confirmation-status');
+    if (statusElement) {
+        statusElement.textContent = 'Cargando...';
+        statusElement.className = '';
+    }
+    
+    // Query existing confirmations for this date and department
+    confirmationsCollection
         .where('date', '==', dateString)
-        .where('departmentId', '==', currentUser.departmentId);
-    
-    query.get()
+        .where('departmentId', '==', currentUser.departmentId)
+        .get()
         .then(snapshot => {
             if (snapshot.empty) {
                 console.log('No hay confirmaciones para esta fecha');
+                
+                // Update status
+                if (statusElement) {
+                    statusElement.textContent = 'No enviado';
+                    statusElement.className = 'status-pending';
+                }
+                
+                // Clear comments field
+                const commentsField = document.getElementById('confirmation-comments');
+                if (commentsField) {
+                    commentsField.value = '';
+                }
+                
+                // Uncheck all checkboxes
+                selectAllEmployees(false);
+                
                 showInfoMessage('No hay confirmaciones registradas para esta fecha');
                 showLoadingState(false);
                 return;
             }
             
-            // Obtener la primera confirmación (debería haber solo una por fecha/departamento)
+            // Get the first confirmation (should be only one per date/department)
             const confirmationDoc = snapshot.docs[0];
             const confirmationData = confirmationDoc.data();
             
-            // Cargar comentarios si existen
+            console.log('Confirmación encontrada:', confirmationData);
+            
+            // Load comments if they exist
             const commentsField = document.getElementById('confirmation-comments');
             if (commentsField && confirmationData.comments) {
                 commentsField.value = confirmationData.comments;
             }
             
-            // Marcar los empleados confirmados
-            if (confirmationData.employees && confirmationData.employees.length > 0) {
-                const employeeCheckboxes = document.querySelectorAll('.employee-select');
+            // Update status
+            if (statusElement) {
+                statusElement.textContent = 'Enviado';
+                statusElement.className = 'status-completed';
+            }
+            
+            // Get selected employees array
+            if (confirmationData.employees && Array.isArray(confirmationData.employees)) {
+                selectedEmployeeIds = [...confirmationData.employees];
                 
+                // Update UI checkboxes based on saved data
+                const employeeCheckboxes = document.querySelectorAll('.employee-select');
                 employeeCheckboxes.forEach(checkbox => {
                     const employeeId = checkbox.getAttribute('data-employee-id');
-                    if (confirmationData.employees.includes(employeeId)) {
-                        checkbox.checked = true;
-                    }
+                    checkbox.checked = selectedEmployeeIds.includes(employeeId);
                 });
                 
-                // Actualizar estado del checkbox "seleccionar todos"
+                // Update UI
                 updateSelectAllCheckboxState();
-                
-                // Actualizar contador de empleados
                 updateEmployeeCount();
                 
-                showInfoMessage(`Se cargó la confirmación existente con ${confirmationData.employees.length} empleados`);
+                showInfoMessage(`Se cargó la confirmación existente con ${selectedEmployeeIds.length} empleados`);
             }
             
             showLoadingState(false);
@@ -579,17 +720,6 @@ async function saveConfirmation(event) {
         const date = dateInput.value;
         const comments = commentsInput ? commentsInput.value.trim() : '';
         
-        // Get selected employees
-        const selectedEmployeeIds = [];
-        const employeeCheckboxes = document.querySelectorAll('.employee-select:checked');
-        
-        employeeCheckboxes.forEach(checkbox => {
-            const employeeId = checkbox.getAttribute('data-employee-id');
-            if (employeeId) {
-                selectedEmployeeIds.push(employeeId);
-            }
-        });
-        
         // Check if we already have a confirmation for this date
         const querySnapshot = await confirmationsCollection
             .where('date', '==', date)
@@ -604,24 +734,45 @@ async function saveConfirmation(event) {
             coordinatorId: currentUser.uid,
             coordinatorName: currentUser.displayName || currentUser.email,
             employees: selectedEmployeeIds,
+            confirmedCount: selectedEmployeeIds.length, // Add a count field for easier querying
             comments: comments,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         
+        let confirmationId;
+        
         if (querySnapshot.empty) {
             // Create new confirmation
             confirmationData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-            await confirmationsCollection.add(confirmationData);
+            const docRef = await confirmationsCollection.add(confirmationData);
+            confirmationId = docRef.id;
             showSuccessMessage('Confirmación guardada correctamente.');
         } else {
             // Update existing confirmation
             const docRef = querySnapshot.docs[0].ref;
-            await docRef.set(confirmationData, { merge: true });
+            confirmationId = docRef.id;
+            await docRef.update(confirmationData);
             showSuccessMessage('Confirmación actualizada correctamente.');
         }
         
-        // Reset form after successful save
-        resetConfirmationForm();
+        // Update UI status
+        const statusElement = document.getElementById('confirmation-status');
+        if (statusElement) {
+            statusElement.textContent = 'Enviado';
+            statusElement.className = 'status-completed';
+        }
+        
+        // Show success modal with count
+        const successModal = document.getElementById('confirmation-success-modal');
+        const modalConfirmedCount = document.getElementById('modal-confirmed-count');
+        
+        if (successModal && modalConfirmedCount) {
+            modalConfirmedCount.textContent = selectedEmployeeIds.length;
+            successModal.style.display = 'block';
+        }
+        
+        // Update confirmation history if it exists on the page
+        updateConfirmationHistory();
     } catch (error) {
         console.error("Error saving confirmation:", error);
         showErrorMessage("Error al guardar la confirmación. Por favor intente de nuevo.");
@@ -632,13 +783,58 @@ async function saveConfirmation(event) {
 }
 
 /**
+ * Update confirmation history table if it exists on the page
+ */
+function updateConfirmationHistory() {
+    const historyBody = document.getElementById('confirmation-history-body');
+    if (!historyBody) return; // Not on this page
+    
+    // Query recent confirmations
+    confirmationsCollection
+        .where('coordinatorId', '==', currentUser.uid)
+        .orderBy('date', 'desc')
+        .limit(5)
+        .get()
+        .then(snapshot => {
+            if (snapshot.empty) {
+                historyBody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="text-center">No hay confirmaciones registradas</td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            let historyHTML = '';
+            snapshot.forEach(doc => {
+                const confirmation = doc.data();
+                const confirmedCount = confirmation.confirmedCount || (confirmation.employees ? confirmation.employees.length : 0);
+                const createdDate = confirmation.createdAt ? new Date(confirmation.createdAt.seconds * 1000) : new Date();
+                
+                historyHTML += `
+                    <tr>
+                        <td>${confirmation.date}</td>
+                        <td>${confirmedCount}</td>
+                        <td class="status-completed">Enviado</td>
+                        <td>${createdDate.toLocaleString()}</td>
+                    </tr>
+                `;
+            });
+            
+            historyBody.innerHTML = historyHTML;
+        })
+        .catch(error => {
+            console.error('Error loading confirmation history:', error);
+        });
+}
+
+/**
  * Validate confirmation form inputs
  * @returns {boolean} - Whether the form is valid
  */
 function validateConfirmationForm() {
     // Get form values
     const date = document.getElementById('confirmation-date').value;
-    const selectedEmployees = document.querySelectorAll('.employee-select:checked');
     
     // Check date
     if (!date) {
@@ -647,45 +843,12 @@ function validateConfirmationForm() {
     }
     
     // Check if at least one employee is selected
-    if (selectedEmployees.length === 0) {
+    if (selectedEmployeeIds.length === 0) {
         showErrorMessage("Por favor seleccione al menos un empleado.");
         return false;
     }
     
     return true;
-}
-
-/**
- * Reset confirmation form to default state
- */
-function resetConfirmationForm() {
-    // Reset date to today if needed
-    const datePicker = document.getElementById('confirmation-date');
-    if (datePicker) {
-        // Keep current date selection
-    }
-    
-    // Clear comments
-    const commentsField = document.getElementById('confirmation-comments');
-    if (commentsField) {
-        commentsField.value = '';
-    }
-    
-    // Uncheck all employee checkboxes
-    const employeeCheckboxes = document.querySelectorAll('.employee-select');
-    employeeCheckboxes.forEach(checkbox => {
-        checkbox.checked = false;
-    });
-    
-    // Uncheck "select all" checkbox
-    const selectAllCheckbox = document.getElementById('select-all-employees');
-    if (selectAllCheckbox) {
-        selectAllCheckbox.checked = false;
-        selectAllCheckbox.indeterminate = false;
-    }
-    
-    // Update employee count
-    updateEmployeeCount();
 }
 
 /**
