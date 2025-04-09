@@ -18,7 +18,7 @@ let selectedEmployeeIds = []; // Track selected employee IDs for easier operatio
  * Initialize the module when DOM is ready
  */
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("Inicializando módulo de confirmaciones...");
+    console.log("Inicializando m\u00f3dulo de confirmaciones...");
     
     // Check if user has correct role - we don't redefine USER_ROLES here, use the global one
     if (!checkAuth('coordinator')) {
@@ -156,7 +156,7 @@ function handleDatePicker() {
     if (typeof flatpickr === 'function' && !datePicker._flatpickr) {
         try {
             // Define day names with correct accents
-            const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+            const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Mi\u00e9rcoles', 'Jueves', 'Viernes', 'S\u00e1bado'];
             
             flatpickr(datePicker, {
                 dateFormat: "Y-m-d",
@@ -275,10 +275,10 @@ function showDayOfWeek(dateString) {
     const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
     
     // Day names with correct accents
-    const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    const dayNames = ['Domingo', 'Lunes', 'Martes', 'Mi\u00e9rcoles', 'Jueves', 'Viernes', 'S\u00e1bado'];
     const dayName = dayNames[dayOfWeek];
     
-    console.log(`Día seleccionado: ${dayName} (índice: ${dayOfWeek})`);
+    console.log(`D\u00eda seleccionado: ${dayName} (\u00edndice: ${dayOfWeek})`);
     
     // Display the day name
     const dayDisplay = document.createElement('div');
@@ -468,55 +468,62 @@ function loadEmployees() {
     
     console.log('Cargando empleados para departamento:', currentUser.departmentId);
     
-    // Use Firestore to get employees
-    employeesCollection
-        .where('departmentId', '==', currentUser.departmentId)
-        .get()
-        .then(querySnapshot => {
-            console.log(`Se encontraron ${querySnapshot.size} empleados`);
-            
-            const employees = [];
-            querySnapshot.forEach(doc => {
-                const employee = doc.data();
-                employee.id = doc.id;
+    try {
+        // Use Firestore to get employees
+        console.log('Intentando cargar empleados usando Firestore...');
+        employeesCollection
+            .where('departmentId', '==', currentUser.departmentId)
+            .get()
+            .then(querySnapshot => {
+                console.log(`Se encontraron ${querySnapshot.size} empleados`);
                 
-                // Solo incluir empleados activos o sin estado definido
-                if (employee.status !== 'inactive') {
-                    employees.push(employee);
+                const employees = [];
+                querySnapshot.forEach(doc => {
+                    const employee = doc.data();
+                    employee.id = doc.id;
+                    
+                    // Solo incluir empleados activos o sin estado definido
+                    if (employee.status !== 'inactive') {
+                        employees.push(employee);
+                    }
+                });
+                
+                // Sort employees by name
+                employees.sort((a, b) => {
+                    return (a.name || '').localeCompare(b.name || '');
+                });
+                
+                // Store for later use
+                employeeList = employees;
+                
+                // Display employees in UI
+                displayEmployees(employees);
+                
+                // Update total employees count
+                const totalEmployeesCount = document.getElementById('total-employees-count');
+                if (totalEmployeesCount) {
+                    totalEmployeesCount.textContent = employees.length;
                 }
+                
+                console.log("Empleados cargados correctamente:", employees.length);
+                showLoadingState(false);
+                
+                // Trigger initial date check
+                const datePicker = document.getElementById('confirmation-date');
+                if (datePicker && datePicker.value) {
+                    loadExistingConfirmations(datePicker.value);
+                }
+            })
+            .catch(error => {
+                console.error("Error loading employees:", error);
+                showErrorMessage("Error al cargar la lista de empleados. Por favor intente de nuevo.");
+                showLoadingState(false);
             });
-            
-            // Sort employees by name
-            employees.sort((a, b) => {
-                return (a.name || '').localeCompare(b.name || '');
-            });
-            
-            // Store for later use
-            employeeList = employees;
-            
-            // Display employees in UI
-            displayEmployees(employees);
-            
-            // Update total employees count
-            const totalEmployeesCount = document.getElementById('total-employees-count');
-            if (totalEmployeesCount) {
-                totalEmployeesCount.textContent = employees.length;
-            }
-            
-            console.log("Empleados cargados correctamente:", employees.length);
-            showLoadingState(false);
-            
-            // Trigger initial date check
-            const datePicker = document.getElementById('confirmation-date');
-            if (datePicker && datePicker.value) {
-                loadExistingConfirmations(datePicker.value);
-            }
-        })
-        .catch(error => {
-            console.error("Error loading employees:", error);
-            showErrorMessage("Error al cargar la lista de empleados. Por favor intente de nuevo.");
-            showLoadingState(false);
-        });
+    } catch (error) {
+        console.error("Error al cargar empleados:", error);
+        showErrorMessage("Error al cargar empleados. Por favor intente de nuevo.");
+        showLoadingState(false);
+    }
 }
 
 /**
@@ -528,7 +535,7 @@ function displayEmployees(employees) {
     
     const employeeTableBody = document.getElementById('employees-table-body');
     if (!employeeTableBody) {
-        console.error('No se encontró el elemento employees-table-body');
+        console.error('No se encontr\u00f3 el elemento employees-table-body');
         return;
     }
     
@@ -602,7 +609,7 @@ function displayEmployees(employees) {
  */
 function loadExistingConfirmations(dateString) {
     if (!dateString || !isValidDateString(dateString)) {
-        console.error('Fecha inválida para cargar confirmaciones');
+        console.error('Fecha inv\u00e1lida para cargar confirmaciones');
         return;
     }
     
@@ -663,7 +670,7 @@ function loadExistingConfirmations(dateString) {
             const confirmationDoc = snapshot.docs[0];
             const confirmationData = confirmationDoc.data();
             
-            console.log('Confirmación encontrada:', confirmationData);
+            console.log('Confirmaci\u00f3n encontrada:', confirmationData);
             
             // Load comments if they exist
             const commentsField = document.getElementById('confirmation-comments');
@@ -697,7 +704,7 @@ function loadExistingConfirmations(dateString) {
                 updateSelectAllCheckboxState();
                 updateEmployeeCount();
                 
-                showInfoMessage(`Se cargó la confirmación existente con ${selectedEmployeeIds.length} empleados`);
+                showInfoMessage(`Se carg\u00f3 la confirmaci\u00f3n existente con ${selectedEmployeeIds.length} empleados`);
             }
             
             showLoadingState(false);
@@ -716,7 +723,7 @@ function loadExistingConfirmations(dateString) {
 async function saveConfirmation(event) {
     if (event) event.preventDefault();
     
-    console.log("Guardando confirmación...");
+    console.log("Guardando confirmaci\u00f3n...");
     
     // Validate form
     if (!validateConfirmationForm()) {
@@ -736,7 +743,7 @@ async function saveConfirmation(event) {
         const date = dateInput.value;
         const comments = commentsInput ? commentsInput.value.trim() : '';
         
-        console.log(`Guardando confirmación para ${date} con ${selectedEmployeeIds.length} empleados`);
+        console.log(`Guardando confirmaci\u00f3n para ${date} con ${selectedEmployeeIds.length} empleados`);
         
         // Check if we already have a confirmation for this date
         const querySnapshot = await confirmationsCollection
@@ -764,13 +771,13 @@ async function saveConfirmation(event) {
             confirmationData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
             const docRef = await confirmationsCollection.add(confirmationData);
             confirmationId = docRef.id;
-            showSuccessMessage('Confirmación guardada correctamente.');
+            showSuccessMessage('Confirmaci\u00f3n guardada correctamente.');
         } else {
             // Update existing confirmation
             const docRef = querySnapshot.docs[0].ref;
             confirmationId = docRef.id;
             await docRef.update(confirmationData);
-            showSuccessMessage('Confirmación actualizada correctamente.');
+            showSuccessMessage('Confirmaci\u00f3n actualizada correctamente.');
         }
         
         // Update UI status
@@ -786,10 +793,10 @@ async function saveConfirmation(event) {
             estadoElement.textContent = 'Enviado';
         }
         
-        console.log("Confirmación guardada exitosamente");
+        console.log("Confirmaci\u00f3n guardada exitosamente");
     } catch (error) {
         console.error("Error saving confirmation:", error);
-        showErrorMessage("Error al guardar la confirmación. Por favor intente de nuevo.");
+        showErrorMessage("Error al guardar la confirmaci\u00f3n. Por favor intente de nuevo.");
     } finally {
         // Hide loading state
         showLoadingState(false);
@@ -804,7 +811,7 @@ function validateConfirmationForm() {
     // Get form values
     const datePicker = document.getElementById('confirmation-date');
     if (!datePicker) {
-        showErrorMessage("Error: No se encontró el selector de fecha.");
+        showErrorMessage("Error: No se encontr\u00f3 el selector de fecha.");
         return false;
     }
     
@@ -832,12 +839,12 @@ function validateConfirmationForm() {
 function showLoadingState(isLoading) {
     const mainContent = document.querySelector('.main-content');
     
-    // Espera un momento para asegurarnos que estamos en el mismo hilo de ejecución
+    // Espera un momento para asegurarnos que estamos en el mismo hilo de ejecuci\u00f3n
     setTimeout(() => {
         // Mostrar mensaje de carga en la tabla
         const employeeTableBody = document.getElementById('employees-table-body');
         if (employeeTableBody && isLoading) {
-            // Solo si está cargando y no hay contenido
+            // Solo si est\u00e1 cargando y no hay contenido
             if (employeeTableBody.childElementCount === 0) {
                 employeeTableBody.innerHTML = `
                     <tr>
@@ -868,7 +875,7 @@ function showLoadingState(isLoading) {
  * @param {number} duration - Duration in milliseconds to show the message
  */
 function showErrorMessage(message, duration = 5000) {
-    // Mostrar alerta con alert nativo (más sencillo y garantizado)
+    // Mostrar alerta con alert nativo (m\u00e1s sencillo y garantizado)
     alert(`Error: ${message}`);
     console.error(message);
 }
@@ -879,8 +886,8 @@ function showErrorMessage(message, duration = 5000) {
  * @param {number} duration - Duration in milliseconds to show the message
  */
 function showSuccessMessage(message, duration = 3000) {
-    // Mostrar alerta con alert nativo (más sencillo y garantizado)
-    alert(`Éxito: ${message}`);
+    // Mostrar alerta con alert nativo (m\u00e1s sencillo y garantizado)
+    alert(`\u00c9xito: ${message}`);
     console.log(message);
 }
 
