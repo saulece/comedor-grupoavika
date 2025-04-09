@@ -25,51 +25,69 @@ Aplicación web para la gestión del comedor de la empresa Grupo Avika. El siste
 ## Estructura del Proyecto
 
 ```
-comedor-app/
+comedor-grupoavika/
 │
 ├── index.html                          # Página de inicio/login
 ├── favicon.ico                         # Ícono de la aplicación
 │
-├── css/
+├── css/                                # Estilos CSS de la aplicación
 │   ├── styles.css                      # Estilos globales
 │   ├── login.css                       # Estilos para login
 │   ├── admin.css                       # Estilos para panel de administrador
 │   └── coordinator.css                 # Estilos para panel de coordinador
 │
 ├── js/
-│   ├── firebase-config.js              # Configuración de Firebase
-│   ├── auth.js                         # Funciones de autenticación
-│   ├── admin/
-│   │   ├── menu.js                     # Gestión de menú (admin)
-│   │   └── confirmations.js            # Ver confirmaciones (admin)
+│   ├── components/                     # Componentes reutilizables de UI
+│   │   ├── admin/                      # Componentes específicos para administradores
+│   │   ├── coordinator/                # Componentes específicos para coordinadores
+│   │   └── common/                     # Componentes comunes reutilizables
 │   │
-│   ├── coordinator/
-│   │   ├── menu-view.js                # Ver menú (coordinador)
-│   │   ├── confirmations.js            # Registrar confirmaciones
-│   │   └── employees.js                # Gestión de empleados
+│   ├── services/                       # Servicios centralizados
+│   │   ├── firebase/                   # Servicios relacionados con Firebase
+│   │   │   ├── config.js               # Configuración de Firebase
+│   │   │   ├── firebase-service.js     # Servicio general de Firebase
+│   │   │   ├── firestore.js            # Operaciones de Firestore
+│   │   │   └── firestoreService.js     # Servicio para gestión de Firestore
+│   │   │
+│   │   ├── error/                      # Servicios de gestión de errores
+│   │   │   ├── errorService.js         # Servicio centralizado de errores
+│   │   │   └── examples.js             # Ejemplos de uso del servicio de errores
+│   │   │
+│   │   └── state/                      # Servicios de gestión de estado
+│   │       └── stateManager.js         # Gestor centralizado de estado
 │   │
-│   └── utils/
-│       ├── excel-parser.js             # Manejo de importación de Excel
-│       ├── data-formatter.js           # Formateo de datos
-│       └── validators.js               # Validaciones
+│   ├── utils/                          # Utilidades y funciones auxiliares
+│   │   ├── date/                       # Utilidades para manejo de fechas
+│   │   ├── validation/                 # Funciones de validación
+│   │   ├── formatting/                 # Utilidades de formateo y Excel
+│   │   ├── common-utils.js             # Utilidades comunes
+│   │   ├── error-handler.js            # Manejador de errores
+│   │   └── logger.js                   # Utilidad de registro (logging)
+│   │
+│   └── views/                          # Lógica específica de cada vista
+│       ├── admin/                      # Vistas de administrador
+│       │   ├── menu.js                 # Gestión de menú
+│       │   ├── confirmations.js        # Ver confirmaciones
+│       │   └── users.js                # Gestión de usuarios
+│       │
+│       ├── coordinator/                # Vistas de coordinador
+│       │   ├── menu-view.js            # Ver menú
+│       │   ├── confirmaciones.js        # Registrar confirmaciones
+│       │   └── employees.js            # Gestión de empleados
+│       │
+│       └── auth/                       # Vistas de autenticación
+│           └── auth.js                 # Funciones de autenticación
 │
-├── pages/
-│   ├── admin/
-│   │   ├── dashboard.html              # Panel principal del admin
-│   │   ├── menu.html                   # Publicar menú
-│   │   └── confirmations.html          # Ver confirmaciones
-│   │
-│   └── coordinator/
-│       ├── dashboard.html              # Panel principal del coordinador
-│       ├── menu.html                   # Ver menú
-│       ├── confirmations.html          # Registrar confirmaciones
-│       └── employees.html              # Gestión de empleados
+├── pages/                              # Archivos HTML de la aplicación
+│   ├── admin/                          # Páginas de administrador
+│   └── coordinator/                    # Páginas de coordinador
 │
-├── assets/
-│   ├── icons/                          # Íconos de la aplicación
+├── assets/                             # Recursos estáticos
 │   └── img/                            # Imágenes
 │
-└── README.md                           # Documentación del proyecto
+├── docs/                               # Documentación del proyecto
+│
+└── tests/                              # Pruebas automatizadas
 ```
 
 ## Instalación y Configuración
@@ -84,7 +102,7 @@ comedor-app/
 1. Crear un proyecto en Firebase Console
 2. Habilitar Autenticación (correo/contraseña)
 3. Configurar Firestore Database
-4. Actualizar `js/firebase-config.js` con tus credenciales:
+4. Actualizar `js/services/firebase/config.js` con tus credenciales:
 
 ```javascript
 const firebaseConfig = {
@@ -144,4 +162,4 @@ Para agregar nuevas funcionalidades:
 ## Licencia
 
 Proyecto desarrollado para uso interno de Grupo Avika.
-Todos los derechos reservados © 2025 Grupo Avika
+Todos los derechos reservados 2025 Grupo Avika

@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Confirmaciones - Coordinador</title>
+    <title>Confirmaciones - Comedor Grupo Avika</title>
     <link rel="stylesheet" href="../../css/styles.css">
     <link rel="stylesheet" href="../../css/coordinator.css">
-    <link rel="icon" type="image/x-icon" href="../../favicon.ico">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="../../css/error-service.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="icon" type="image/x-icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../css/fixes.css">
 </head>
 <body>
@@ -222,30 +223,33 @@
     <div id="error-alert" class="alert-message error-message" style="display: none;"></div>
     <div id="success-alert" class="alert-message success-message" style="display: none;"></div>
     <div id="info-alert" class="alert-message info-message" style="display: none;"></div>
+    <div id="warning-alert" class="alert-message warning-message" style="display: none;"></div>
 
-    <!-- Firebase Scripts -->
+    <!-- Firebase Scripts - Core y Auth son críticos, Analytics puede ser asíncrono -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-analytics.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-analytics.js" async></script>
 
-    <!-- External Libraries -->
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
+    <!-- External Libraries - Flatpickr puede cargarse con defer ya que se inicializa después -->
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js" defer></script>
     
     <!-- Firebase Config - Debe cargarse después de Firebase pero antes de los módulos de utilidad -->
-    <script src="../../js/firebase-config.js"></script>
+    <script src="../../js/services/firebase/config.js"></script>
     
-    <!-- Utility Scripts - Módulos de utilidad en orden de dependencia -->
-    <script src="../../js/utils/logger.js"></script>
-    <script src="../../js/utils/date-utils.js"></script>
-    <script src="../../js/utils/error-handler.js"></script>
+    <!-- Utility Scripts - Módulos de utilidad pueden cargarse con defer -->
+    <script src="../../js/utils/logger.js" defer></script>
+    <script src="../../js/utils/date/date-utils.js" defer></script>
+    <script src="../../js/utils/error-handler.js" defer></script>
     
-    <!-- Servicios y autenticación -->
-    <script src="../../js/services/firestore.js"></script>
-    <script src="../../js/auth.js"></script>
+    <!-- Servicios - Críticos para la funcionalidad principal -->
+    <script src="../../js/services/firebase/firestore.js"></script>
+    <script src="../../js/services/error/errorService.js"></script>
+    <script src="../../js/services/state/stateManager.js"></script>
+    <script src="../../js/views/auth/auth.js"></script>
     
-    <!-- Script principal de la página -->
-    <script src="../../js/coordinator/confirmations.js"></script>
+    <!-- Script principal de la página - Se mantiene síncrono para garantizar funcionalidad -->
+    <script src="../../js/views/coordinator/confirmations.js"></script>
 </body>
 </html>

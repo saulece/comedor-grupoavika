@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prueba del Servicio de Errores - Comedor Grupo Avika</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+    <link rel="stylesheet" href="../../css/error-service.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        
+        .test-section h2 {
+            margin-top: 0;
+            color: #444;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        
+        .test-section p {
+            margin-bottom: 15px;
+        }
+        
+        .test-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .btn {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+        
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #0069d9;
+        }
+        
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+        
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background-color: #218838;
+        }
+        
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+        
+        .btn-warning {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        
+        .btn-warning:hover {
+            background-color: #e0a800;
+        }
+        
+        .btn-info {
+            background-color: #17a2b8;
+            color: white;
+        }
+        
+        .btn-info:hover {
+            background-color: #138496;
+        }
+        
+        .console-output {
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: monospace;
+            height: 200px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        
+        .console-output p {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        
+        .console-output .error {
+            color: #dc3545;
+        }
+        
+        .console-output .warning {
+            color: #ffc107;
+        }
+        
+        .console-output .info {
+            color: #17a2b8;
+        }
+        
+        .console-output .success {
+            color: #28a745;
+        }
+        
+        .form-test {
+            margin-top: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .nav-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Prueba del Servicio de Errores</h1>
+        
+        <div class="test-section">
+            <h2>Pruebas Automáticas</h2>
+            <p>Ejecute las pruebas automáticas para verificar el funcionamiento del servicio de errores.</p>
+            
+            <div class="test-buttons">
+                <button id="run-all-tests" class="btn btn-primary">Ejecutar Todas las Pruebas</button>
+                <button id="test-messages" class="btn btn-info">Probar Mensajes</button>
+                <button id="test-firebase" class="btn btn-warning">Probar Errores Firebase</button>
+                <button id="test-validation" class="btn btn-danger">Probar Validación</button>
+                <button id="test-loading" class="btn btn-secondary">Probar Indicador de Carga</button>
+                <button id="test-uncaught" class="btn btn-danger">Probar Error No Manejado</button>
+            </div>
+            
+            <div class="console-output" id="console-output">
+                <p>Consola de salida (los mensajes aparecerán aquí)</p>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>Prueba de Formulario</h2>
+            <p>Complete el formulario y pruebe la validación de errores.</p>
+            
+            <div class="form-test">
+                <div class="form-group">
+                    <label for="nombre">Nombre:</label>
+                    <input type="text" id="nombre" name="nombre" placeholder="Ingrese su nombre">
+                </div>
+                
+                <div class="form-group">
+                    <label for="email">Email:</label>
+                    <input type="email" id="email" name="email" placeholder="Ingrese su email">
+                </div>
+                
+                <div class="form-group">
+                    <label for="departamento">Departamento:</label>
+                    <select id="departamento" name="departamento">
+                        <option value="0">Seleccione un departamento</option>
+                        <option value="1">Administración</option>
+                        <option value="2">Recursos Humanos</option>
+                        <option value="3">Tecnología</option>
+                        <option value="4">Ventas</option>
+                    </select>
+                </div>
+                
+                <button id="validate-form" class="btn btn-primary">Validar Formulario</button>
+                <button id="submit-form" class="btn btn-success">Enviar Formulario</button>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>Prueba Manual de Mensajes</h2>
+            <p>Pruebe manualmente los diferentes tipos de mensajes.</p>
+            
+            <div class="test-buttons">
+                <button id="show-error" class="btn btn-danger">Mostrar Error</button>
+                <button id="show-warning" class="btn btn-warning">Mostrar Advertencia</button>
+                <button id="show-info" class="btn btn-info">Mostrar Información</button>
+                <button id="show-success" class="btn btn-success">Mostrar Éxito</button>
+            </div>
+        </div>
+        
+        <div class="nav-buttons">
+            <a href="../../index.html" class="btn btn-secondary">Volver al Inicio</a>
+        </div>
+    </div>
+
+    <!-- Alert Messages -->
+    <div id="error-alert" class="alert-message error-message" style="display: none;"></div>
+    <div id="success-alert" class="alert-message success-message" style="display: none;"></div>
+    <div id="info-alert" class="alert-message info-message" style="display: none;"></div>
+    <div id="warning-alert" class="alert-message warning-message" style="display: none;"></div>
+
+    <!-- Loading Indicator -->
+    <div id="loading-indicator" style="display: none;">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Firebase Scripts -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    
+    <!-- Firebase Config -->
+    <script src="../../js/firebase-config.js"></script>
+    
+    <!-- Utility Scripts -->
+    <script src="../../js/utils/logger.js"></script>
+    <script src="../../js/utils/date-utils.js"></script>
+    <script src="../../js/utils/error-handler.js"></script>
+    
+    <!-- Error Service -->
+    <script src="../../js/services/errorService.js"></script>
+    <script src="../../js/services/errorService.test.js"></script>
+    
+    <script>
+        // Función para agregar mensajes a la consola de salida
+        function logToConsole(message, type = 'normal') {
+            const consoleOutput = document.getElementById('console-output');
+            const p = document.createElement('p');
+            p.textContent = message;
+            
+            if (type) {
+                p.classList.add(type);
+            }
+            
+            consoleOutput.appendChild(p);
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+        
+        // Sobrescribir console.log para mostrar en nuestra consola
+        const originalConsoleLog = console.log;
+        const originalConsoleError = console.error;
+        const originalConsoleWarn = console.warn;
+        const originalConsoleInfo = console.info;
+        
+        console.log = function() {
+            originalConsoleLog.apply(console, arguments);
+            logToConsole(Array.from(arguments).join(' '));
+        };
+        
+        console.error = function() {
+            originalConsoleError.apply(console, arguments);
+            logToConsole(Array.from(arguments).join(' '), 'error');
+        };
+        
+        console.warn = function() {
+            originalConsoleWarn.apply(console, arguments);
+            logToConsole(Array.from(arguments).join(' '), 'warning');
+        };
+        
+        console.info = function() {
+            originalConsoleInfo.apply(console, arguments);
+            logToConsole(Array.from(arguments).join(' '), 'info');
+        };
+        
+        // Configurar eventos de los botones
+        document.addEventListener('DOMContentLoaded', function() {
+            // Botones de pruebas automáticas
+            document.getElementById('run-all-tests').addEventListener('click', function() {
+                logToConsole('Ejecutando todas las pruebas...', 'info');
+                window.errorServiceTest.runAllTests();
+            });
+            
+            document.getElementById('test-messages').addEventListener('click', function() {
+                logToConsole('Probando mensajes...', 'info');
+                window.errorServiceTest.testMessages();
+            });
+            
+            document.getElementById('test-firebase').addEventListener('click', function() {
+                logToConsole('Probando errores de Firebase...', 'info');
+                window.errorServiceTest.testFirebaseErrors();
+            });
+            
+            document.getElementById('test-validation').addEventListener('click', function() {
+                logToConsole('Probando errores de validación...', 'info');
+                window.errorServiceTest.testValidationErrors();
+            });
+            
+            document.getElementById('test-loading').addEventListener('click', function() {
+                logToConsole('Probando indicador de carga...', 'info');
+                window.errorServiceTest.testLoading();
+            });
+            
+            document.getElementById('test-uncaught').addEventListener('click', function() {
+                logToConsole('Probando error no manejado...', 'info');
+                window.errorServiceTest.testUncaughtError();
+            });
+            
+            // Botones de prueba de formulario
+            document.getElementById('validate-form').addEventListener('click', function() {
+                const nombre = document.getElementById('nombre').value.trim();
+                const email = document.getElementById('email').value.trim();
+                const departamento = document.getElementById('departamento').value;
+                
+                const errores = {};
+                
+                if (!nombre) {
+                    errores.nombre = 'El nombre es obligatorio';
+                } else if (nombre.length < 3) {
+                    errores.nombre = 'El nombre debe tener al menos 3 caracteres';
+                }
+                
+                if (!email) {
+                    errores.email = 'El email es obligatorio';
+                } else if (!email.includes('@') || !email.includes('.')) {
+                    errores.email = 'El email no es válido';
+                }
+                
+                if (!departamento || departamento === '0') {
+                    errores.departamento = 'Debe seleccionar un departamento';
+                }
+                
+                if (Object.keys(errores).length > 0) {
+                    window.errorService.handleValidationError(
+                        'Por favor corrija los errores en el formulario',
+                        errores
+                    );
+                    
+                    logToConsole('Formulario con errores de validación', 'error');
+                } else {
+                    window.errorService.showSuccess('Formulario validado correctamente');
+                    logToConsole('Formulario validado correctamente', 'success');
+                }
+            });
+            
+            document.getElementById('submit-form').addEventListener('click', function() {
+                const nombre = document.getElementById('nombre').value.trim();
+                const email = document.getElementById('email').value.trim();
+                const departamento = document.getElementById('departamento').value;
+                
+                const errores = {};
+                
+                if (!nombre) {
+                    errores.nombre = 'El nombre es obligatorio';
+                } else if (nombre.length < 3) {
+                    errores.nombre = 'El nombre debe tener al menos 3 caracteres';
+                }
+                
+                if (!email) {
+                    errores.email = 'El email es obligatorio';
+                } else if (!email.includes('@') || !email.includes('.')) {
+                    errores.email = 'El email no es válido';
+                }
+                
+                if (!departamento || departamento === '0') {
+                    errores.departamento = 'Debe seleccionar un departamento';
+                }
+                
+                if (Object.keys(errores).length > 0) {
+                    window.errorService.handleValidationError(
+                        'Por favor corrija los errores en el formulario',
+                        errores
+                    );
+                    
+                    logToConsole('No se pudo enviar el formulario debido a errores de validación', 'error');
+                    return;
+                }
+                
+                // Simular envío de formulario
+                window.errorService.toggleLoading(true);
+                logToConsole('Enviando formulario...', 'info');
+                
+                setTimeout(function() {
+                    // Simular éxito o error aleatorio
+                    if (Math.random() > 0.3) {
+                        window.errorService.showSuccess('Formulario enviado correctamente');
+                        logToConsole('Formulario enviado correctamente', 'success');
+                        
+                        // Limpiar formulario
+                        document.getElementById('nombre').value = '';
+                        document.getElementById('email').value = '';
+                        document.getElementById('departamento').value = '0';
+                    } else {
+                        window.errorService.handleError(
+                            new Error('Error al enviar el formulario'),
+                            'No se pudo enviar el formulario. Por favor intente de nuevo más tarde.',
+                            ERROR_TYPES.NETWORK,
+                            ERROR_SEVERITY.ERROR
+                        );
+                        logToConsole('Error al enviar el formulario', 'error');
+                    }
+                    
+                    window.errorService.toggleLoading(false);
+                }, 2000);
+            });
+            
+            // Botones de prueba manual de mensajes
+            document.getElementById('show-error').addEventListener('click', function() {
+                window.errorService.handleError(
+                    new Error('Error manual'),
+                    'Este es un error manual de prueba',
+                    ERROR_TYPES.UI,
+                    ERROR_SEVERITY.ERROR
+                );
+                logToConsole('Mostrando error manual', 'error');
+            });
+            
+            document.getElementById('show-warning').addEventListener('click', function() {
+                window.errorService.showWarning('Esta es una advertencia manual de prueba');
+                logToConsole('Mostrando advertencia manual', 'warning');
+            });
+            
+            document.getElementById('show-info').addEventListener('click', function() {
+                window.errorService.showInfo('Este es un mensaje informativo manual de prueba');
+                logToConsole('Mostrando información manual', 'info');
+            });
+            
+            document.getElementById('show-success').addEventListener('click', function() {
+                window.errorService.showSuccess('Esta es una operación exitosa manual de prueba');
+                logToConsole('Mostrando éxito manual', 'success');
+            });
+            
+            // Mensaje inicial
+            logToConsole('Página de prueba del servicio de errores cargada correctamente', 'info');
+            logToConsole('Utilice los botones para probar las diferentes funcionalidades', 'info');
+        });
+    </script>
+</body>
+</html>

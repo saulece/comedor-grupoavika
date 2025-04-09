@@ -1,0 +1,246 @@
+/**
+ * Estilos para el servicio de errores
+ * 
+ * Este archivo contiene los estilos para los diferentes tipos de mensajes
+ * que puede mostrar el errorService: errores, advertencias, información y éxito.
+ */
+
+/* Contenedor base para todos los mensajes de alerta */
+.alert-message {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    max-width: 400px;
+    padding: 15px 20px;
+    border-radius: 5px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+    font-size: 14px;
+    line-height: 1.5;
+    display: flex;
+    align-items: center;
+    transition: all 0.3s ease;
+    opacity: 0;
+    transform: translateY(-20px);
+    animation: fadeInDown 0.3s forwards;
+}
+
+/* Animación de entrada para los mensajes */
+@keyframes fadeInDown {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Animación de salida para los mensajes */
+@keyframes fadeOutUp {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+}
+
+/* Clase para la animación de salida */
+.alert-message.fade-out {
+    animation: fadeOutUp 0.3s forwards;
+}
+
+/* Estilos específicos para cada tipo de mensaje */
+.error-message {
+    background-color: #f8d7da;
+    color: #721c24;
+    border-left: 5px solid #dc3545;
+}
+
+.warning-message {
+    background-color: #fff3cd;
+    color: #856404;
+    border-left: 5px solid #ffc107;
+}
+
+.info-message {
+    background-color: #d1ecf1;
+    color: #0c5460;
+    border-left: 5px solid #17a2b8;
+}
+
+.success-message {
+    background-color: #d4edda;
+    color: #155724;
+    border-left: 5px solid #28a745;
+}
+
+/* Iconos para los mensajes */
+.alert-message::before {
+    font-family: 'Font Awesome 5 Free', sans-serif;
+    font-weight: 900;
+    margin-right: 10px;
+    font-size: 18px;
+}
+
+.error-message::before {
+    content: '\f06a'; /* fa-exclamation-circle */
+    color: #dc3545;
+}
+
+.warning-message::before {
+    content: '\f071'; /* fa-exclamation-triangle */
+    color: #ffc107;
+}
+
+.info-message::before {
+    content: '\f05a'; /* fa-info-circle */
+    color: #17a2b8;
+}
+
+.success-message::before {
+    content: '\f058'; /* fa-check-circle */
+    color: #28a745;
+}
+
+/* Botón de cierre para los mensajes */
+.alert-message .close-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: none;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    opacity: 0.5;
+    transition: opacity 0.2s;
+}
+
+.alert-message .close-btn:hover {
+    opacity: 1;
+}
+
+/* Estilos para el indicador de carga */
+#loading-indicator {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+
+.spinner {
+    width: 50px;
+    height: 50px;
+    border: 5px solid #f3f3f3;
+    border-top: 5px solid #3498db;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Estilos para errores de validación en formularios */
+.field-error {
+    border-color: #dc3545 !important;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25) !important;
+}
+
+.error-message-text {
+    color: #dc3545;
+    font-size: 12px;
+    margin-top: 5px;
+    display: block;
+}
+
+/* Estilos para pantallas pequeñas */
+@media (max-width: 768px) {
+    .alert-message {
+        top: 10px;
+        right: 10px;
+        left: 10px;
+        max-width: none;
+    }
+}
+
+/* Estilos para mensajes con detalles adicionales */
+.alert-message .details-toggle {
+    margin-top: 5px;
+    color: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+    display: block;
+}
+
+.alert-message .details-content {
+    margin-top: 10px;
+    padding: 10px;
+    background-color: rgba(0, 0, 0, 0.05);
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 12px;
+    max-height: 150px;
+    overflow-y: auto;
+    display: none;
+}
+
+/* Estilos para mensajes apilados */
+.alert-message:nth-child(2) {
+    top: 90px;
+}
+
+.alert-message:nth-child(3) {
+    top: 160px;
+}
+
+.alert-message:nth-child(4) {
+    top: 230px;
+}
+
+/* Estilos para mensajes con acciones */
+.alert-message .action-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.alert-message .action-button {
+    padding: 5px 10px;
+    border-radius: 3px;
+    border: none;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background-color 0.2s;
+}
+
+.error-message .action-button {
+    background-color: #dc3545;
+    color: white;
+}
+
+.warning-message .action-button {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+.info-message .action-button {
+    background-color: #17a2b8;
+    color: white;
+}
+
+.success-message .action-button {
+    background-color: #28a745;
+    color: white;
+}
+
+.alert-message .action-button:hover {
+    opacity: 0.9;
+}

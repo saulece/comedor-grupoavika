@@ -8,13 +8,15 @@ const USER_ROLES = {
     EMPLOYEE: 'employee'
 };
 
-// Variables globales
-let currentUser = null;
-let currentDepartment = null;
-let currentDate = null;
-let employeeList = [];
-let selectedEmployeeIds = [];
-let messageHandler = null;
+// Crear un estado local para este módulo usando StateManager
+const confirmationsState = window.StateManager.createModuleState('confirmations', {
+    currentUser: null,
+    currentDepartment: null,
+    currentDate: null,
+    employeeList: [],
+    selectedEmployeeIds: [],
+    messageHandler: null
+});
 
 // Elementos DOM principales
 const domElements = {
@@ -30,17 +32,18 @@ const domElements = {
 async function initConfirmationsPage() {
     try {
         // Inicializar manejador de mensajes
-        messageHandler = window.commonUtils;
+        confirmationsState.setValue('messageHandler', window.commonUtils);
         
-        messageHandler.toggleLoading(true);
+        window.errorService.toggleLoading(true);
         
         // Cargar servicios y utilidades
         await loadDependencies();
         
         // Obtener datos del usuario actual usando la función centralizada
-        currentUser = getCurrentUser();
+        confirmationsState.setValue('currentUser', getCurrentUser());
         
         // Verificar si hay un usuario en sesión
+        const currentUser = confirmationsState.getValue('currentUser');
         if (!currentUser || !currentUser.uid) {
             throw new Error('No hay usuario en sesión');
         }
@@ -63,10 +66,14 @@ async function initConfirmationsPage() {
         setupEventListeners();
         
     } catch (error) {
-        console.error('Error al inicializar la página de confirmaciones:', error);
-        messageHandler.showError('Error al cargar la página. Por favor, intente recargar.');
+        window.errorService.handleError(
+            error,
+            'Error al inicializar la página de confirmaciones',
+            ERROR_TYPES.UNKNOWN,
+            ERROR_SEVERITY.ERROR
+        );
     } finally {
-        messageHandler.toggleLoading(false);
+        window.errorService.toggleLoading(false);
     }
 }
 
@@ -85,6 +92,8 @@ async function loadDependencies() {
  */
 async function loadUserDepartment() {
     try {
+        const currentUser = confirmationsState.getValue('currentUser');
+        
         // Obtener departamento del usuario desde Firestore
         const userDoc = await window.firebaseService.getDocument('users', currentUser.uid);
         
@@ -92,10 +101,10 @@ async function loadUserDepartment() {
             throw new Error('No se pudo determinar el departamento del usuario');
         }
         
-        currentDepartment = userDoc.departmentId;
+        confirmationsState.setValue('currentDepartment', userDoc.departmentId);
         
         // Obtener nombre del departamento para mostrar
-        const deptDoc = await window.firebaseService.getDocument('departments', currentDepartment);
+        const deptDoc = await window.firebaseService.getDocument('departments', confirmationsState.getValue('currentDepartment'));
         if (deptDoc && deptDoc.name) {
             const deptNameElement = document.getElementById('department-name');
             if (deptNameElement) {
@@ -104,8 +113,12 @@ async function loadUserDepartment() {
         }
         
     } catch (error) {
-        console.error('Error al cargar departamento:', error);
-        messageHandler.showError('Error al cargar información del departamento');
+        window.errorService.handleError(
+            error,
+            'Error al cargar información del departamento',
+            ERROR_TYPES.DATABASE,
+            ERROR_SEVERITY.ERROR
+        );
         throw error;
     }
 }
@@ -117,10 +130,11 @@ function setupDateSelector() {
     if (!domElements.dateSelector) return;
     
     // Establecer fecha actual como valor predeterminado
-    currentDate = new Date();
+    confirmationsState.setValue('currentDate', new Date());
     
     // Formatear fecha para mostrar (usando la función centralizada)
-    const dateStr = messageHandler.DateUtils.formatDateDisplay(currentDate);
+    const messageHandler = confirmationsState.getValue('messageHandler');
+    const dateStr = messageHandler.DateUtils.formatDateDisplay(confirmationsState.getValue('currentDate'));
     
     domElements.dateSelector.value = dateStr;
     
@@ -130,13 +144,16 @@ function setupDateSelector() {
         
         // Validar formato de fecha (DD/MM/YYYY)
         if (!messageHandler.DateUtils.isValidDateString(dateStr)) {
-            messageHandler.showError('Formato de fecha inválido. Use DD/MM/YYYY');
+            window.errorService.handleValidationError(
+                'Formato de fecha inválido. Use DD/MM/YYYY',
+                { date: 'Formato inválido' }
+            );
             return;
         }
         
         // Convertir a objeto Date
         const [day, month, year] = dateStr.split('/').map(Number);
-        currentDate = new Date(year, month - 1, day);
+        confirmationsState.setValue('currentDate', new Date(year, month - 1, day));
         
         // Recargar datos con la nueva fecha
         await loadData();
@@ -148,10 +165,11 @@ function setupDateSelector() {
  */
 async function loadData() {
     try {
-        messageHandler.toggleLoading(true);
+        window.errorService.toggleLoading(true);
         
         // Formatear fecha para consulta (YYYY-MM-DD)
-        const dateStr = messageHandler.DateUtils.formatDate(currentDate);
+        const messageHandler = confirmationsState.getValue('messageHandler');
+        const dateStr = messageHandler.DateUtils.formatDate(confirmationsState.getValue('currentDate'));
         
         // Cargar lista de empleados del departamento
         await loadEmployees();
@@ -163,10 +181,14 @@ async function loadData() {
         renderEmployeeList();
         
     } catch (error) {
-        console.error('Error al cargar datos:', error);
-        messageHandler.showError('Error al cargar datos. Por favor, intente de nuevo.');
+        window.errorService.handleError(
+            error,
+            'Error al cargar datos. Por favor, intente de nuevo.',
+            ERROR_TYPES.DATABASE,
+            ERROR_SEVERITY.ERROR
+        );
     } finally {
-        messageHandler.toggleLoading(false);
+        window.errorService.toggleLoading(false);
     }
 }
 
@@ -178,7 +200,7 @@ async function loadEmployees() {
         // Consultar empleados del departamento actual
         const query = {
             collection: 'employees',
-            where: [['departmentId', '==', currentDepartment], ['active', '==', true]]
+            where: [['departmentId', '==', confirmationsState.getValue('currentDepartment')], ['active', '==', true]]
         };
         
         const employees = await window.firebaseService.getDocuments(query);
@@ -188,12 +210,19 @@ async function loadEmployees() {
         }
         
         // Ordenar por nombre
-        employeeList = employees.sort((a, b) => {
+        const sortedEmployees = employees.sort((a, b) => {
             return (a.name || '').localeCompare(b.name || '');
         });
         
+        confirmationsState.setValue('employeeList', sortedEmployees);
+        
     } catch (error) {
-        console.error('Error al cargar empleados:', error);
+        window.errorService.handleError(
+            error,
+            'Error al cargar empleados',
+            ERROR_TYPES.DATABASE,
+            ERROR_SEVERITY.ERROR
+        );
         throw error;
     }
 }
@@ -203,6 +232,8 @@ async function loadEmployees() {
  */
 async function loadConfirmations(dateStr) {
     try {
+        const messageHandler = confirmationsState.getValue('messageHandler');
+        
         // Validar formato de fecha
         if (!messageHandler.DateUtils.isValidDateString(dateStr)) {
             throw new Error('Formato de fecha inválido');
@@ -213,7 +244,7 @@ async function loadConfirmations(dateStr) {
             collection: 'confirmations',
             where: [
                 ['date', '==', dateStr],
-                ['departmentId', '==', currentDepartment]
+                ['departmentId', '==', confirmationsState.getValue('currentDepartment')]
             ]
         };
         
@@ -221,17 +252,24 @@ async function loadConfirmations(dateStr) {
         
         if (!confirmations || !Array.isArray(confirmations)) {
             // Si no hay confirmaciones, dejar la lista vacía
-            selectedEmployeeIds = [];
+            confirmationsState.setValue('selectedEmployeeIds', []);
             return;
         }
         
         // Extraer IDs de empleados confirmados
-        selectedEmployeeIds = confirmations
+        const confirmedIds = confirmations
             .filter(conf => conf.status === 'confirmed')
             .map(conf => conf.employeeId);
+            
+        confirmationsState.setValue('selectedEmployeeIds', confirmedIds);
         
     } catch (error) {
-        console.error('Error al cargar confirmaciones:', error);
+        window.errorService.handleError(
+            error,
+            'Error al cargar confirmaciones',
+            ERROR_TYPES.DATABASE,
+            ERROR_SEVERITY.ERROR
+        );
         throw error;
     }
 }
@@ -241,6 +279,10 @@ async function loadConfirmations(dateStr) {
  */
 function renderEmployeeList() {
     if (!domElements.employeeList) return;
+    
+    const employeeList = confirmationsState.getValue('employeeList');
+    const selectedEmployeeIds = confirmationsState.getValue('selectedEmployeeIds');
+    const messageHandler = confirmationsState.getValue('messageHandler');
     
     // Limpiar lista actual
     messageHandler.DOMUtils.clearElement(domElements.employeeList);
@@ -289,6 +331,7 @@ function renderEmployeeList() {
  * Alternar selección de un empleado
  */
 function toggleEmployeeSelection(employeeId, element) {
+    const selectedEmployeeIds = [...confirmationsState.getValue('selectedEmployeeIds')];
     const index = selectedEmployeeIds.indexOf(employeeId);
     
     if (index === -1) {
@@ -305,6 +348,9 @@ function toggleEmployeeSelection(employeeId, element) {
         element.querySelector('.status-indicator').classList.remove('confirmed');
     }
     
+    // Actualizar estado
+    confirmationsState.setValue('selectedEmployeeIds', selectedEmployeeIds);
+    
     // Actualizar contador
     updateCounter();
 }
@@ -315,6 +361,9 @@ function toggleEmployeeSelection(employeeId, element) {
 function updateCounter() {
     const counterElement = document.getElementById('selected-counter');
     if (!counterElement) return;
+    
+    const employeeList = confirmationsState.getValue('employeeList');
+    const selectedEmployeeIds = confirmationsState.getValue('selectedEmployeeIds');
     
     const total = employeeList.length;
     const selected = selectedEmployeeIds.length;
@@ -348,7 +397,8 @@ function setupEventListeners() {
  * Seleccionar todos los empleados
  */
 function selectAllEmployees() {
-    selectedEmployeeIds = employeeList.map(emp => emp.id);
+    const employeeList = confirmationsState.getValue('employeeList');
+    confirmationsState.setValue('selectedEmployeeIds', employeeList.map(emp => emp.id));
     renderEmployeeList();
 }
 
@@ -356,7 +406,7 @@ function selectAllEmployees() {
  * Deseleccionar todos los empleados
  */
 function deselectAllEmployees() {
-    selectedEmployeeIds = [];
+    confirmationsState.setValue('selectedEmployeeIds', []);
     renderEmployeeList();
 }
 
@@ -365,7 +415,14 @@ function deselectAllEmployees() {
  */
 async function saveConfirmations() {
     try {
-        messageHandler.toggleLoading(true);
+        window.errorService.toggleLoading(true);
+        
+        const messageHandler = confirmationsState.getValue('messageHandler');
+        const currentDate = confirmationsState.getValue('currentDate');
+        const currentDepartment = confirmationsState.getValue('currentDepartment');
+        const employeeList = confirmationsState.getValue('employeeList');
+        const selectedEmployeeIds = confirmationsState.getValue('selectedEmployeeIds');
+        const currentUser = confirmationsState.getValue('currentUser');
         
         // Formatear fecha para almacenamiento (YYYY-MM-DD)
         const dateStr = messageHandler.DateUtils.formatDate(currentDate);
@@ -397,13 +454,12 @@ async function saveConfirmations() {
         // Ejecutar batch
         await batch.commit();
         
-        messageHandler.showSuccess('Confirmaciones guardadas correctamente');
+        window.errorService.showSuccess('Confirmaciones guardadas correctamente');
         
     } catch (error) {
-        console.error('Error al guardar confirmaciones:', error);
-        messageHandler.showError('Error al guardar confirmaciones. Por favor, intente de nuevo.');
+        window.errorService.handleFirebaseError(error, 'Error al guardar confirmaciones');
     } finally {
-        messageHandler.toggleLoading(false);
+        window.errorService.toggleLoading(false);
     }
 }
 
@@ -412,6 +468,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Proteger esta ruta para el rol de coordinador
     await protectRoute(USER_ROLES.COORDINATOR);
     
-    // Inicializar la página si la autenticación es válida
-    initConfirmationsPage();
+    // Inicializar la página
+    await initConfirmationsPage();
 });

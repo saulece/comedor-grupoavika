@@ -277,14 +277,27 @@
     <div id="error-alert" class="alert-message error-message" style="display: none;"></div>
     <div id="success-alert" class="alert-message success-message" style="display: none;"></div>
 
-    <!-- Firebase Scripts -->
+    <!-- Firebase Scripts - Core y Auth son críticos, Analytics puede ser asíncrono -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-analytics.js" async></script>
     
-    <!-- Custom Scripts -->
-    <script src="../../js/firebase-config.js"></script>
-    <script src="../../js/auth.js"></script>
+    <!-- Firebase Config - Crítico para la inicialización -->
+    <script src="../../js/services/firebase/config.js"></script>
+    
+    <!-- Utility Scripts - Pueden cargarse con defer -->
+    <script src="../../js/utils/logger.js" defer></script>
+    <script src="../../js/utils/date/date-utils.js" defer></script>
+    <script src="../../js/utils/error-handler.js" defer></script>
+    
+    <!-- Services - Críticos para la funcionalidad principal -->
+    <script src="../../js/services/error/errorService.js"></script>
+    <script src="../../js/services/state/stateManager.js"></script>
+    <script src="../../js/services/firebase/firestoreService.js"></script>
+    
+    <!-- Auth Script - Crítico para la verificación de acceso -->
+    <script src="../../js/views/auth/auth.js"></script>
     
     <!-- Simple Menu Management Script -->
     <script>
@@ -584,10 +597,6 @@
         try {
             showLoadingState(true);
             
-            if (!window.db) {
-                throw new Error('Firebase no está inicializado correctamente');
-            }
-            
             const weekId = formatDate(currentWeekStart);
             
             // Prepare menu document
@@ -607,8 +616,8 @@
                 menuDoc.status = 'published';
             }
             
-            // Save to Firestore
-            await window.db.collection('menus').doc(weekId).set(menuDoc, { merge: true });
+            // Save to Firestore using firestoreService
+            await window.firestoreService.setDocument('menus', weekId, menuDoc, true);
             
             showSuccessMessage('Menú guardado correctamente');
         } catch (error) {
@@ -642,14 +651,10 @@
         try {
             showLoadingState(true);
             
-            if (!window.db) {
-                throw new Error('Firebase no está inicializado correctamente');
-            }
-            
             const weekId = formatDate(currentWeekStart);
             
-            // Update status
-            await window.db.collection('menus').doc(weekId).update({
+            // Update status using firestoreService
+            await window.firestoreService.updateDocument('menus', weekId, {
                 status: 'published',
                 publishedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
@@ -708,48 +713,47 @@
         try {
             showLoadingState(true);
             
-            if (!window.db) {
-                throw new Error('Firebase no está inicializado correctamente');
-            }
-            
             const weekId = formatDate(currentWeekStart);
             
             // Get menu from Firestore
-            const doc = await window.db.collection('menus').doc(weekId).get();
+            const doc = await window.firestoreService.getDocument('menus', weekId);
             
-            if (doc.exists) {
-                const data = doc.data();
+            if (doc) {
+                // Actualizar para usar el documento directamente del servicio
+                const data = doc;
                 
-                // Update publish status
-                isPublished = data.status === 'published';
-                updatePublishStatus();
-                
-                // Update menu data
-                // Load menu
-                Object.keys(menuData).forEach(day => {
-                    if (data[day] && data[day].items) {
-                        menuData[day] = data[day].items;
-                    } else {
-                        menuData[day] = [];
-                    }
-                    
-                    // Update UI
-                    updateDayContent(day);
-                });
-            } else {
-                // Reset data
+                // Reset menu data
                 resetMenuData();
-                isPublished = false;
+                
+                // Process days
+                Object.keys(menuData).forEach(day => {
+                    if (data[day] && data[day].items && Array.isArray(data[day].items)) {
+                        menuData[day] = data[day].items;
+                    }
+                });
+                
+                // Check if published
+                isPublished = data.status === 'published';
+                
+                // Update UI
+                updateDayContent(currentDay);
                 updatePublishStatus();
                 
-                // Update UI for all days
-                Object.keys(menuData).forEach(day => {
-                    updateDayContent(day);
-                });
+                showSuccessMessage('Menú cargado correctamente');
+            } else {
+                // No menu for this week
+                resetMenuData();
+                updateDayContent(currentDay);
+                updatePublishStatus();
             }
         } catch (error) {
             console.error('Error loading menu:', error);
             showErrorMessage('Error al cargar el menú: ' + error.message);
+            
+            // Reset menu data on error
+            resetMenuData();
+            updateDayContent(currentDay);
+            updatePublishStatus();
         } finally {
             showLoadingState(false);
         }

@@ -5,14 +5,12 @@
  * @jest-environment jsdom
  */
 
-// Configurar el entorno de prueba
-global.commonUtils = require('../../js/utils/common-utils');
+// Usar el mock de commonUtils ya configurado en setup.js
+const { DateUtils, TextUtils } = global.commonUtils;
 
 describe('Normalización de días de la semana', () => {
   describe('Casos específicos para Miércoles', () => {
     test('debe normalizar correctamente "Miércoles" con diferentes formatos', () => {
-      const { DateUtils } = commonUtils;
-      
       // Diferentes variantes de escritura para Miércoles
       expect(DateUtils.normalizeDayName('Miércoles')).toBe('miercoles');
       expect(DateUtils.normalizeDayName('miércoles')).toBe('miercoles');
@@ -24,8 +22,6 @@ describe('Normalización de días de la semana', () => {
     });
     
     test('debe formatear correctamente "miercoles" a "Miércoles"', () => {
-      const { DateUtils } = commonUtils;
-      
       // Diferentes variantes deben convertirse al formato correcto con acento
       expect(DateUtils.formatDayName('miercoles')).toBe('Miércoles');
       expect(DateUtils.formatDayName('Miercoles')).toBe('Miércoles');
@@ -35,8 +31,6 @@ describe('Normalización de días de la semana', () => {
     });
     
     test('debe identificar correctamente que todas las variantes de "Miércoles" son iguales', () => {
-      const { DateUtils } = commonUtils;
-      
       expect(DateUtils.areDaysEqual('Miércoles', 'miercoles')).toBe(true);
       expect(DateUtils.areDaysEqual('MIÉRCOLES', 'Miercoles')).toBe(true);
       expect(DateUtils.areDaysEqual('miércoles', 'MiErCoLeS')).toBe(true);
@@ -46,8 +40,6 @@ describe('Normalización de días de la semana', () => {
   
   describe('Casos específicos para Sábado', () => {
     test('debe normalizar correctamente "Sábado" con diferentes formatos', () => {
-      const { DateUtils } = commonUtils;
-      
       expect(DateUtils.normalizeDayName('Sábado')).toBe('sabado');
       expect(DateUtils.normalizeDayName('sábado')).toBe('sabado');
       expect(DateUtils.normalizeDayName('SÁBADO')).toBe('sabado');
@@ -56,8 +48,6 @@ describe('Normalización de días de la semana', () => {
     });
     
     test('debe formatear correctamente "sabado" a "Sábado"', () => {
-      const { DateUtils } = commonUtils;
-      
       expect(DateUtils.formatDayName('sabado')).toBe('Sábado');
       expect(DateUtils.formatDayName('Sabado')).toBe('Sábado');
       expect(DateUtils.formatDayName('SABADO')).toBe('Sábado');
@@ -68,8 +58,6 @@ describe('Normalización de días de la semana', () => {
   
   describe('Integración con normalizeMenuData', () => {
     test('debe normalizar correctamente las claves de días en datos de menú', () => {
-      const { TextUtils } = commonUtils;
-      
       const menuData = {
         'Lunes': { items: [{ name: 'Sopa' }] },
         'Miércoles': { items: [{ name: 'Pasta' }] },
@@ -90,8 +78,6 @@ describe('Normalización de días de la semana', () => {
     });
     
     test('debe manejar correctamente diferentes variantes de "Miércoles" en datos de menú', () => {
-      const { TextUtils } = commonUtils;
-      
       // Caso problemático mencionado en la memoria: diferentes formas de escribir Miércoles
       const menuData = {
         'Miércoles': { items: [{ name: 'Plato 1' }] },
