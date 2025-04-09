@@ -1,13 +1,20 @@
 // Coordinator Dashboard for Comedor Grupo Avika
 
-// Ensure coordinator only access
-document.addEventListener('DOMContentLoaded', () => {
-    if (!checkAuth(USER_ROLES.COORDINATOR)) {
-        return;
-    }
+// Inicialización de la página cuando el DOM esté listo
+document.addEventListener('DOMContentLoaded', async () => {
+    // Proteger esta ruta para el rol de coordinador
+    await protectRoute(USER_ROLES.COORDINATOR);
     
+    // Inicializar la página si la autenticación es válida
+    initDashboard();
+});
+
+/**
+ * Inicializar el dashboard del coordinador
+ */
+function initDashboard() {
     // Set user name
-    const user = JSON.parse(sessionStorage.getItem('user'));
+    const user = getCurrentUser();
     const userNameElement = document.getElementById('user-name');
     if (userNameElement && user) {
         userNameElement.textContent = user.displayName || 'Coordinador';
@@ -24,7 +31,10 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Load dashboard data
     loadDashboardData();
-});
+}
+
+// Referencia al servicio centralizado de Firebase
+const firebaseService = window.firebaseService;
 
 // Load dashboard data
 async function loadDashboardData() {
@@ -33,9 +43,15 @@ async function loadDashboardData() {
         showLoadingState(true);
         
         // Get current coordinator ID
-        const currentUserId = sessionStorage.getItem('userId');
+        const currentUser = getCurrentUser();
+        const currentUserId = currentUser.uid || currentUser.id;
         if (!currentUserId) {
             throw new Error('Usuario no identificado');
+        }
+        
+        // Verificar que el servicio de Firebase esté disponible
+        if (!firebaseService) {
+            throw new Error('Servicio de Firebase no disponible');
         }
         
         // Load stats data in parallel
@@ -59,7 +75,8 @@ async function loadDashboardData() {
 async function loadEmployeeStats(coordinatorId) {
     try {
         // Get employees for this coordinator
-        const employeesSnapshot = await firebase.firestore().collection('employees')
+        const employeesCollection = firebaseService.getCollection('employees');
+        const employeesSnapshot = await employeesCollection
             .where('coordinatorId', '==', coordinatorId)
             .get();
         
@@ -82,7 +99,8 @@ async function loadConfirmationStats(coordinatorId) {
         const todayStr = formatDate(today);
         
         // Check if there's a confirmation for today from this coordinator
-        const confirmationSnapshot = await firebase.firestore().collection('confirmations')
+        const confirmationsCollection = firebaseService.getCollection('confirmations');
+        const confirmationSnapshot = await confirmationsCollection
             .where('date', '==', todayStr)
             .where('coordinatorId', '==', coordinatorId)
             .get();
@@ -135,7 +153,8 @@ async function loadMenuStatus() {
         const currentWeek = getMonday(new Date());
         const weekStartStr = formatDate(currentWeek);
         
-        const menuDoc = await firebase.firestore().collection('menus').doc(weekStartStr).get();
+        const menusCollection = firebaseService.getCollection('menus');
+        const menuDoc = await menusCollection.doc(weekStartStr).get();
         const menuStatusContainer = document.getElementById('menu-status-container');
         
         if (menuStatusContainer) {

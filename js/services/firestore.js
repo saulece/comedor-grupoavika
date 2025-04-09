@@ -1,11 +1,7 @@
 // Módulo de servicios de Firestore para Comedor Grupo Avika
 
-// Asegurarse de que Firebase esté inicializado
-document.addEventListener('DOMContentLoaded', () => {
-    if (window.initializeFirebase) {
-        window.initializeFirebase();
-    }
-});
+// Referencia al servicio centralizado de Firebase
+const firebaseService = window.firebaseService;
 
 /**
  * Obtiene una referencia a una colección de Firestore
@@ -13,11 +9,11 @@ document.addEventListener('DOMContentLoaded', () => {
  * @returns {object} - Referencia a la colección
  */
 function getCollection(name) {
-    if (!window.db) {
-        console.error(`Error: Firestore no está inicializado al intentar acceder a la colección ${name}`);
+    if (!firebaseService) {
+        console.error(`Error: Servicio de Firebase no disponible al intentar acceder a la colección ${name}`);
         return null;
     }
-    return window.db.collection(name);
+    return firebaseService.getCollection(name);
 }
 
 /**
@@ -31,7 +27,7 @@ const menuService = {
      */
     getMenuForWeek: (weekStart) => {
         const collection = getCollection('menus');
-        if (!collection) return Promise.reject(new Error('Firestore no está inicializado'));
+        if (!collection) return Promise.reject(new Error('Servicio de Firebase no disponible'));
         return collection.doc(weekStart).get();
     },
     
@@ -43,7 +39,7 @@ const menuService = {
      */
     saveMenu: (weekStart, data) => {
         const collection = getCollection('menus');
-        if (!collection) return Promise.reject(new Error('Firestore no está inicializado'));
+        if (!collection) return Promise.reject(new Error('Servicio de Firebase no disponible'));
         return collection.doc(weekStart).set(data, { merge: true });
     },
     
@@ -54,27 +50,31 @@ const menuService = {
      */
     publishMenu: (weekStart) => {
         const collection = getCollection('menus');
-        if (!collection) return Promise.reject(new Error('Firestore no está inicializado'));
+        if (!collection) return Promise.reject(new Error('Servicio de Firebase no disponible'));
         return collection.doc(weekStart).update({
             status: 'published',
-            publishedAt: firebase.firestore.FieldValue.serverTimestamp()
+            publishedAt: firebaseService.getFirestore().FieldValue.serverTimestamp()
         });
     },
     
     /**
-     * Normaliza los datos de un menú para garantizar compatibilidad
+     * Normaliza los datos del menú para asegurar consistencia
      * @param {object} menuData - Datos del menú a normalizar
-     * @returns {object} - Datos normalizados
+     * @returns {object} - Datos del menú normalizados
+     * @deprecated Use commonUtils.TextUtils.normalizeMenuData instead
      */
     normalizeMenuData: (menuData) => {
-        if (!menuData) return {};
+        // Usar la función centralizada en commonUtils
+        if (window.commonUtils && window.commonUtils.TextUtils && window.commonUtils.TextUtils.normalizeMenuData) {
+            return window.commonUtils.TextUtils.normalizeMenuData(menuData);
+        }
         
-        const days = window.dateUtils ? window.dateUtils.DATE_FORMATS.COORDINATOR : 
-            ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
-        
+        // Fallback a la implementación original
         const normalizedData = {...menuData};
         
-        // Asegurarse de que cada día tenga su estructura adecuada
+        // Asegurar que todos los días tengan un array de items válido
+        const days = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
+        
         days.forEach(day => {
             if (!normalizedData[day]) {
                 normalizedData[day] = { items: [] };
@@ -98,7 +98,7 @@ const employeeService = {
      */
     getEmployeesByDepartment: (departmentId) => {
         const collection = getCollection('employees');
-        if (!collection) return Promise.reject(new Error('Firestore no está inicializado'));
+        if (!collection) return Promise.reject(new Error('Servicio de Firebase no disponible'));
         return collection.where('departmentId', '==', departmentId).get();
     },
     
@@ -110,7 +110,7 @@ const employeeService = {
      */
     saveEmployee: (employeeId, data) => {
         const collection = getCollection('employees');
-        if (!collection) return Promise.reject(new Error('Firestore no está inicializado'));
+        if (!collection) return Promise.reject(new Error('Servicio de Firebase no disponible'));
         
         if (employeeId) {
             return collection.doc(employeeId).update(data);
@@ -126,7 +126,7 @@ const employeeService = {
      */
     deleteEmployee: (employeeId) => {
         const collection = getCollection('employees');
-        if (!collection) return Promise.reject(new Error('Firestore no está inicializado'));
+        if (!collection) return Promise.reject(new Error('Servicio de Firebase no disponible'));
         return collection.doc(employeeId).delete();
     }
 };
@@ -144,7 +144,7 @@ const confirmationService = {
      */
     getConfirmationsForDateRange: (startDate, endDate, departmentId) => {
         const collection = getCollection('confirmations');
-        if (!collection) return Promise.reject(new Error('Firestore no está inicializado'));
+        if (!collection) return Promise.reject(new Error('Servicio de Firebase no disponible'));
         
         let query = collection
             .where('date', '>=', startDate)
@@ -165,7 +165,7 @@ const confirmationService = {
      */
     getConfirmationByDateAndDepartment: (date, departmentId) => {
         const collection = getCollection('confirmations');
-        if (!collection) return Promise.reject(new Error('Firestore no está inicializado'));
+        if (!collection) return Promise.reject(new Error('Servicio de Firebase no disponible'));
         
         return collection
             .where('date', '==', date)
@@ -181,7 +181,7 @@ const confirmationService = {
      */
     saveConfirmation: (confirmationId, data) => {
         const collection = getCollection('confirmations');
-        if (!collection) return Promise.reject(new Error('Firestore no está inicializado'));
+        if (!collection) return Promise.reject(new Error('Servicio de Firebase no disponible'));
         
         if (confirmationId) {
             return collection.doc(confirmationId).update(data);
@@ -201,7 +201,7 @@ const userService = {
      */
     getCoordinators: () => {
         const collection = getCollection('users');
-        if (!collection) return Promise.reject(new Error('Firestore no está inicializado'));
+        if (!collection) return Promise.reject(new Error('Servicio de Firebase no disponible'));
         
         return collection
             .where('role', '==', 'coordinator')
@@ -216,7 +216,7 @@ const userService = {
      */
     saveUser: (userId, data) => {
         const collection = getCollection('users');
-        if (!collection) return Promise.reject(new Error('Firestore no está inicializado'));
+        if (!collection) return Promise.reject(new Error('Servicio de Firebase no disponible'));
         
         if (userId) {
             return collection.doc(userId).update(data);
@@ -232,7 +232,7 @@ const userService = {
      */
     deleteUser: (userId) => {
         const collection = getCollection('users');
-        if (!collection) return Promise.reject(new Error('Firestore no está inicializado'));
+        if (!collection) return Promise.reject(new Error('Servicio de Firebase no disponible'));
         return collection.doc(userId).delete();
     }
 };

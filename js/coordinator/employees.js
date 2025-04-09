@@ -1,5 +1,8 @@
 // Coordinator Employees Management for Comedor Grupo Avika
 
+// Referencia al servicio centralizado de Firebase
+const firebaseService = window.firebaseService;
+
 // Ensure coordinator only access
 document.addEventListener('DOMContentLoaded', () => {
     if (!checkAuth(USER_ROLES.COORDINATOR)) {
@@ -9,13 +12,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Set user name
     let userName = 'Coordinador';
     try {
-        const userJson = sessionStorage.getItem('user');
-        if (userJson) {
-            const userObj = JSON.parse(userJson);
-            userName = userObj.displayName || userName;
+        const user = getCurrentUser();
+        if (user) {
+            userName = user.displayName || userName;
         }
     } catch (error) {
-        console.error('Error parsing user data:', error);
+        console.error('Error obteniendo datos del usuario:', error);
     }
     
     const userNameElement = document.getElementById('user-name');
@@ -38,19 +40,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Current user information
-let currentUser = null;
-try {
-    const userJson = sessionStorage.getItem('user');
-    if (userJson) {
-        currentUser = JSON.parse(userJson);
-    } else {
-        currentUser = {
-            departmentId: sessionStorage.getItem('userDepartmentId'),
-            department: sessionStorage.getItem('userDepartment')
-        };
-    }
-} catch (error) {
-    console.error('Error parsing user data:', error);
+let currentUser = getCurrentUser();
+if (!currentUser || Object.keys(currentUser).length === 0) {
+    console.error('No se pudo obtener la información del usuario actual');
     currentUser = {};
 }
 
@@ -143,11 +135,19 @@ function loadEmployees() {
         return;
     }
     
+    // Verificar que el servicio de Firebase esté disponible
+    if (!firebaseService) {
+        showErrorMessage('Servicio de Firebase no disponible. Por favor, recargue la página.');
+        showLoadingState(false);
+        return;
+    }
+    
     // Clear employees list
     currentEmployees = [];
     
-    // Get employees from Firestore
-    window.db.collection('employees')
+    // Get employees from Firestore usando el servicio centralizado
+    const employeesCollection = firebaseService.getCollection('employees');
+    employeesCollection
         .where('departmentId', '==', departmentId)
         .orderBy('name')
         .get()
@@ -408,6 +408,13 @@ async function saveEmployee(event) {
     // Show loading state
     showLoadingState(true);
     
+    // Verificar que el servicio de Firebase esté disponible
+    if (!firebaseService) {
+        showErrorMessage('Servicio de Firebase no disponible. Por favor, recargue la página.');
+        showLoadingState(false);
+        return;
+    }
+    
     // Get form values
     const idField = document.getElementById('employee-id');
     const employeeId = idField ? idField.value : '';
@@ -432,34 +439,30 @@ async function saveEmployee(event) {
         active: active,
         departmentId: currentUser.departmentId || sessionStorage.getItem('userDepartmentId'),
         department: currentUser.department || sessionStorage.getItem('userDepartment'),
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        updatedAt: firebaseService.firestore.FieldValue.serverTimestamp()
     };
     
     try {
+        const employeesCollection = firebaseService.getCollection('employees');
+        
         if (employeeId) {
             // Update existing employee
-            await window.db.collection('employees').doc(employeeId).update(employee);
-            showSuccessMessage('Empleado actualizado correctamente.');
+            await employeesCollection.doc(employeeId).update(employee);
+            showSuccessMessage('Empleado actualizado correctamente');
         } else {
-            // Add created timestamp for new employees
-            employee.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-            
-            // Create new employee
-            await window.db.collection('employees').add(employee);
-            showSuccessMessage('Empleado agregado correctamente.');
+            // Add new employee
+            employee.createdAt = firebaseService.firestore.FieldValue.serverTimestamp();
+            await employeesCollection.add(employee);
+            showSuccessMessage('Empleado agregado correctamente');
         }
         
-        // Close modal
+        // Close modal and reload employees
         closeModal();
-        
-        // Reset page to first
-        currentPage = 1;
-        
-        // Reload employees
         loadEmployees();
     } catch (error) {
-        console.error("Error saving employee:", error);
-        showErrorMessage("Error al guardar el empleado: " + error.message);
+        console.error('Error saving employee:', error);
+        showErrorMessage('Error al guardar el empleado. Por favor intente de nuevo.');
+    } finally {
         showLoadingState(false);
     }
 }
@@ -505,21 +508,30 @@ async function deleteEmployee(employeeId) {
     // Show loading state
     showLoadingState(true);
     
+    // Verificar que el servicio de Firebase esté disponible
+    if (!firebaseService) {
+        showErrorMessage('Servicio de Firebase no disponible. Por favor, recargue la página.');
+        showLoadingState(false);
+        return;
+    }
+    
     try {
-        // Delete employee from Firestore
-        await window.db.collection('employees').doc(employeeId).delete();
+        // Delete employee from Firestore usando el servicio centralizado
+        const employeesCollection = firebaseService.getCollection('employees');
+        await employeesCollection.doc(employeeId).delete();
         
         // Close modal
         closeModal();
         
         // Show success message
-        showSuccessMessage('Empleado eliminado correctamente.');
+        showSuccessMessage('Empleado eliminado correctamente');
         
         // Reload employees
         loadEmployees();
     } catch (error) {
-        console.error("Error deleting employee:", error);
-        showErrorMessage("Error al eliminar el empleado: " + error.message);
+        console.error('Error deleting employee:', error);
+        showErrorMessage('Error al eliminar el empleado. Por favor intente de nuevo.');
+    } finally {
         showLoadingState(false);
     }
 }
@@ -641,19 +653,26 @@ function parseCSV(csvData) {
 
 // Import employees to Firestore
 async function importEmployeesToFirestore(employees) {
+    // Verificar que el servicio de Firebase esté disponible
+    if (!firebaseService) {
+        showErrorMessage('Servicio de Firebase no disponible. Por favor, recargue la página.');
+        return;
+    }
+    
     try {
         // Get batch
-        const batch = window.db.batch();
+        const batch = firebaseService.db.batch();
         
         // Add department info to each employee
         const departmentId = currentUser.departmentId || sessionStorage.getItem('userDepartmentId');
         const department = currentUser.department || sessionStorage.getItem('userDepartment');
         
-        const timestamp = firebase.firestore.FieldValue.serverTimestamp();
+        const timestamp = firebaseService.firestore.FieldValue.serverTimestamp();
         
         // Add employees to batch
         employees.forEach(employee => {
-            const employeeRef = window.db.collection('employees').doc();
+            const employeesCollection = firebaseService.getCollection('employees');
+            const employeeRef = employeesCollection.doc();
             batch.set(employeeRef, {
                 ...employee,
                 departmentId: departmentId,
@@ -667,7 +686,7 @@ async function importEmployeesToFirestore(employees) {
         await batch.commit();
         
         // Show success message
-        showSuccessMessage(`${employees.length} empleados importados correctamente.`);
+        showSuccessMessage(`${employees.length} empleados importados correctamente`);
         
         // Close modal
         closeModal();
@@ -676,8 +695,7 @@ async function importEmployeesToFirestore(employees) {
         loadEmployees();
     } catch (error) {
         console.error('Error importing employees:', error);
-        showErrorMessage('Error al importar los empleados: ' + error.message);
-        showLoadingState(false);
+        showErrorMessage('Error al importar empleados. Por favor intente de nuevo.');
     }
 }
 

@@ -184,8 +184,15 @@ function objectsToCSV(data, headers) {
  * Normalize menu data structure to ensure consistency
  * @param {Object} menuData - The menu data to normalize
  * @returns {Object} - Normalized menu data
+ * @deprecated Use commonUtils.TextUtils.normalizeMenuData instead
  */
 function normalizeMenuData(menuData) {
+    // Usar la función centralizada en commonUtils
+    if (window.commonUtils && window.commonUtils.TextUtils && window.commonUtils.TextUtils.normalizeMenuData) {
+        return window.commonUtils.TextUtils.normalizeMenuData(menuData);
+    }
+    
+    // Fallback a la implementación original si commonUtils no está disponible
     const normalizedData = {};
     
     // Normalize day keys (remove accents, convert to lowercase)

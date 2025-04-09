@@ -54,16 +54,12 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-analytics.js"></script>
     
     <!-- Application Scripts -->
-    <script src="js/firebase-config.js"></script>
+    <script src="js/utils/common-utils.js"></script>
+    <script src="js/services/firebase-service.js"></script>
     <script src="js/auth.js"></script>
     <script>
-        // Inicializar Firebase y configurar manejadores de eventos después de que el DOM esté listo
+        // Configurar el formulario de inicio de sesión después de que el DOM esté listo
         document.addEventListener("DOMContentLoaded", () => {
-            // Inicializar Firebase si está disponible
-            if (window.initializeFirebase) {
-                window.initializeFirebase();
-            }
-            
             // Configurar el formulario de inicio de sesión
             const loginForm = document.getElementById("loginForm");
             if (loginForm) {
@@ -101,33 +97,42 @@
             const email = document.getElementById("email").value.trim();
             const password = document.getElementById("password").value;
             
-            // Verificar que tenemos la función de login
-            if (!window.loginUser) {
-                showError("Error: La función de inicio de sesión no está disponible. Por favor, recarga la página.");
+            // Validar campos
+            if (!email || !password) {
+                showError("Por favor, complete todos los campos");
                 return;
             }
             
             try {
-            // Intentar iniciar sesión
-            await loginUser(email, password);
-        } catch (error) {
-            // El manejo de errores se hace en loginUser
-            console.error("Error en el proceso de inicio de sesión:", error);
+                // Mostrar estado de carga
+                const loginLoader = document.getElementById("loginLoader");
+                const loginButton = document.getElementById("loginButton");
+                if (loginLoader) loginLoader.style.display = "inline-block";
+                if (loginButton) loginButton.disabled = true;
+                
+                // Intentar iniciar sesión
+                await loginUser(email, password);
+                
+            } catch (error) {
+                console.error("Error en inicio de sesión:", error);
+                showError(error.message || "Error al iniciar sesión");
+                
+                // Ocultar estado de carga
+                const loginLoader = document.getElementById("loginLoader");
+                const loginButton = document.getElementById("loginButton");
+                if (loginLoader) loginLoader.style.display = "none";
+                if (loginButton) loginButton.disabled = false;
+            }
         }
-    }
-    
-    // Función de respaldo para mostrar errores si clearError no está disponible
-    function showError(message) {
-        const errorElement = document.getElementById("loginError");
-        if (errorElement) {
-            errorElement.textContent = message;
-            errorElement.style.display = "block";
-        } else {
-            // Mostrar error en consola y alert como respaldo
-            console.error(message);
-            alert(message);
+        
+        // Función de respaldo para mostrar errores si clearError no está disponible
+        function showError(message) {
+            const errorElement = document.getElementById("loginError");
+            if (errorElement) {
+                errorElement.textContent = message;
+                errorElement.style.display = "block";
+            }
         }
-    }
-</script>
+    </script>
 </body>
 </html>

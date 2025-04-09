@@ -37,8 +37,8 @@ document.addEventListener('DOMContentLoaded', () => {
     loadCoordinators();
 });
 
-// Referencia a las colecciones usando las variables globales
-const usersCollection = window.db ? window.db.collection('users') : null;
+// Referencia al servicio centralizado de Firebase
+const firebaseService = window.firebaseService;
 
 // Setup event listeners
 function setupEventListeners() {
@@ -116,27 +116,27 @@ async function createCoordinator(name, email, password, branch) {
     try {
         showLoadingState(true);
         
-        if (!window.auth || !window.db) {
+        if (!firebaseService || !firebaseService.db) {
             throw new Error('Firebase no está inicializado correctamente');
         }
         
         // Check if email already exists
-        const emailCheck = await window.db.collection('users').where('email', '==', email).get();
+        const emailCheck = await firebaseService.db.collection('users').where('email', '==', email).get();
         if (!emailCheck.empty) {
             throw new Error('El correo electrónico ya está registrado');
         }
         
         // Create user in Firebase Auth
-        const userCredential = await window.auth.createUserWithEmailAndPassword(email, password);
+        const userCredential = await firebaseService.auth.createUserWithEmailAndPassword(email, password);
         const user = userCredential.user;
         
         // Add user to Firestore
-        await window.db.collection('users').doc(user.uid).set({
+        await firebaseService.db.collection('users').doc(user.uid).set({
             name: name,
             email: email,
             role: 'coordinator',
             branch: branch,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            createdAt: firebaseService.firestore.FieldValue.serverTimestamp(),
             createdBy: sessionStorage.getItem('userId')
         });
         
@@ -178,12 +178,12 @@ async function loadCoordinators() {
     try {
         showLoadingState(true);
         
-        if (!window.db) {
+        if (!firebaseService || !firebaseService.db) {
             throw new Error('Firebase no está inicializado correctamente');
         }
         
         // Get coordinators from Firestore
-        const snapshot = await window.db.collection('users')
+        const snapshot = await firebaseService.db.collection('users')
             .where('role', '==', 'coordinator')
             .get();
         
@@ -314,12 +314,12 @@ async function deleteUserHandler() {
             throw new Error('ID de usuario no válido');
         }
         
-        if (!window.db) {
+        if (!firebaseService || !firebaseService.db) {
             throw new Error('Firebase no está inicializado correctamente');
         }
         
         // Delete user from Firestore
-        await window.db.collection('users').doc(userId).delete();
+        await firebaseService.db.collection('users').doc(userId).delete();
         
         // Note: To fully delete from Authentication requires a Cloud Function
         showSuccessMessage('Usuario eliminado de Firestore. La eliminación completa requiere una Cloud Function.');

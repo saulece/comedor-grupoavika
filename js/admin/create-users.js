@@ -27,11 +27,13 @@ document.addEventListener('DOMContentLoaded', () => {
     loadCoordinators();
 });
 
-// Firebase services
-const db = firebase.firestore();
-const auth = firebase.auth();
+// Referencia al servicio centralizado de Firebase
+const firebaseService = window.firebaseService;
 
 // Collection references
+const db = firebaseService.firestore();
+const auth = firebaseService.auth();
+
 const usersCollection = db.collection('users');
 
 // Setup event listeners
@@ -192,7 +194,7 @@ async function createCoordinatorHandler(e) {
             email: email,
             role: 'coordinator',
             branch: branch,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            createdAt: firebaseService.firestore.FieldValue.serverTimestamp(),
             createdBy: sessionStorage.getItem('userId')
         });
         
@@ -318,7 +320,7 @@ async function createAllCoordinators() {
                     email: email,
                     role: 'coordinator',
                     branch: sucursal,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    createdAt: firebaseService.firestore.FieldValue.serverTimestamp(),
                     createdBy: sessionStorage.getItem('userId')
                 });
                 

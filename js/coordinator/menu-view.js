@@ -2,11 +2,6 @@
 
 // Ensure coordinator only access
 document.addEventListener('DOMContentLoaded', () => {
-    // Asegurar que Firebase se inicialice
-    if (window.initializeFirebase) {
-        window.initializeFirebase();
-    }
-    
     // Verificar permisos de acceso
     if (!window.checkAuth) {
         console.error('La función de autenticación no está disponible');
@@ -49,26 +44,24 @@ document.addEventListener('DOMContentLoaded', () => {
         logoutBtn.addEventListener('click', (e) => {
             e.preventDefault();
             if (window.logout) {
-                logout();
+                window.logout();
             } else {
-                // Fallback si logout no está disponible
+                // Fallback si la función de logout no está disponible
                 sessionStorage.clear();
-                window.location.href = '../../index.html';
+                window.location.href = '../index.html';
             }
         });
     }
     
-    // Initialize the UI
+    // Initialize week selector
     initializeWeekSelector();
-    loadMenuForWeek();
     
-    // Set event listeners for menu tabs
-    document.querySelectorAll('.menu-tab').forEach(tab => {
-        tab.addEventListener('click', function() {
-            switchMenuTab(this.getAttribute('data-day'));
-        });
-    });
+    // Load current week menu
+    loadMenuForWeek();
 });
+
+// Referencia al servicio centralizado de Firebase
+const firebaseService = window.firebaseService;
 
 // Current week settings
 // Usar la utilidad de fecha del módulo dateUtils si está disponible
@@ -162,18 +155,18 @@ function loadMenuForWeek() {
         console.log('Cargando menú para la semana que comienza el:', weekStartStr);
     }
     
-    // Intentar usar los servicios de Firestore si están disponibles
-    if (window.firestoreServices && window.firestoreServices.menu) {
-        window.firestoreServices.menu.getMenuForWeek(weekStartStr)
-            .then(processMenuDocument)
-            .catch(handleMenuLoadError);
-    } else {
-        // Fallback al método directo si los servicios no están disponibles
-        window.db.collection('menus').doc(weekStartStr)
-            .get()
-            .then(processMenuDocument)
-            .catch(handleMenuLoadError);
+    // Verificar que el servicio de Firebase esté disponible
+    if (!firebaseService) {
+        handleMenuLoadError(new Error('Servicio de Firebase no disponible'));
+        return;
     }
+    
+    // Usar el servicio centralizado de Firebase
+    const menusCollection = firebaseService.getCollection('menus');
+    menusCollection.doc(weekStartStr)
+        .get()
+        .then(processMenuDocument)
+        .catch(handleMenuLoadError);
 }
 
 /**
@@ -396,7 +389,16 @@ function showNoMenuMessage() {
 }
 
 // Normalize menu data to ensure compatibility between formats
+/**
+ * @deprecated Use commonUtils.TextUtils.normalizeMenuData instead
+ */
 function normalizeMenuData(menuData) {
+    // Usar la función centralizada en commonUtils
+    if (window.commonUtils && window.commonUtils.TextUtils && window.commonUtils.TextUtils.normalizeMenuData) {
+        return window.commonUtils.TextUtils.normalizeMenuData(menuData);
+    }
+    
+    // Fallback a la implementación original
     if (!menuData) return {};
     
     const normalizedData = {...menuData};

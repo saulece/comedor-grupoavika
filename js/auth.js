@@ -1,9 +1,14 @@
 // Authentication module for Comedor Grupo Avika - Firebase v8 approach
 
+// Importar utilidades comunes si están disponibles
+const commonUtils = window.commonUtils || {};
+const firebaseService = window.firebaseService;
+
 // User Roles
-const USER_ROLES = {
+const USER_ROLES = commonUtils.CONSTANTS ? commonUtils.CONSTANTS.USER_ROLES : {
     ADMIN: 'admin',
-    COORDINATOR: 'coordinator'
+    COORDINATOR: 'coordinator',
+    EMPLOYEE: 'employee'
 };
 
 /**
@@ -12,9 +17,13 @@ const USER_ROLES = {
  * @returns {boolean} - Whether user has access
  */
 function checkAuth(requiredRole) {
-    // Asegúrate de que Firebase esté inicializado
-    if (window.initializeFirebase && !window.firebaseInitialized) {
-        window.initializeFirebase();
+    console.log(`Verificando autenticación para rol: ${requiredRole}`);
+    
+    // Asegurarnos de que el servicio de Firebase esté disponible
+    if (!window.firebaseService) {
+        console.warn('Servicio de Firebase no disponible. Redirigiendo a login...');
+        redirectToLogin();
+        return false;
     }
     
     // Normalizar el rol requerido
@@ -22,26 +31,89 @@ function checkAuth(requiredRole) {
     if (requiredRole === 'admin') normalizedRole = USER_ROLES.ADMIN;
     if (requiredRole === 'coordinator') normalizedRole = USER_ROLES.COORDINATOR;
     
-    const userRole = sessionStorage.getItem("userRole");
-    const userId = sessionStorage.getItem("userId");
+    // Verificar si hay un usuario en la sesión
+    const currentUser = getCurrentUser();
     
-    if (!userId) {
+    if (!currentUser || !currentUser.uid) {
+        console.warn('No hay usuario autenticado');
         // Redirect to login page
-        const currentPath = window.location.pathname;
-        // Check if we're not already on the login page to avoid redirect loop
-        if (!currentPath.includes('index.html') && currentPath !== '/') {
-            window.location.href = getBasePath() + "index.html";
-        }
+        redirectToLogin();
         return false;
     }
     
-    if (normalizedRole && userRole !== normalizedRole) {
-        // Redirect to appropriate dashboard
-        redirectBasedOnRole(userRole);
+    // Si no se requiere un rol específico, solo verificar autenticación
+    if (!normalizedRole) {
+        return true;
+    }
+    
+    // Verificar si el usuario tiene el rol requerido
+    if (currentUser.role !== normalizedRole) {
+        console.warn(`Rol requerido: ${normalizedRole}, rol del usuario: ${currentUser.role}`);
+        // Redirect to appropriate page based on role
+        redirectBasedOnRole(currentUser.role);
         return false;
     }
     
     return true;
+}
+
+/**
+ * Get current user data from session storage
+ * @returns {Object|null} - User object or null if not logged in
+ */
+function getCurrentUserFromSession() {
+    try {
+        // Intentar obtener objeto de usuario completo
+        const userJson = sessionStorage.getItem('currentUser');
+        if (!userJson) {
+            return null;
+        }
+        
+        return JSON.parse(userJson);
+    } catch (error) {
+        console.error('Error al obtener usuario de la sesión:', error);
+        return null;
+    }
+}
+
+/**
+ * Obtiene los datos del usuario actual
+ * Función centralizada para acceder a los datos del usuario en toda la aplicación
+ * @returns {Object} - Objeto con datos del usuario o un objeto vacío si no hay usuario
+ */
+function getCurrentUser() {
+    const user = getCurrentUserFromSession();
+    
+    if (!user) {
+        // Si no hay usuario en la sesión, intentar obtener solo el rol (compatibilidad)
+        const role = sessionStorage.getItem('userRole');
+        if (role) {
+            return { role };
+        }
+        return {};
+    }
+    
+    return user;
+}
+
+/**
+ * Obtiene el rol del usuario actual
+ * @returns {string|null} - Rol del usuario o null si no está autenticado
+ */
+function getCurrentUserRole() {
+    const user = getCurrentUser();
+    return user ? user.role : null;
+}
+
+/**
+ * Redirect to login page
+ */
+function redirectToLogin() {
+    const currentPath = window.location.pathname;
+    // Check if we're not already on the login page to avoid redirect loop
+    if (!currentPath.includes('index.html') && currentPath !== '/') {
+        window.location.href = getBasePath() + "index.html";
+    }
 }
 
 /**
@@ -73,10 +145,13 @@ function redirectBasedOnRole(role) {
         case USER_ROLES.COORDINATOR:
             window.location.href = basePath + "pages/coordinator/dashboard.html";
             break;
+        case USER_ROLES.EMPLOYEE:
+            window.location.href = basePath + "pages/employee/dashboard.html";
+            break;
         default:
             showError("Rol de usuario no reconocido");
             // Sign out if role is invalid
-            firebase.auth().signOut();
+            logout();
     }
 }
 
@@ -88,9 +163,9 @@ function redirectBasedOnRole(role) {
  */
 async function loginUser(email, password) {
     try {
-        // Asegúrate de que Firebase esté inicializado
-        if (window.initializeFirebase && !window.firebaseInitialized) {
-            window.initializeFirebase();
+        // Asegurarnos de que el servicio de Firebase esté disponible
+        if (!window.firebaseService) {
+            throw new Error('Servicio de Firebase no disponible');
         }
         
         // Show loader and disable button if they exist
@@ -100,63 +175,55 @@ async function loginUser(email, password) {
         if (loginButton) loginButton.disabled = true;
         if (loginLoader) loginLoader.style.display = "block";
         
-        // Attempt login
-        const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
-        const user = userCredential.user;
+        // Clear previous errors
+        clearError();
         
-        // Get additional user information from Firestore
-        const userDoc = await firebase.firestore().collection("users").doc(user.uid).get();
-        
-        if (userDoc.exists) {
-            const userData = userDoc.data();
-            
-            // Validate user role
-            if (!userData.role || (userData.role !== USER_ROLES.ADMIN && userData.role !== USER_ROLES.COORDINATOR)) {
-                throw new Error("Invalid user role");
-            }
-            
-            // Create a user object
-            const userObject = {
-                uid: user.uid,
-                email: user.email,
-                displayName: userData.name,
-                role: userData.role,
-                branch: userData.branch || "",
-                department: userData.department || "",
-                departmentId: userData.departmentId || ""
-            };
-            
-            // Save as JSON string
-            sessionStorage.setItem("user", JSON.stringify(userObject));
-            
-            // Also save individual properties for backwards compatibility
-            sessionStorage.setItem("userId", user.uid);
-            sessionStorage.setItem("userEmail", user.email);
-            sessionStorage.setItem("userName", userData.name);
-            sessionStorage.setItem("userRole", userData.role);
-            sessionStorage.setItem("userBranch", userData.branch || "");
-            sessionStorage.setItem("userDepartment", userData.department || "");
-            sessionStorage.setItem("userDepartmentId", userData.departmentId || "");
-            
-            // Redirect based on role
-            redirectBasedOnRole(userData.role);
-        } else {
-            throw new Error("User information not found");
+        // Validate inputs
+        if (!email || !password) {
+            throw new Error("Por favor ingrese su correo y contraseña");
         }
         
-        return user;
+        let userData;
+        
+        // Use firebase service to login
+        userData = await window.firebaseService.login(email, password);
+        
+        if (!userData) {
+            throw new Error("Error al obtener datos del usuario");
+        }
+        
+        // Store user data in session
+        sessionStorage.setItem("currentUser", JSON.stringify(userData));
+        
+        // For backwards compatibility
+        sessionStorage.setItem("userId", userData.uid);
+        sessionStorage.setItem("userEmail", userData.email);
+        sessionStorage.setItem("userName", userData.displayName || userData.name || "");
+        sessionStorage.setItem("userRole", userData.role);
+        
+        if (userData.departmentId) {
+            sessionStorage.setItem("userDepartmentId", userData.departmentId);
+            sessionStorage.setItem("userDepartment", userData.department || "");
+        }
+        
+        console.log("Login exitoso:", userData);
+        
+        // Redirect based on role
+        redirectBasedOnRole(userData.role);
+        
+        return userData;
     } catch (error) {
-        console.error("Authentication error:", error);
+        console.error("Error de autenticación:", error);
         
-        // Handle authentication errors
-        handleAuthError(error);
-        
-        // Re-enable login button and hide loader
+        // Reset UI
         const loginButton = document.getElementById("loginButton");
         const loginLoader = document.getElementById("loginLoader");
         
         if (loginButton) loginButton.disabled = false;
         if (loginLoader) loginLoader.style.display = "none";
+        
+        // Show friendly error message
+        handleAuthError(error);
         
         throw error;
     }
@@ -167,25 +234,33 @@ async function loginUser(email, password) {
  * @param {Error} error - Error object
  */
 function handleAuthError(error) {
-    let errorMessage = "Error al iniciar sesión";
+    let message = "Error de autenticación. Por favor intente nuevamente.";
     
-    // Custom error messages
-    if (error.code === "auth/user-not-found") {
-        errorMessage = "Usuario no encontrado";
-    } else if (error.code === "auth/wrong-password") {
-        errorMessage = "Contraseña incorrecta";
-    } else if (error.code === "auth/invalid-email") {
-        errorMessage = "Correo electrónico inválido";
-    } else if (error.code === "auth/too-many-requests") {
-        errorMessage = "Demasiados intentos fallidos. Intenta más tarde";
-    } else if (error.code === "auth/network-request-failed") {
-        errorMessage = "Error de conexión. Verifica tu conexión a internet";
+    if (error.code) {
+        switch (error.code) {
+            case 'auth/user-not-found':
+                message = "Usuario no encontrado. Verifique su correo electrónico.";
+                break;
+            case 'auth/wrong-password':
+                message = "Contraseña incorrecta. Por favor intente nuevamente.";
+                break;
+            case 'auth/invalid-email':
+                message = "Formato de correo electrónico inválido.";
+                break;
+            case 'auth/user-disabled':
+                message = "Este usuario ha sido deshabilitado. Contacte al administrador.";
+                break;
+            case 'auth/too-many-requests':
+                message = "Demasiados intentos fallidos. Por favor intente más tarde.";
+                break;
+            default:
+                message = error.message || message;
+        }
     } else if (error.message) {
-        errorMessage = error.message;
+        message = error.message;
     }
     
-    // Show error message
-    showError(errorMessage);
+    showError(message);
 }
 
 /**
@@ -193,20 +268,24 @@ function handleAuthError(error) {
  * @param {string} message - Error message to display
  */
 function showError(message) {
-    // Intenta usar el error handler global si está disponible
-    if (window.errorHandler && window.errorHandler.showUIError) {
-        window.errorHandler.showUIError(message);
+    // Use common utils if available
+    if (window.uiMessageHandler) {
+        window.uiMessageHandler.showError(message);
         return;
     }
     
-    // Fallback al método antiguo
+    // Fallback to direct DOM manipulation
     const errorElement = document.getElementById("loginError");
     if (errorElement) {
         errorElement.textContent = message;
         errorElement.style.display = "block";
+        
+        // Auto-hide after 5 seconds
+        setTimeout(() => {
+            clearError();
+        }, 5000);
     } else {
-        console.error(message);
-        alert("Error: " + message);
+        alert(message);
     }
 }
 
@@ -223,80 +302,205 @@ function clearError() {
 
 /**
  * Log out current user
+ * Limpia toda la información de sesión, tokens y variables globales
+ * @returns {Promise<void>}
  */
-function logout() {
-    firebase.auth().signOut()
-        .then(() => {
-            // Clear session storage
-            sessionStorage.clear();
-            // Redirect to login page
-            window.location.href = getBasePath() + "index.html";
-        })
-        .catch((error) => {
-            console.error("Logout error:", error);
-            alert("Error al cerrar sesión: " + error.message);
+async function logout() {
+    try {
+        console.log("Cerrando sesión y limpiando datos...");
+        
+        // 1. Limpiar sessionStorage completamente
+        sessionStorage.clear();
+        
+        // 2. Limpiar localStorage si se usa para almacenar información de sesión
+        // Opcionalmente, podemos limpiar solo claves específicas relacionadas con la autenticación
+        const authKeys = ['firebase:authUser', 'firebase:token', 'userToken', 'refreshToken'];
+        authKeys.forEach(key => {
+            if (localStorage.getItem(key)) {
+                localStorage.removeItem(key);
+            }
         });
+        
+        // 3. Limpiar cookies relacionadas con la autenticación
+        document.cookie.split(';').forEach(cookie => {
+            const name = cookie.trim().split('=')[0];
+            if (name.includes('firebase') || name.includes('token') || name.includes('session')) {
+                document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+            }
+        });
+        
+        // 4. Limpiar variables globales relacionadas con el usuario
+        window.currentUser = null;
+        
+        // 5. Cerrar sesión en Firebase
+        if (window.firebaseService && typeof window.firebaseService.logout === 'function') {
+            await window.firebaseService.logout();
+        } else if (window.firebase && window.firebase.auth) {
+            // Fallback al método directo de Firebase si el servicio no está disponible
+            await window.firebase.auth().signOut();
+        }
+        
+        console.log("Sesión cerrada exitosamente");
+        
+        // 6. Redireccionar a la página de login
+        window.location.href = getBasePath() + "index.html";
+    } catch (error) {
+        console.error("Error al cerrar sesión:", error);
+        
+        // Forzar redirección incluso si hubo un error
+        window.location.href = getBasePath() + "index.html";
+    }
 }
+
+/**
+ * Verificar la autenticación del usuario y validar el token
+ * Función centralizada para proteger rutas y vistas
+ * @param {string} requiredRole - Rol requerido para acceder a la ruta (opcional)
+ * @returns {Promise<boolean>} - Promesa que se resuelve con true si el usuario está autenticado y tiene el rol requerido
+ */
+async function validateAuthToken(requiredRole = null) {
+    console.log(`Validando token de autenticación${requiredRole ? ` para rol: ${requiredRole}` : ''}`);
+    
+    try {
+        // Verificar que el servicio de Firebase esté disponible
+        if (!window.firebaseService) {
+            console.error('Servicio de Firebase no disponible');
+            redirectToLogin();
+            return false;
+        }
+        
+        // Verificar la validez del token
+        const isTokenValid = await window.firebaseService.verifyAuthToken();
+        
+        if (!isTokenValid) {
+            console.warn('Token de autenticación inválido o expirado');
+            // Limpiar datos de sesión
+            sessionStorage.clear();
+            redirectToLogin();
+            return false;
+        }
+        
+        // Si no se requiere un rol específico, solo verificar autenticación
+        if (!requiredRole) {
+            return true;
+        }
+        
+        // Normalizar el rol requerido
+        let normalizedRole = requiredRole;
+        if (requiredRole === 'admin') normalizedRole = USER_ROLES.ADMIN;
+        if (requiredRole === 'coordinator') normalizedRole = USER_ROLES.COORDINATOR;
+        
+        // Verificar si el usuario tiene el rol requerido
+        const hasRole = await window.firebaseService.verifyUserRole(normalizedRole);
+        
+        if (!hasRole) {
+            console.warn(`El usuario no tiene el rol requerido: ${normalizedRole}`);
+            
+            // Obtener el rol actual del usuario
+            const currentUser = getCurrentUser();
+            
+            // Redirigir según el rol del usuario
+            if (currentUser && currentUser.role) {
+                redirectBasedOnRole(currentUser.role);
+            } else {
+                redirectToLogin();
+            }
+            
+            return false;
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('Error al validar token de autenticación:', error);
+        redirectToLogin();
+        return false;
+    }
+}
+
+/**
+ * Proteger una ruta o vista verificando la autenticación y el rol
+ * Esta función debe llamarse al inicio de cada página protegida
+ * @param {string} requiredRole - Rol requerido para acceder a la ruta (opcional)
+ * @returns {Promise<void>}
+ */
+async function protectRoute(requiredRole = null) {
+    // Mostrar indicador de carga si está disponible
+    if (window.commonUtils && window.commonUtils.showLoading) {
+        window.commonUtils.showLoading();
+    }
+    
+    try {
+        const isValid = await validateAuthToken(requiredRole);
+        
+        if (!isValid) {
+            // La redirección ya se maneja en validateAuthToken
+            return;
+        }
+        
+        // Si llegamos aquí, la autenticación es válida
+        console.log('Autenticación válida, acceso permitido');
+        
+    } catch (error) {
+        console.error('Error al proteger ruta:', error);
+        redirectToLogin();
+    } finally {
+        // Ocultar indicador de carga si está disponible
+        if (window.commonUtils && window.commonUtils.hideLoading) {
+            window.commonUtils.hideLoading();
+        }
+    }
+}
+
+// Exportar las nuevas funciones
+window.validateAuthToken = validateAuthToken;
+window.protectRoute = protectRoute;
 
 // Check if user is already logged in when page loads
 document.addEventListener('DOMContentLoaded', () => {
-    // Ensure Firebase is initialized
-    if (window.initializeFirebase) {
-        window.initializeFirebase();
+    // Ensure Firebase service is available
+    if (!window.firebaseService) {
+        console.warn('Servicio de Firebase no disponible. Redirigiendo a login...');
+        redirectToLogin();
+        return;
     }
     
-    firebase.auth().onAuthStateChanged(async (user) => {
-        // Only handle auth state if we're on the login page
-        const isLoginPage = window.location.pathname.endsWith("index.html") || 
-                            window.location.pathname === "/";
-                           
-        if (isLoginPage && user) {
-            try {
-                // Get user data including role
-                const userDoc = await firebase.firestore().collection("users").doc(user.uid).get();
-                
-                if (userDoc.exists) {
-                    const userData = userDoc.data();
-                    
-                    // Save user data to session storage if not already there
-                    if (!sessionStorage.getItem("userRole")) {
-                        // Create a user object
-                        const userObject = {
-                            uid: user.uid,
-                            email: user.email,
-                            displayName: userData.name,
-                            role: userData.role,
-                            branch: userData.branch || "",
-                            department: userData.department || "",
-                            departmentId: userData.departmentId || ""
-                        };
-                        
-                        // Save as JSON string
-                        sessionStorage.setItem("user", JSON.stringify(userObject));
-                        
-                        // Also save individual properties
-                        sessionStorage.setItem("userId", user.uid);
-                        sessionStorage.setItem("userEmail", user.email);
-                        sessionStorage.setItem("userName", userData.name);
-                        sessionStorage.setItem("userRole", userData.role);
-                        sessionStorage.setItem("userBranch", userData.branch || "");
-                        sessionStorage.setItem("userDepartment", userData.department || "");
-                        sessionStorage.setItem("userDepartmentId", userData.departmentId || "");
-                        
-                        // Redirect to appropriate dashboard
-                        redirectBasedOnRole(userData.role);
-                    }
-                }
-            } catch (error) {
-                console.error("Error checking user role:", error);
-            }
+    // Check if we're on login page
+    const isLoginPage = window.location.pathname.includes('index.html') || 
+                        window.location.pathname === '/' || 
+                        window.location.pathname.endsWith('/');
+    
+    if (isLoginPage) {
+        // If we're on login page and user is already logged in, redirect to appropriate dashboard
+        const currentUser = getCurrentUserFromSession();
+        if (currentUser && currentUser.uid) {
+            redirectBasedOnRole(currentUser.role);
         }
-    });
+        
+        // Setup login form
+        const loginForm = document.getElementById('loginForm');
+        if (loginForm) {
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                
+                try {
+                    await loginUser(email, password);
+                } catch (error) {
+                    // Error is already handled in loginUser
+                    console.log("Error manejado en loginUser");
+                }
+            });
+        }
+    }
 });
 
-// Exportar constantes y funciones
-window.USER_ROLES = USER_ROLES;
+// Export functions for global use
 window.checkAuth = checkAuth;
 window.loginUser = loginUser;
 window.logout = logout;
+window.showError = showError;
 window.clearError = clearError;
+window.getCurrentUser = getCurrentUser;
+window.getCurrentUserRole = getCurrentUserRole;
