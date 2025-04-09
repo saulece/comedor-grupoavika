@@ -6,9 +6,7 @@ let selectedEmployeeIds = [];
 let employeeList = [];
 let currentUser = null;
 
-// Referencias a servicios y colecciones de Firebase
-// Acceder a los objetos globales sin redeclararlos
-const confirmationsCollection = window.confirmationsCollection;
+// No declaramos variables globales aquí, sino que accedemos a ellas cuando sea necesario
 
 // Current user information
 let currentDate = new Date();
@@ -488,13 +486,6 @@ function loadEmployees() {
         const db = firebase.firestore();
         const employeesRef = db.collection('employees');
         
-        if (!employeesRef) {
-            console.error('Error: No se pudo acceder a la colección de empleados');
-            showErrorMessage('Error al cargar empleados: No se pudo acceder a la base de datos');
-            showLoadingState(false);
-            return;
-        }
-        
         console.log('Intentando cargar empleados usando Firestore...');
         
         // Realizar la consulta
@@ -660,7 +651,7 @@ function loadExistingConfirmations(dateString) {
     }
     
     // Query existing confirmations for this date and department
-    confirmationsCollection
+    firebase.firestore().collection('confirmations')
         .where('date', '==', dateString)
         .where('departmentId', '==', currentUser.departmentId)
         .get()
@@ -773,7 +764,7 @@ async function saveConfirmation(event) {
         console.log(`Guardando confirmación para ${date} con ${selectedEmployeeIds.length} empleados`);
         
         // Check if we already have a confirmation for this date
-        const querySnapshot = await confirmationsCollection
+        const querySnapshot = await firebase.firestore().collection('confirmations')
             .where('date', '==', date)
             .where('departmentId', '==', currentUser.departmentId)
             .get();
@@ -796,7 +787,7 @@ async function saveConfirmation(event) {
         if (querySnapshot.empty) {
             // Create new confirmation
             confirmationData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-            const docRef = await confirmationsCollection.add(confirmationData);
+            const docRef = await firebase.firestore().collection('confirmations').add(confirmationData);
             confirmationId = docRef.id;
             showSuccessMessage('Confirmación guardada correctamente.');
         } else {

@@ -14,7 +14,7 @@ const firebaseConfig = {
 
 // Initialize Firebase only if it hasn't been initialized already
 if (typeof firebase !== 'undefined') {
-  if (!firebase.apps || !firebase.apps.length) {
+  if (!firebase.apps || firebase.apps.length === 0) {
     firebase.initializeApp(firebaseConfig);
     console.log("Firebase inicializado correctamente");
   } else {
@@ -34,13 +34,11 @@ try {
 }
 
 // Create references to collections
-let employeesCollection, menusCollection, confirmationsCollection;
-
 try {
   // Initialize collections
-  employeesCollection = db.collection('employees');
-  menusCollection = db.collection('menus');
-  confirmationsCollection = db.collection('confirmations');
+  const employeesCollection = db.collection('employees');
+  const menusCollection = db.collection('menus');
+  const confirmationsCollection = db.collection('confirmations');
   
   // Make collections available globally
   window.db = db;
