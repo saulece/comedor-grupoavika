@@ -34,7 +34,13 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Initialize the UI
     setupEventListeners();
+    setupPasswordValidation();
     loadCoordinators();
+    
+    // Proteger todos los formularios con CSRF
+    if (window.csrfProtection) {
+        window.csrfProtection.protectAllForms();
+    }
 });
 
 // Referencia al servicio centralizado de Firebase
@@ -46,54 +52,141 @@ function setupEventListeners() {
     const createCoordinatorForm = document.getElementById('create-coordinator-form');
     if (createCoordinatorForm) {
         createCoordinatorForm.addEventListener('submit', createCoordinatorHandler);
+        
+        // Configurar validación de formulario
+        if (window.formValidator) {
+            new window.formValidator.FormValidator(createCoordinatorForm, {
+                'coordinator-name': {
+                    required: true,
+                    pattern: 'NAME',
+                    minLength: 3,
+                    maxLength: 50,
+                    message: 'Ingresa un nombre válido (solo letras, espacios y algunos caracteres especiales)'
+                },
+                'coordinator-email': {
+                    required: true,
+                    pattern: 'EMAIL',
+                    message: 'Ingresa un correo electrónico válido'
+                },
+                'coordinator-password': {
+                    required: true,
+                    pattern: 'PASSWORD',
+                    minLength: 8,
+                    message: 'La contraseña debe tener al menos 8 caracteres, una mayúscula, una minúscula y un número'
+                },
+                'coordinator-branch': {
+                    required: true,
+                    message: 'Selecciona una sucursal'
+                }
+            });
+        }
     } else {
         // Si no encuentra el formulario por ID, intentar por otra vía
         const createBtn = document.querySelector('button[type="submit"]');
         if (createBtn) {
-            createBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                createCoordinatorByForm();
-            });
+            createBtn.addEventListener('click', createCoordinatorByForm);
         }
     }
     
-    // Buttons in modals
+    // Setup modal buttons
     setupModalButtons();
 }
 
-// Setup modal buttons
-function setupModalButtons() {
-    // Reset password form
-    const resetPasswordForm = document.getElementById('reset-password-form');
-    if (resetPasswordForm) {
-        resetPasswordForm.addEventListener('submit', resetPasswordHandler);
-    }
+// Setup password validation
+function setupPasswordValidation() {
+    // Validación en tiempo real para contraseñas
+    const passwordFields = document.querySelectorAll('.password-field');
     
-    // Delete confirmation button
-    const deleteUserBtn = document.getElementById('confirm-delete-user-btn');
-    if (deleteUserBtn) {
-        deleteUserBtn.addEventListener('click', deleteUserHandler);
-    }
-    
-    // Close modal buttons
-    document.querySelectorAll('.close-modal, .cancel-modal').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.modal').forEach(modal => {
-                modal.style.display = 'none';
-            });
+    passwordFields.forEach(field => {
+        const isResetField = field.id === 'new-password';
+        const reqPrefix = isResetField ? 'reset-' : '';
+        
+        field.addEventListener('input', () => {
+            const value = field.value;
+            
+            // Verificar longitud
+            const reqLength = document.getElementById(`${reqPrefix}req-length`);
+            if (reqLength) {
+                if (value.length >= 8) {
+                    reqLength.classList.add('met');
+                } else {
+                    reqLength.classList.remove('met');
+                }
+            }
+            
+            // Verificar mayúscula
+            const reqUppercase = document.getElementById(`${reqPrefix}req-uppercase`);
+            if (reqUppercase) {
+                if (/[A-Z]/.test(value)) {
+                    reqUppercase.classList.add('met');
+                } else {
+                    reqUppercase.classList.remove('met');
+                }
+            }
+            
+            // Verificar minúscula
+            const reqLowercase = document.getElementById(`${reqPrefix}req-lowercase`);
+            if (reqLowercase) {
+                if (/[a-z]/.test(value)) {
+                    reqLowercase.classList.add('met');
+                } else {
+                    reqLowercase.classList.remove('met');
+                }
+            }
+            
+            // Verificar número
+            const reqNumber = document.getElementById(`${reqPrefix}req-number`);
+            if (reqNumber) {
+                if (/\d/.test(value)) {
+                    reqNumber.classList.add('met');
+                } else {
+                    reqNumber.classList.remove('met');
+                }
+            }
         });
     });
 }
 
+// Setup modal buttons
+function setupModalButtons() {
+    // Close modal buttons
+    const closeButtons = document.querySelectorAll('.close-modal, .cancel-modal');
+    closeButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const modals = document.querySelectorAll('.modal');
+            modals.forEach(modal => {
+                modal.style.display = 'none';
+            });
+        });
+    });
+    
+    // Reset password form
+    const resetPasswordForm = document.getElementById('reset-password-form');
+    if (resetPasswordForm) {
+        resetPasswordForm.addEventListener('submit', resetPasswordHandler);
+        
+        // Configurar validación de formulario
+        if (window.formValidator) {
+            new window.formValidator.FormValidator(resetPasswordForm, {
+                'new-password': {
+                    required: true,
+                    pattern: 'PASSWORD',
+                    minLength: 8,
+                    message: 'La contraseña debe tener al menos 8 caracteres, una mayúscula, una minúscula y un número'
+                }
+            });
+        }
+    }
+}
+
 // Function to create coordinator by getting form data directly
 function createCoordinatorByForm() {
-    // Get form elements by their labels or placeholders
-    const nameInput = document.querySelector('input[placeholder*="nombre"], input[placeholder*="Nombre"]');
-    const emailInput = document.querySelector('input[type="email"], input[placeholder*="correo"], input[placeholder*="Correo"]');
-    const passwordInput = document.querySelector('input[type="password"], input[placeholder*="contraseña"], input[placeholder*="Contraseña"]');
-    const branchSelect = document.querySelector('select');
+    const nameInput = document.getElementById('coordinator-name');
+    const emailInput = document.getElementById('coordinator-email');
+    const passwordInput = document.getElementById('coordinator-password');
+    const branchInput = document.getElementById('coordinator-branch');
     
-    if (!nameInput || !emailInput || !passwordInput || !branchSelect) {
+    if (!nameInput || !emailInput || !passwordInput || !branchInput) {
         showErrorMessage('No se pudieron encontrar todos los campos del formulario');
         return;
     }
@@ -101,12 +194,7 @@ function createCoordinatorByForm() {
     const name = nameInput.value.trim();
     const email = emailInput.value.trim();
     const password = passwordInput.value;
-    const branch = branchSelect.value;
-    
-    if (!name || !email || !password || !branch) {
-        showErrorMessage('Por favor complete todos los campos');
-        return;
-    }
+    const branch = branchInput.value;
     
     createCoordinator(name, email, password, branch);
 }
@@ -114,47 +202,63 @@ function createCoordinatorByForm() {
 // Function to create a coordinator with the given data
 async function createCoordinator(name, email, password, branch) {
     try {
+        // Validar datos
+        if (!name || !email || !password || !branch) {
+            showErrorMessage('Por favor, complete todos los campos');
+            return;
+        }
+        
+        // Validar formato de correo electrónico
+        if (!window.formValidator.ValidationPatterns.EMAIL.test(email)) {
+            showErrorMessage('Por favor, ingresa un correo electrónico válido');
+            return;
+        }
+        
+        // Validar contraseña
+        if (!window.formValidator.ValidationPatterns.PASSWORD.test(password)) {
+            showErrorMessage('La contraseña debe tener al menos 8 caracteres, una mayúscula, una minúscula y un número');
+            return;
+        }
+        
+        // Mostrar estado de carga
         showLoadingState(true);
         
-        if (!firebaseService || !firebaseService.db) {
-            throw new Error('Firebase no está inicializado correctamente');
-        }
+        // Obtener token CSRF
+        const csrfToken = window.csrfProtection ? window.csrfProtection.getToken() : null;
         
-        // Check if email already exists
-        const emailCheck = await firebaseService.db.collection('users').where('email', '==', email).get();
-        if (!emailCheck.empty) {
-            throw new Error('El correo electrónico ya está registrado');
-        }
-        
-        // Create user in Firebase Auth
-        const userCredential = await firebaseService.auth.createUserWithEmailAndPassword(email, password);
-        const user = userCredential.user;
-        
-        // Add user to Firestore
-        await firebaseService.db.collection('users').doc(user.uid).set({
-            name: name,
-            email: email,
+        // Crear usuario en Firebase Auth y Firestore
+        const userData = {
+            name,
+            email,
+            password,
             role: 'coordinator',
-            branch: branch,
-            createdAt: firebaseService.firestore.FieldValue.serverTimestamp(),
-            createdBy: sessionStorage.getItem('userId')
-        });
+            branch,
+            departments: [branch],
+            createdAt: new Date().toISOString()
+        };
         
-        // Show success message
-        showSuccessMessage(`Coordinador ${name} creado correctamente`);
+        // Usar el servicio de Firebase para crear el usuario
+        const result = await firebaseService.createUser(userData, csrfToken);
         
-        // Reset form
-        document.querySelectorAll('input').forEach(input => {
-            if (input.type !== 'submit' && input.type !== 'button') {
-                input.value = '';
-            }
-        });
+        if (!result || !result.uid) {
+            throw new Error('No se pudo crear el usuario');
+        }
         
-        // Reload coordinators list
+        // Mostrar mensaje de éxito
+        showSuccessMessage(`Coordinador ${name} creado exitosamente`);
+        
+        // Limpiar formulario
+        const form = document.getElementById('create-coordinator-form');
+        if (form) {
+            form.reset();
+        }
+        
+        // Recargar lista de coordinadores
         loadCoordinators();
+        
     } catch (error) {
-        console.error('Error creating coordinator:', error);
-        showErrorMessage('Error al crear coordinador: ' + error.message);
+        console.error('Error al crear coordinador:', error);
+        showErrorMessage(error.message || 'Error al crear coordinador');
     } finally {
         showLoadingState(false);
     }
@@ -179,58 +283,72 @@ async function loadCoordinators() {
         showLoadingState(true);
         
         if (!firebaseService || !firebaseService.db) {
-            throw new Error('Firebase no está inicializado correctamente');
+            throw new Error('Servicio de Firebase no disponible');
         }
+        
+        // Obtener token CSRF
+        const csrfToken = window.csrfProtection ? window.csrfProtection.getToken() : null;
         
         // Get coordinators from Firestore
-        const snapshot = await firebaseService.db.collection('users')
-            .where('role', '==', 'coordinator')
-            .get();
+        const coordinators = await firebaseService.getCoordinators(csrfToken);
         
-        const tableBody = document.querySelector('tbody');
-        if (tableBody) {
-            if (snapshot.empty) {
-                tableBody.innerHTML = `
-                    <tr>
-                        <td colspan="5" class="text-center">No hay coordinadores registrados</td>
-                    </tr>
-                `;
-            } else {
-                let html = '';
-                snapshot.forEach(doc => {
-                    const user = doc.data();
-                    const createdAt = user.createdAt ? new Date(user.createdAt.seconds * 1000) : new Date();
-                    const formattedDate = createdAt.toLocaleDateString();
-                    
-                    html += `
-                        <tr data-id="${doc.id}">
-                            <td>${user.name}</td>
-                            <td>${user.email}</td>
-                            <td>${user.branch || '-'}</td>
-                            <td>${formattedDate}</td>
-                            <td class="actions">
-                                <button class="btn btn-sm btn-warning reset-password" data-id="${doc.id}" data-name="${user.name}">
-                                    <i class="fas fa-key"></i> Reiniciar
-                                </button>
-                                <button class="btn btn-sm btn-danger delete-user" data-id="${doc.id}" data-name="${user.name}">
-                                    <i class="fas fa-trash"></i> Eliminar
-                                </button>
-                            </td>
-                        </tr>
-                    `;
-                });
-                
-                tableBody.innerHTML = html;
-                
-                // Setup action buttons
-                setupActionButtons();
-            }
+        // Update table
+        const tableBody = document.getElementById('coordinators-table-body');
+        if (!tableBody) {
+            throw new Error('No se pudo encontrar la tabla de coordinadores');
         }
         
-        showLoadingState(false);
+        if (!coordinators || coordinators.length === 0) {
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="5" class="text-center">No hay coordinadores registrados</td>
+                </tr>
+            `;
+            return;
+        }
+        
+        // Sort coordinators by name
+        coordinators.sort((a, b) => {
+            const nameA = a.name || a.displayName || '';
+            const nameB = b.name || b.displayName || '';
+            return nameA.localeCompare(nameB);
+        });
+        
+        // Create table rows
+        let html = '';
+        coordinators.forEach(coordinator => {
+            const name = coordinator.name || coordinator.displayName || 'Sin nombre';
+            const email = coordinator.email || 'Sin correo';
+            const branch = coordinator.branch || coordinator.department || 'No asignada';
+            const createdAt = coordinator.createdAt ? new Date(coordinator.createdAt).toLocaleDateString() : 'Desconocida';
+            
+            html += `
+                <tr data-id="${coordinator.uid}">
+                    <td>${name}</td>
+                    <td>${email}</td>
+                    <td>${branch}</td>
+                    <td>${createdAt}</td>
+                    <td class="actions">
+                        <button class="btn btn-sm btn-warning reset-password-btn" data-id="${coordinator.uid}" data-name="${name}">
+                            <i class="fas fa-key"></i>
+                        </button>
+                        <button class="btn btn-sm btn-danger delete-user-btn" data-id="${coordinator.uid}" data-name="${name}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        tableBody.innerHTML = html;
+        
+        // Setup action buttons
+        setupActionButtons();
+        
     } catch (error) {
-        console.error('Error loading coordinators:', error);
-        showErrorMessage('Error al cargar los coordinadores: ' + error.message);
+        console.error('Error al cargar coordinadores:', error);
+        showErrorMessage(error.message || 'Error al cargar coordinadores');
+    } finally {
         showLoadingState(false);
     }
 }
@@ -238,12 +356,13 @@ async function loadCoordinators() {
 // Setup action buttons for each user row
 function setupActionButtons() {
     // Reset password buttons
-    document.querySelectorAll('.reset-password').forEach(button => {
-        button.addEventListener('click', e => {
-            const userId = e.currentTarget.getAttribute('data-id');
-            const userName = e.currentTarget.getAttribute('data-name');
+    const resetPasswordButtons = document.querySelectorAll('.reset-password-btn');
+    resetPasswordButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const userId = button.getAttribute('data-id');
+            const userName = button.getAttribute('data-name');
             
-            // Set modal elements
+            // Set user data in modal
             document.getElementById('reset-user-id').value = userId;
             document.getElementById('reset-user-name').textContent = userName;
             
@@ -253,16 +372,18 @@ function setupActionButtons() {
     });
     
     // Delete user buttons
-    document.querySelectorAll('.delete-user').forEach(button => {
-        button.addEventListener('click', e => {
-            const userId = e.currentTarget.getAttribute('data-id');
-            const userName = e.currentTarget.getAttribute('data-name');
+    const deleteUserButtons = document.querySelectorAll('.delete-user-btn');
+    deleteUserButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const userId = button.getAttribute('data-id');
+            const userName = button.getAttribute('data-name');
             
-            // Set modal elements
+            // Set user data in modal
             document.getElementById('delete-user-name').textContent = userName;
             
-            // Store ID in button for later use
-            document.getElementById('confirm-delete-user-btn').setAttribute('data-id', userId);
+            // Setup confirm button
+            const confirmButton = document.getElementById('confirm-delete-user-btn');
+            confirmButton.onclick = () => deleteUserHandler(userId);
             
             // Show modal
             document.getElementById('delete-user-modal').style.display = 'block';
@@ -272,66 +393,80 @@ function setupActionButtons() {
 
 // Reset password handler
 async function resetPasswordHandler(e) {
-    if (e) e.preventDefault();
+    e.preventDefault();
     
     try {
-        showLoadingState(true);
-        
-        // Get form values
+        // Get user id and new password
         const userId = document.getElementById('reset-user-id').value;
         const newPassword = document.getElementById('new-password').value;
         
-        // Validate password
-        if (newPassword.length < 8) {
-            throw new Error('La nueva contraseña debe tener al menos 8 caracteres');
+        if (!userId || !newPassword) {
+            throw new Error('Datos incompletos');
         }
         
-        // Reset password using Cloud Function (not implemented in client)
-        // This would typically be done through a Firebase Cloud Function
-        showSuccessMessage('Función no implementada: para resetear contraseñas se requiere una Cloud Function');
+        // Validar contraseña
+        if (!window.formValidator.ValidationPatterns.PASSWORD.test(newPassword)) {
+            showErrorMessage('La contraseña debe tener al menos 8 caracteres, una mayúscula, una minúscula y un número');
+            return;
+        }
         
-        // Close modal
+        // Show loading state
+        showLoadingState(true);
+        
+        // Obtener token CSRF
+        const csrfToken = window.csrfProtection ? window.csrfProtection.getToken() : null;
+        
+        // Reset password
+        await firebaseService.resetUserPassword(userId, newPassword, csrfToken);
+        
+        // Hide modal
         document.getElementById('reset-password-modal').style.display = 'none';
         
-        // Reset form
-        document.getElementById('reset-password-form').reset();
+        // Show success message
+        showSuccessMessage('Contraseña restablecida exitosamente');
+        
     } catch (error) {
-        console.error('Error resetting password:', error);
-        showErrorMessage('Error al reiniciar contraseña: ' + error.message);
+        console.error('Error al restablecer contraseña:', error);
+        
+        // Show error in modal
+        const errorElement = document.getElementById('reset-password-error');
+        if (errorElement) {
+            errorElement.textContent = error.message || 'Error al restablecer contraseña';
+            errorElement.style.display = 'block';
+        }
     } finally {
         showLoadingState(false);
     }
 }
 
 // Delete user handler
-async function deleteUserHandler() {
+async function deleteUserHandler(userId) {
     try {
-        showLoadingState(true);
-        
-        const userId = document.getElementById('confirm-delete-user-btn').getAttribute('data-id');
-        
         if (!userId) {
             throw new Error('ID de usuario no válido');
         }
         
-        if (!firebaseService || !firebaseService.db) {
-            throw new Error('Firebase no está inicializado correctamente');
-        }
+        // Show loading state
+        showLoadingState(true);
         
-        // Delete user from Firestore
-        await firebaseService.db.collection('users').doc(userId).delete();
+        // Obtener token CSRF
+        const csrfToken = window.csrfProtection ? window.csrfProtection.getToken() : null;
         
-        // Note: To fully delete from Authentication requires a Cloud Function
-        showSuccessMessage('Usuario eliminado de Firestore. La eliminación completa requiere una Cloud Function.');
+        // Delete user
+        await firebaseService.deleteUser(userId, csrfToken);
         
-        // Close modal
+        // Hide modal
         document.getElementById('delete-user-modal').style.display = 'none';
         
-        // Reload coordinators list
+        // Show success message
+        showSuccessMessage('Usuario eliminado exitosamente');
+        
+        // Reload coordinators
         loadCoordinators();
+        
     } catch (error) {
-        console.error('Error deleting user:', error);
-        showErrorMessage('Error al eliminar usuario: ' + error.message);
+        console.error('Error al eliminar usuario:', error);
+        showErrorMessage(error.message || 'Error al eliminar usuario');
     } finally {
         showLoadingState(false);
     }
@@ -341,45 +476,48 @@ async function deleteUserHandler() {
 function showLoadingState(isLoading) {
     const loadingIndicator = document.getElementById('loading-indicator');
     if (loadingIndicator) {
-        loadingIndicator.style.display = isLoading ? 'block' : 'none';
+        loadingIndicator.style.display = isLoading ? 'flex' : 'none';
     }
     
-    // Toggle button states
-    document.querySelectorAll('button').forEach(button => {
+    // Disable buttons while loading
+    const buttons = document.querySelectorAll('button');
+    buttons.forEach(button => {
         button.disabled = isLoading;
     });
 }
 
 // Show error message
 function showErrorMessage(message) {
-    const errorAlert = document.getElementById('error-alert');
-    if (errorAlert) {
-        errorAlert.textContent = message;
-        errorAlert.style.display = 'block';
+    // Try to show in specific error element
+    const errorElement = document.getElementById('create-coordinator-error');
+    if (errorElement) {
+        errorElement.textContent = message;
+        errorElement.style.display = 'block';
         
         // Hide after 5 seconds
         setTimeout(() => {
-            errorAlert.style.display = 'none';
+            errorElement.style.display = 'none';
         }, 5000);
     } else {
         // Fallback to alert
-        alert('Error: ' + message);
+        alert(message);
     }
 }
 
 // Show success message
 function showSuccessMessage(message) {
-    const successAlert = document.getElementById('success-alert');
-    if (successAlert) {
-        successAlert.textContent = message;
-        successAlert.style.display = 'block';
+    // Try to show in specific success element
+    const successElement = document.getElementById('create-coordinator-success');
+    if (successElement) {
+        successElement.textContent = message;
+        successElement.style.display = 'block';
         
         // Hide after 5 seconds
         setTimeout(() => {
-            successAlert.style.display = 'none';
+            successElement.style.display = 'none';
         }, 5000);
     } else {
         // Fallback to alert
-        alert('Éxito: ' + message);
+        alert(message);
     }
 }

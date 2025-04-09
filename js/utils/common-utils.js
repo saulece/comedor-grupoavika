@@ -205,48 +205,55 @@ const commonUtils = (function() {
      */
     const TextUtils = {
         /**
-         * Normaliza un texto eliminando acentos y caracteres especiales
+         * Normaliza un texto eliminando acentos y caracteres especiales.
+         * Función crítica para el manejo correcto de nombres de días con acentos.
+         * 
          * @param {string} text - Texto a normalizar
-         * @returns {string} - Texto normalizado
+         * @returns {string} - Texto normalizado en minúsculas, sin acentos y sin espacios al inicio/final
+         * @example
+         * // Retorna "miercoles"
+         * normalizeText("Miércoles");
          */
         normalizeText(text) {
             if (!text) return '';
             
-            // Convertir a minúsculas y normalizar
-            return text.toLowerCase()
-                .normalize('NFD')
-                .replace(/[\u0300-\u036f]/g, '') // Eliminar acentos
-                .replace(/[^\w\s]/g, '') // Eliminar caracteres especiales
+            return String(text).toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
                 .trim();
         },
         
         /**
-         * Normaliza la estructura de datos del menú para asegurar consistencia
+         * Normaliza la estructura de datos del menú para asegurar consistencia.
+         * Función crítica para el manejo correcto de menús con días acentuados.
+         * 
          * @param {Object} menuData - Datos del menú a normalizar
-         * @returns {Object} - Datos del menú normalizados
+         * @returns {Object} - Datos del menú normalizados con claves de días sin acentos
+         * @example
+         * // Convierte {"Miércoles": {items: ["Sopa"]}} a {"miercoles": {items: ["Sopa"]}}
+         * normalizeMenuData({"Miércoles": {items: ["Sopa"]}});
          */
         normalizeMenuData(menuData) {
             if (!menuData) return {};
             
             const normalizedData = {};
             
-            // Asegurar que cada día tenga un array de platos
-            for (const day of CONSTANTS.DAYS.slice(1, 6)) { // Lunes a Viernes
-                const normalizedDay = CONSTANTS.DAYS_NORMALIZED[day];
-                
-                // Si el día existe en los datos originales, copiar sus platos
-                if (menuData[normalizedDay] && Array.isArray(menuData[normalizedDay])) {
-                    normalizedData[normalizedDay] = [...menuData[normalizedDay]];
-                } 
-                // Si el día existe pero no es un array, convertirlo
-                else if (menuData[normalizedDay]) {
-                    normalizedData[normalizedDay] = [menuData[normalizedDay]];
-                } 
-                // Si el día no existe, crear un array vacío
-                else {
-                    normalizedData[normalizedDay] = [];
-                }
+            // Normalizar claves de días
+            for (const key in menuData) {
+                const normalizedKey = this.normalizeText(key).replace(/\s+/g, "");
+                normalizedData[normalizedKey] = menuData[key];
             }
+            
+            // Asegurar que todos los días tengan un array de items válido
+            const days = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
+            
+            days.forEach(day => {
+                if (!normalizedData[day]) {
+                    normalizedData[day] = { items: [] };
+                } else if (!normalizedData[day].items) {
+                    normalizedData[day].items = [];
+                }
+            });
             
             return normalizedData;
         }
@@ -258,27 +265,42 @@ const commonUtils = (function() {
     const DateUtils = {
         /**
          * Obtener el lunes de la semana actual o de una fecha específica
+         * 
          * @param {Date} date - Fecha (opcional, por defecto es la fecha actual)
          * @returns {Date} - Fecha del lunes de la semana
+         * @example
+         * // Retorna la fecha del lunes de la semana actual
+         * getMonday();
          */
         getMonday(date = new Date()) {
-            const d = new Date(date);
-            const day = d.getDay();
-            const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Ajustar cuando es domingo
+            if (!date || !(date instanceof Date)) {
+                return null;
+            }
             
-            d.setDate(diff);
-            d.setHours(0, 0, 0, 0);
-            
-            return d;
+            const day = date.getDay();
+            const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+            const monday = new Date(date);
+            monday.setDate(diff);
+            return monday;
         },
         
         /**
          * Formatear fecha como YYYY-MM-DD (formato para almacenamiento)
-         * @param {Date} date - Fecha a formatear
-         * @returns {string} - Fecha formateada
+         * 
+         * @param {Date|string} date - Fecha a formatear
+         * @returns {string} - Fecha formateada en formato YYYY-MM-DD
+         * @example
+         * // Retorna "2025-04-09"
+         * formatDate(new Date(2025, 3, 9));
          */
         formatDate(date) {
-            if (!date || !(date instanceof Date)) {
+            if (!date) return '';
+            
+            // Si ya es una cadena, verificar si tiene el formato correcto
+            if (typeof date === 'string') {
+                if (this.isValidDateString(date)) {
+                    return date;
+                }
                 return '';
             }
             
@@ -291,25 +313,44 @@ const commonUtils = (function() {
         
         /**
          * Formatear fecha como DD/MM/YYYY (formato para mostrar al usuario)
-         * @param {Date} date - Fecha a formatear
-         * @returns {string} - Fecha formateada
+         * 
+         * @param {Date|string} date - Fecha a formatear
+         * @returns {string} - Fecha formateada en formato DD/MM/YYYY
+         * @example
+         * // Retorna "09/04/2025"
+         * formatDateDisplay(new Date(2025, 3, 9));
+         * // También funciona con strings en formato YYYY-MM-DD
+         * formatDateDisplay("2025-04-09");
          */
         formatDateDisplay(date) {
-            if (!date || !(date instanceof Date)) {
-                return '';
+            if (!date) return '';
+            
+            if (typeof date === 'string') {
+                // Convertir de YYYY-MM-DD a DD/MM/YYYY
+                const parts = date.split('-');
+                if (parts.length === 3) {
+                    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+                }
+                return date;
             }
             
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
             const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
             
             return `${day}/${month}/${year}`;
         },
         
         /**
          * Verificar si una cadena es una fecha válida en formato YYYY-MM-DD
+         * 
          * @param {string} dateString - Cadena de fecha a validar
          * @returns {boolean} - true si es una fecha válida
+         * @example
+         * // Retorna true
+         * isValidDateString("2025-04-09");
+         * // Retorna false
+         * isValidDateString("2025/04/09");
          */
         isValidDateString(dateString) {
             if (!dateString || typeof dateString !== 'string') {
@@ -321,28 +362,32 @@ const commonUtils = (function() {
                 return false;
             }
             
-            // Extraer componentes
-            const [year, month, day] = dateString.split('-').map(Number);
+            // Verificar que sea una fecha válida
+            const parts = dateString.split('-');
+            const year = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10) - 1; // Los meses en JS son 0-11
+            const day = parseInt(parts[2], 10);
             
-            // Crear objeto Date y verificar si es válida
-            const date = new Date(year, month - 1, day);
+            const date = new Date(year, month, day);
             
-            // Verificar que los componentes coincidan (para detectar fechas como 2023-02-31)
-            return (
-                date.getFullYear() === year &&
-                date.getMonth() === month - 1 &&
-                date.getDate() === day
-            );
+            return date.getFullYear() === year &&
+                   date.getMonth() === month &&
+                   date.getDate() === day;
         },
         
         /**
          * Obtener el nombre del día de la semana
+         * 
          * @param {Date} date - Fecha
          * @returns {string} - Nombre del día (con acento si corresponde)
+         * @throws {Error} Si la fecha no es válida
+         * @example
+         * // Retorna "Miércoles" (si date es un miércoles)
+         * getDayOfWeek(new Date(2025, 3, 9));
          */
         getDayOfWeek(date) {
-            if (!date || !(date instanceof Date)) {
-                return '';
+            if (!date) {
+                throw new Error('Fecha no válida');
             }
             
             const dayIndex = date.getDay();
@@ -350,81 +395,77 @@ const commonUtils = (function() {
         },
         
         /**
-         * Normalizar nombre de día (quitar acentos y convertir a minúsculas)
+         * Normalizar nombre de día (quitar acentos y convertir a minúsculas).
+         * Función crítica para el manejo correcto de nombres de días con acentos.
+         * 
          * @param {string} day - Nombre del día
-         * @returns {string} - Nombre normalizado
+         * @returns {string} - Nombre normalizado sin acentos y en minúsculas
+         * @example
+         * // Retorna "miercoles"
+         * normalizeDayName("Miércoles");
+         * // También funciona con nombres ya normalizados
+         * normalizeDayName("miercoles");
          */
         normalizeDayName(day) {
-            if (!day || typeof day !== 'string') {
-                return '';
-            }
+            if (!day) return '';
             
-            // Primero verificar si es uno de los días con formato conocido
-            // Esto maneja directamente casos como "Miércoles" sin pasar por normalización general
-            const dayLower = day.toLowerCase().trim();
-            
-            // Verificar directamente en el mapeo inverso (con acentos a normalizados)
-            for (const [key, value] of Object.entries(CONSTANTS.DAYS_NORMALIZED)) {
-                if (key.toLowerCase() === dayLower) {
-                    return value;
-                }
-            }
-            
-            // Si no es un día conocido, aplicar normalización general
-            const normalizedDay = TextUtils.normalizeText(day);
-            
-            // Verificar si el resultado normalizado coincide con algún día conocido
-            if (Object.values(CONSTANTS.DAYS_NORMALIZED).includes(normalizedDay)) {
-                return normalizedDay;
-            }
-            
-            return normalizedDay;
+            // Usar la función de normalización de texto
+            return TextUtils.normalizeText(day).replace(/\s+/g, "");
         },
         
         /**
-         * Obtener nombre de día con formato correcto (con acento si corresponde)
+         * Obtener nombre de día con formato correcto (con acento si corresponde).
+         * Función crítica para mostrar correctamente los nombres de días con acentos.
+         * 
          * @param {string} day - Nombre del día (normalizado o no)
-         * @returns {string} - Nombre del día con formato correcto
+         * @returns {string} - Nombre del día con formato correcto y acentos
+         * @example
+         * // Retorna "Miércoles"
+         * formatDayName("miercoles");
+         * // También funciona con nombres ya formateados
+         * formatDayName("Miércoles");
          */
         formatDayName(day) {
-            if (!day || typeof day !== 'string') {
-                return '';
-            }
+            if (!day) return '';
             
-            // Primero verificar si ya es un día con formato correcto
-            const dayTrimmed = day.trim();
-            if (Object.keys(CONSTANTS.DAYS_NORMALIZED).includes(dayTrimmed)) {
-                return dayTrimmed; // Ya está en formato correcto
-            }
-            
-            // Normalizar para buscar en el mapeo
+            // Normalizar primero para asegurar consistencia
             const normalizedDay = this.normalizeDayName(day);
             
-            // Buscar en el mapeo de días
+            // Obtener el nombre formateado del mapeo
             return CONSTANTS.DAYS_MAPPING[normalizedDay] || day;
         },
         
         /**
-         * Comparar dos nombres de día para verificar si son iguales
+         * Comparar dos nombres de día para verificar si son iguales.
+         * Función crítica para comparar días con y sin acentos.
+         * 
          * @param {string} day1 - Primer nombre de día
          * @param {string} day2 - Segundo nombre de día
-         * @returns {boolean} - true si los días son iguales
+         * @returns {boolean} - true si los días son iguales (ignorando acentos y mayúsculas)
+         * @example
+         * // Retorna true
+         * areDaysEqual("Miércoles", "miercoles");
+         * // Retorna false
+         * areDaysEqual("Lunes", "Martes");
          */
         areDaysEqual(day1, day2) {
-            if (!day1 || !day2) {
-                return false;
-            }
+            if (!day1 || !day2) return false;
             
-            const normalizedDay1 = TextUtils.normalizeText(day1);
-            const normalizedDay2 = TextUtils.normalizeText(day2);
+            // Normalizar ambos nombres para comparar
+            const normalizedDay1 = this.normalizeDayName(day1);
+            const normalizedDay2 = this.normalizeDayName(day2);
             
             return normalizedDay1 === normalizedDay2;
         },
         
         /**
          * Obtener fecha a partir de una cadena en formato YYYY-MM-DD
+         * 
          * @param {string} dateString - Cadena de fecha
          * @returns {Date|null} - Objeto Date o null si no es válida
+         * @example
+         * // Retorna la fecha correspondiente
+         * parseDate("2025-04-09");
          */
         parseDate(dateString) {
             if (!this.isValidDateString(dateString)) {
@@ -437,8 +478,12 @@ const commonUtils = (function() {
         
         /**
          * Obtener el viernes de la semana actual o de una fecha específica
+         * 
          * @param {Date} date - Fecha (opcional, por defecto es la fecha actual)
          * @returns {Date} - Fecha del viernes de la semana
+         * @example
+         * // Retorna la fecha del viernes de la semana actual
+         * getFriday();
          */
         getFriday(date = new Date()) {
             const monday = this.getMonday(date);
@@ -449,8 +494,12 @@ const commonUtils = (function() {
         
         /**
          * Formatear rango de fechas (lunes a viernes) para mostrar
+         * 
          * @param {Date} startDate - Fecha de inicio (lunes)
          * @returns {Object} - Objeto con fechas formateadas
+         * @example
+         * // Retorna un objeto con fechas formateadas
+         * formatWeekRange(new Date(2025, 3, 7));
          */
         formatWeekRange(startDate) {
             const monday = startDate instanceof Date ? startDate : this.getMonday();
@@ -473,8 +522,12 @@ const commonUtils = (function() {
     const ValidationUtils = {
         /**
          * Validar dirección de correo electrónico
+         * 
          * @param {string} email - Correo electrónico a validar
          * @returns {boolean} - true si es válido
+         * @example
+         * // Retorna true
+         * isValidEmail("correo@example.com");
          */
         isValidEmail(email) {
             if (!email || typeof email !== 'string') {
@@ -488,8 +541,12 @@ const commonUtils = (function() {
         
         /**
          * Validar que un campo no esté vacío
+         * 
          * @param {string} value - Valor a validar
          * @returns {boolean} - true si no está vacío
+         * @example
+         * // Retorna true
+         * isNotEmpty("Hola");
          */
         isNotEmpty(value) {
             if (value === null || value === undefined) {
@@ -509,8 +566,12 @@ const commonUtils = (function() {
         
         /**
          * Validar que un valor sea numérico
+         * 
          * @param {any} value - Valor a validar
          * @returns {boolean} - true si es numérico
+         * @example
+         * // Retorna true
+         * isNumeric(123);
          */
         isNumeric(value) {
             if (value === null || value === undefined || value === '') {
@@ -531,10 +592,14 @@ const commonUtils = (function() {
         
         /**
          * Validar que un número esté dentro de un rango
+         * 
          * @param {number} value - Valor a validar
          * @param {number} min - Valor mínimo (inclusive)
          * @param {number} max - Valor máximo (inclusive)
          * @returns {boolean} - true si está dentro del rango
+         * @example
+         * // Retorna true
+         * isInRange(5, 1, 10);
          */
         isInRange(value, min, max) {
             if (!this.isNumeric(value)) {
@@ -547,10 +612,14 @@ const commonUtils = (function() {
         
         /**
          * Validar que una cadena tenga una longitud dentro de un rango
+         * 
          * @param {string} value - Cadena a validar
          * @param {number} minLength - Longitud mínima (inclusive)
          * @param {number} maxLength - Longitud máxima (inclusive)
          * @returns {boolean} - true si la longitud está dentro del rango
+         * @example
+         * // Retorna true
+         * hasValidLength("Hola", 3, 10);
          */
         hasValidLength(value, minLength, maxLength) {
             if (typeof value !== 'string') {
@@ -563,9 +632,18 @@ const commonUtils = (function() {
         
         /**
          * Validar un formulario completo
+         * 
          * @param {Object} formData - Datos del formulario
          * @param {Object} validationRules - Reglas de validación
          * @returns {Object} - Resultado de la validación con errores
+         * @example
+         * // Ejemplo de uso
+         * const formData = { name: "Juan", email: "juan@example.com" };
+         * const validationRules = {
+         *   name: { required: true, minLength: 3 },
+         *   email: { required: true, email: true }
+         * };
+         * const result = validateForm(formData, validationRules);
          */
         validateForm(formData, validationRules) {
             const errors = {};
@@ -647,10 +725,14 @@ const commonUtils = (function() {
     const DOMUtils = {
         /**
          * Crear un elemento con atributos y contenido
+         * 
          * @param {string} tag - Etiqueta HTML
          * @param {Object} attributes - Atributos del elemento
          * @param {string|Node|Array} content - Contenido (texto, nodo o array de nodos)
          * @returns {HTMLElement} - Elemento creado
+         * @example
+         * // Ejemplo de uso
+         * const element = createElement("div", { className: "container" }, "Hola");
          */
         createElement(tag, attributes = {}, content = null) {
             const element = document.createElement(tag);
@@ -697,7 +779,12 @@ const commonUtils = (function() {
         
         /**
          * Limpiar el contenido de un elemento
+         * 
          * @param {HTMLElement} element - Elemento a limpiar
+         * @example
+         * // Ejemplo de uso
+         * const element = document.getElementById("myElement");
+         * clearElement(element);
          */
         clearElement(element) {
             if (!element || !(element instanceof HTMLElement)) {
@@ -711,10 +798,17 @@ const commonUtils = (function() {
         
         /**
          * Añadir delegación de eventos a un contenedor
+         * 
          * @param {HTMLElement} container - Elemento contenedor
          * @param {string} eventType - Tipo de evento (click, change, etc.)
          * @param {string} selector - Selector CSS para filtrar elementos
          * @param {Function} handler - Función manejadora
+         * @example
+         * // Ejemplo de uso
+         * const container = document.getElementById("myContainer");
+         * addEventDelegate(container, "click", ".myButton", () => {
+         *   console.log("Botón clickeado");
+         * });
          */
         addEventDelegate(container, eventType, selector, handler) {
             if (!container || !(container instanceof HTMLElement)) {
@@ -735,8 +829,13 @@ const commonUtils = (function() {
         
         /**
          * Mostrar u ocultar un elemento
+         * 
          * @param {HTMLElement} element - Elemento a mostrar/ocultar
          * @param {boolean} show - true para mostrar, false para ocultar
+         * @example
+         * // Ejemplo de uso
+         * const element = document.getElementById("myElement");
+         * toggleElement(element, true);
          */
         toggleElement(element, show) {
             if (!element || !(element instanceof HTMLElement)) {
@@ -749,8 +848,12 @@ const commonUtils = (function() {
     
     /**
      * Función para manejar errores de manera consistente
+     * 
      * @param {Error} error - Objeto de error
      * @param {string} defaultMessage - Mensaje de error por defecto
+     * @example
+     * // Ejemplo de uso
+     * handleError(new Error("Error al cargar datos"), "Error al cargar datos");
      */
     function handleError(error, defaultMessage = 'Se produjo un error') {
         console.error(defaultMessage, error);

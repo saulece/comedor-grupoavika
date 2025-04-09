@@ -1,0 +1,126 @@
+/* Estilos para validación de formularios */
+
+/* Campo con error */
+.form-group input.error,
+.form-group select.error,
+.form-group textarea.error {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+}
+
+/* Mensaje de error */
+.field-error {
+    display: none;
+    color: #dc3545;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+}
+
+/* Icono de error */
+.form-group.has-error::after {
+    content: "⚠";
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #dc3545;
+    font-size: 1.2rem;
+}
+
+/* Campo válido */
+.form-group input.valid,
+.form-group select.valid,
+.form-group textarea.valid {
+    border-color: #28a745;
+    box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+}
+
+/* Icono de válido */
+.form-group.is-valid::after {
+    content: "✓";
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #28a745;
+    font-size: 1.2rem;
+}
+
+/* Estilo para el campo de CSRF token */
+input[name="csrf_token"] {
+    display: none;
+}
+
+/* Spinner de carga durante la validación */
+.form-group.is-validating::after {
+    content: "";
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid rgba(0, 0, 0, 0.2);
+    border-top-color: #007bff;
+    border-radius: 50%;
+    animation: spinner 0.6s linear infinite;
+}
+
+@keyframes spinner {
+    to {
+        transform: translateY(-50%) rotate(360deg);
+    }
+}
+
+/* Tooltip de ayuda para requisitos de contraseña */
+.password-requirements {
+    display: none;
+    position: absolute;
+    background-color: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 10px;
+    width: 250px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    z-index: 100;
+    font-size: 0.8rem;
+    margin-top: 5px;
+}
+
+.password-field:focus + .password-requirements {
+    display: block;
+}
+
+.requirement {
+    margin-bottom: 5px;
+    color: #6c757d;
+}
+
+.requirement.met {
+    color: #28a745;
+}
+
+.requirement.met::before {
+    content: "✓ ";
+}
+
+.requirement:not(.met)::before {
+    content: "○ ";
+}
+
+/* Estilos para formularios responsivos */
+@media (max-width: 768px) {
+    .password-requirements {
+        position: static;
+        width: 100%;
+        margin-top: 5px;
+        margin-bottom: 10px;
+    }
+    
+    .form-group.has-error::after,
+    .form-group.is-valid::after,
+    .form-group.is-validating::after {
+        top: 12px;
+        transform: none;
+    }
+}

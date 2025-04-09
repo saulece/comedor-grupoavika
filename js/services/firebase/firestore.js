@@ -7,6 +7,7 @@ const firebaseService = window.firebaseService;
  * Obtiene una referencia a una colección de Firestore
  * @param {string} name - Nombre de la colección
  * @returns {object} - Referencia a la colección
+ * @throws {Error} Si el servicio de Firebase no está inicializado
  */
 function getCollection(name) {
     if (!firebaseService) {
@@ -23,7 +24,8 @@ const menuService = {
     /**
      * Obtiene el menú para una semana específica
      * @param {string} weekStart - Fecha de inicio de la semana en formato YYYY-MM-DD
-     * @returns {Promise} - Promesa con el documento del menú
+     * @returns {Promise<Object>} - Promesa con el documento del menú
+     * @throws {Error} Si hay problemas al obtener los datos
      */
     getMenuForWeek: (weekStart) => {
         const collection = getCollection('menus');
@@ -35,7 +37,8 @@ const menuService = {
      * Guarda un menú para una semana específica
      * @param {string} weekStart - Fecha de inicio de la semana en formato YYYY-MM-DD
      * @param {object} data - Datos del menú a guardar
-     * @returns {Promise} - Promesa de la operación
+     * @returns {Promise<void>} - Promesa de la operación
+     * @throws {Error} Si hay problemas al guardar los datos
      */
     saveMenu: (weekStart, data) => {
         const collection = getCollection('menus');
@@ -45,8 +48,10 @@ const menuService = {
     
     /**
      * Publica un menú para una semana específica
+     * Cambia el estado del menú a "published"
      * @param {string} weekStart - Fecha de inicio de la semana en formato YYYY-MM-DD
-     * @returns {Promise} - Promesa de la operación
+     * @returns {Promise<void>} - Promesa de la operación
+     * @throws {Error} Si hay problemas al publicar el menú
      */
     publishMenu: (weekStart) => {
         const collection = getCollection('menus');
@@ -59,9 +64,14 @@ const menuService = {
     
     /**
      * Normaliza los datos del menú para asegurar consistencia
+     * Esta función es crítica para el manejo correcto de días con acentos como "Miércoles"
+     * 
      * @param {object} menuData - Datos del menú a normalizar
-     * @returns {object} - Datos del menú normalizados
+     * @returns {object} - Datos del menú normalizados con claves de días sin acentos
      * @deprecated Use commonUtils.TextUtils.normalizeMenuData instead
+     * @example
+     * // Convierte {"Miércoles": {items: ["Sopa"]}} a {"miercoles": {items: ["Sopa"]}}
+     * normalizeMenuData({"Miércoles": {items: ["Sopa"]}});
      */
     normalizeMenuData: (menuData) => {
         // Usar la función centralizada en commonUtils

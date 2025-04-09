@@ -159,9 +159,10 @@ function redirectBasedOnRole(role) {
  * Login user with email and password
  * @param {string} email - User email
  * @param {string} password - User password
+ * @param {string} csrfToken - CSRF token for security validation
  * @returns {Promise<object>} - User object if successful
  */
-async function loginUser(email, password) {
+async function loginUser(email, password, csrfToken) {
     try {
         // Asegurarnos de que el servicio de Firebase esté disponible
         if (!window.firebaseService) {
@@ -181,6 +182,13 @@ async function loginUser(email, password) {
         // Validate inputs
         if (!email || !password) {
             throw new Error("Por favor ingrese su correo y contraseña");
+        }
+        
+        // Validate CSRF token
+        if (!csrfToken) {
+            console.warn("Advertencia: Token CSRF no proporcionado");
+        } else if (window.csrfProtection && !window.csrfProtection.verify(csrfToken)) {
+            throw new Error("Error de seguridad: Token inválido. Por favor, recarga la página e intenta nuevamente.");
         }
         
         let userData;
@@ -204,6 +212,12 @@ async function loginUser(email, password) {
         if (userData.departmentId) {
             sessionStorage.setItem("userDepartmentId", userData.departmentId);
             sessionStorage.setItem("userDepartment", userData.department || "");
+        }
+        
+        // Regenerate CSRF token after successful login for enhanced security
+        if (window.csrfProtection) {
+            const newToken = window.csrfProtection.generateToken();
+            window.csrfProtection.storeToken(newToken);
         }
         
         console.log("Login exitoso:", userData);
@@ -484,9 +498,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 const email = document.getElementById('email').value;
                 const password = document.getElementById('password').value;
+                const csrfToken = document.getElementById('csrfToken').value;
                 
                 try {
-                    await loginUser(email, password);
+                    await loginUser(email, password, csrfToken);
                 } catch (error) {
                     // Error is already handled in loginUser
                     console.log("Error manejado en loginUser");

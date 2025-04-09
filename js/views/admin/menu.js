@@ -29,6 +29,11 @@ const MENU_STATUS = {
 
 /**
  * Inicializar la página de menú
+ * Configura el estado inicial, verifica servicios necesarios y carga datos del menú
+ * 
+ * @async
+ * @returns {Promise<void>}
+ * @throws {Error} Si los servicios necesarios no están disponibles o no hay usuario en sesión
  */
 async function initMenuPage() {
     try {
@@ -81,6 +86,11 @@ async function initMenuPage() {
 
 /**
  * Cargar datos del menú para la semana actual
+ * Obtiene el menú de la semana actual desde Firestore o crea uno nuevo si no existe
+ * 
+ * @async
+ * @returns {Promise<Object>} Datos del menú cargado
+ * @throws {Error} Si hay problemas al cargar los datos
  */
 async function loadMenuData() {
     try {
@@ -118,6 +128,9 @@ async function loadMenuData() {
 
 /**
  * Configurar escucha en tiempo real para el menú actual
+ * Establece un listener para detectar cambios en el menú de la semana actual
+ * 
+ * @returns {Function} Función para cancelar la escucha
  */
 function setupRealTimeListener() {
     try {
@@ -157,6 +170,7 @@ function setupRealTimeListener() {
 
 /**
  * Cancelar escuchas en tiempo real
+ * Limpia todas las escuchas activas para evitar fugas de memoria
  */
 function cancelRealTimeListeners() {
     const unsubscribeListeners = menuState.getValue('unsubscribeListeners');
@@ -174,8 +188,11 @@ function cancelRealTimeListeners() {
 
 /**
  * Crear un menú vacío
+ * Genera la estructura básica de un menú con todos los días de la semana
+ * incluyendo el día "miércoles" con acento
+ * 
  * @param {string} weekStr - Fecha de inicio de la semana en formato YYYY-MM-DD
- * @returns {Object} Menú vacío
+ * @returns {Object} Menú vacío con estructura completa
  */
 function createEmptyMenu(weekStr) {
     const currentUser = menuState.getValue('currentUser');
@@ -204,6 +221,7 @@ function createEmptyMenu(weekStr) {
 
 /**
  * Renderizar la interfaz del menú
+ * Actualiza toda la UI del menú, incluyendo los días con acentos como "miércoles"
  */
 function renderMenuUI() {
     const menuData = menuState.getValue('menuData');
@@ -226,6 +244,7 @@ function renderMenuUI() {
 
 /**
  * Actualizar título con fecha de la semana
+ * Muestra el rango de fechas de la semana actual
  */
 function updateWeekTitle() {
     const currentWeek = menuState.getValue('currentWeek');
@@ -243,6 +262,7 @@ function updateWeekTitle() {
 
 /**
  * Actualizar indicador de estado del menú
+ * Muestra visualmente el estado actual del menú (borrador, publicado, archivado)
  */
 function updateMenuStatus() {
     const menuData = menuState.getValue('menuData');
@@ -273,7 +293,10 @@ function updateMenuStatus() {
 
 /**
  * Renderizar menú de un día específico
- * @param {string} day - Día de la semana (lunes, martes, etc.)
+ * Genera la interfaz para un día del menú, manejando correctamente los nombres
+ * de días con acentos como "miércoles"
+ * 
+ * @param {string} day - Día de la semana (lunes, martes, miércoles, etc.)
  * @param {Object} dayData - Datos del menú para ese día
  * @param {boolean} isEditing - Si estamos en modo edición
  */
@@ -355,6 +378,7 @@ function renderDayMenu(day, dayData, isEditing) {
 
 /**
  * Actualizar botones de acción según estado
+ * Habilita o deshabilita botones según el estado actual del menú
  */
 function updateActionButtons() {
     const menuData = menuState.getValue('menuData');
@@ -409,7 +433,10 @@ function updateActionButtons() {
 
 /**
  * Agregar un nuevo platillo al menú
- * @param {string} day - Día de la semana
+ * Añade un platillo vacío al día especificado y actualiza la UI
+ * Maneja correctamente los días con acentos como "miércoles"
+ * 
+ * @param {string} day - Día de la semana (lunes, martes, miércoles, etc.)
  */
 function addMenuItem(day) {
     const menuData = menuState.getValue('menuData');
@@ -440,7 +467,10 @@ function addMenuItem(day) {
 
 /**
  * Actualizar un platillo existente
- * @param {string} day - Día de la semana
+ * Modifica el valor de un platillo en el día especificado
+ * Maneja correctamente los días con acentos como "miércoles"
+ * 
+ * @param {string} day - Día de la semana (lunes, martes, miércoles, etc.)
  * @param {number} index - Índice del platillo
  * @param {string} value - Nuevo valor
  */
@@ -462,7 +492,10 @@ function updateMenuItem(day, index, value) {
 
 /**
  * Eliminar un platillo del menú
- * @param {string} day - Día de la semana
+ * Quita un platillo del día especificado y actualiza la UI
+ * Maneja correctamente los días con acentos como "miércoles"
+ * 
+ * @param {string} day - Día de la semana (lunes, martes, miércoles, etc.)
  * @param {number} index - Índice del platillo
  */
 function removeMenuItem(day, index) {
@@ -485,6 +518,12 @@ function removeMenuItem(day, index) {
 
 /**
  * Guardar el menú actual
+ * Almacena los cambios del menú en Firestore
+ * Normaliza los datos para manejar correctamente los días con acentos
+ * 
+ * @async
+ * @returns {Promise<void>}
+ * @throws {Error} Si hay problemas al guardar los datos
  */
 async function saveMenu() {
     try {
@@ -524,6 +563,11 @@ async function saveMenu() {
 
 /**
  * Publicar el menú actual
+ * Cambia el estado del menú a publicado y lo guarda en Firestore
+ * 
+ * @async
+ * @returns {Promise<void>}
+ * @throws {Error} Si hay problemas al publicar el menú
  */
 async function publishMenu() {
     try {
@@ -565,6 +609,11 @@ async function publishMenu() {
 
 /**
  * Archivar el menú actual
+ * Cambia el estado del menú a archivado y lo guarda en Firestore
+ * 
+ * @async
+ * @returns {Promise<void>}
+ * @throws {Error} Si hay problemas al archivar el menú
  */
 async function archiveMenu() {
     try {
@@ -606,6 +655,11 @@ async function archiveMenu() {
 
 /**
  * Cambiar a la semana anterior
+ * Carga el menú de la semana anterior a la actual
+ * 
+ * @async
+ * @returns {Promise<void>}
+ * @throws {Error} Si hay problemas al cargar los datos
  */
 async function goToPreviousWeek() {
     try {
@@ -643,6 +697,11 @@ async function goToPreviousWeek() {
 
 /**
  * Cambiar a la semana siguiente
+ * Carga el menú de la semana siguiente a la actual
+ * 
+ * @async
+ * @returns {Promise<void>}
+ * @throws {Error} Si hay problemas al cargar los datos
  */
 async function goToNextWeek() {
     try {
@@ -680,6 +739,7 @@ async function goToNextWeek() {
 
 /**
  * Entrar en modo edición
+ * Activa el modo de edición del menú
  */
 function editMenu() {
     menuState.setValue('isEditing', true);
@@ -688,6 +748,10 @@ function editMenu() {
 
 /**
  * Cancelar edición
+ * Sale del modo de edición descartando los cambios no guardados
+ * 
+ * @async
+ * @returns {Promise<void>}
  */
 async function cancelEdit() {
     try {
@@ -717,6 +781,7 @@ async function cancelEdit() {
 
 /**
  * Configurar eventos de la página
+ * Establece los manejadores de eventos para los elementos de la interfaz
  */
 function setupEventListeners() {
     // Botón de editar
@@ -776,6 +841,8 @@ function setupEventListeners() {
 
 /**
  * Obtener el lunes de la semana actual
+ * Calcula la fecha del lunes de la semana que contiene la fecha proporcionada
+ * 
  * @param {Date} date - Fecha de referencia
  * @returns {Date} Fecha del lunes
  */
@@ -787,6 +854,8 @@ function getMonday(date) {
 
 /**
  * Formatear fecha para almacenamiento (YYYY-MM-DD)
+ * Convierte un objeto Date a formato de cadena para almacenamiento
+ * 
  * @param {Date} date - Fecha a formatear
  * @returns {string} Fecha formateada
  */
@@ -799,6 +868,8 @@ function formatDate(date) {
 
 /**
  * Formatear fecha para mostrar (DD/MM/YYYY)
+ * Convierte un objeto Date a formato de cadena para mostrar al usuario
+ * 
  * @param {Date} date - Fecha a formatear
  * @returns {string} Fecha formateada
  */
@@ -811,6 +882,8 @@ function formatDateDisplay(date) {
 
 /**
  * Generar ID único
+ * Crea un identificador único para nuevos elementos
+ * 
  * @returns {string} ID generado
  */
 function generateId() {
@@ -819,6 +892,8 @@ function generateId() {
 
 /**
  * Obtener usuario actual desde localStorage
+ * Recupera la información del usuario en sesión
+ * 
  * @returns {Object|null} Usuario actual o null
  */
 function getCurrentUser() {
