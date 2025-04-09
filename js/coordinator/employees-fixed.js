@@ -551,54 +551,87 @@ function downloadExcelTemplate() {
     showSuccessMessage('Plantilla descargada correctamente.');
 }
 
+// Validar formato del archivo Excel
+function validateExcelFormat(data) {
+    // Verificar que haya datos
+    if (!data || !Array.isArray(data) || data.length < 2) {
+        throw new Error('El archivo Excel está vacío o no tiene el formato correcto.');
+    }
+    
+    // Verificar que tenga encabezados
+    const headers = data[0];
+    if (!Array.isArray(headers) || headers.length < 2) {
+        throw new Error('El archivo Excel no tiene encabezados válidos.');
+    }
+    
+    // Verificar columnas requeridas
+    const nameIndex = headers.findIndex(header => header && header.toString().includes('Nombre'));
+    const statusIndex = headers.findIndex(header => header && header.toString().includes('Estado'));
+    
+    if (nameIndex === -1 || statusIndex === -1) {
+        throw new Error('El archivo Excel debe tener las columnas "Nombre Completo" y "Estado".');
+    }
+    
+    return { nameIndex, statusIndex, positionIndex: headers.findIndex(header => header && header.toString().includes('Puesto')) };
+}
+
 // Import employees from Excel file
 async function importEmployeesFromExcel(event) {
     event.preventDefault();
     
-    const fileInput = document.getElementById('import-file');
-    const file = fileInput.files[0];
-    
-    if (!file) {
-        showErrorMessage('Por favor selecciona un archivo Excel.');
+    try {
+        // Verificar que XLSX esté definido
+        if (typeof XLSX === 'undefined') {
+            showErrorMessage('La biblioteca XLSX no está cargada correctamente. Por favor, recarga la página.');
+            return;
+        }
+        
+        // Verificar que tengamos un usuario actual con departamento
+        if (!currentUser || !currentUser.departmentId) {
+            console.error('No se encontró información del usuario o departamento');
+            showErrorMessage('Error: No se pudo identificar su departamento. Por favor inicie sesión nuevamente.');
+            return;
+        }
+        
+        const fileInput = document.getElementById('import-file');
+        const file = fileInput.files[0];
+        
+        if (!file) {
+            showErrorMessage('Por favor selecciona un archivo Excel.');
+            return;
+        }
+        
+        // Check file extension
+        const fileExt = file.name.split('.').pop().toLowerCase();
+        if (fileExt !== 'xlsx' && fileExt !== 'xls') {
+            showErrorMessage('El archivo debe ser un documento Excel (.xlsx, .xls).');
+            return;
+        }
+        
+        console.log('Procesando archivo:', file.name, 'tamaño:', file.size, 'bytes');
+        
+        // Show loading state
+        showLoadingState(true);
+    } catch (error) {
+        console.error('Error en la validación inicial:', error);
+        showErrorMessage('Error: ' + error.message);
+        showLoadingState(false);
         return;
     }
-    
-    // Check file extension
-    const fileExt = file.name.split('.').pop().toLowerCase();
-    if (fileExt !== 'xlsx' && fileExt !== 'xls') {
-        showErrorMessage('El archivo debe ser un documento Excel (.xlsx, .xls).');
-        return;
-    }
-    
-    // Show loading state
-    showLoadingState(true);
     
     try {
         // Read the Excel file
         const excelData = await readExcelFile(file);
+        console.log('Datos leídos del Excel:', excelData);
         
-        // Validate Excel data
-        if (!excelData || excelData.length < 2) {
-            showErrorMessage('El archivo Excel está vacío o no tiene el formato correcto.');
-            showLoadingState(false);
-            return;
-        }
+        // Validar formato del Excel
+        const { nameIndex, positionIndex, statusIndex } = validateExcelFormat(excelData);
         
         // Get header row
         const headers = excelData[0];
-        
-        // Find column indexes - ahora solo necesitamos 3 columnas
-        const nameIndex = headers.findIndex(header => header.includes('Nombre'));
-        const positionIndex = headers.findIndex(header => header.includes('Puesto'));
-        const statusIndex = headers.findIndex(header => header.includes('Estado'));
-        
-        // Validate required columns
-        if (nameIndex === -1 || statusIndex === -1) {
-            showErrorMessage('El archivo Excel no tiene las columnas requeridas (Nombre, Estado).');
-            showLoadingState(false);
-            return;
-        }
-        
+        console.log('Encabezados encontrados:', headers);
+        console.log('Índices de columnas - Nombre:', nameIndex, 'Puesto:', positionIndex, 'Estado:', statusIndex);
+    
         // Process data rows
         const employees = [];
         const errors = [];
@@ -661,7 +694,20 @@ async function importEmployeesFromExcel(event) {
         
     } catch (error) {
         console.error('Error importing employees:', error);
-        showErrorMessage('Error al importar empleados. ' + error.message);
+        let errorMsg = 'Error al importar empleados. ';
+        
+        // Mensajes de error más específicos según el tipo de error
+        if (error.message.includes('XLSX')) {
+            errorMsg += 'Problema con la biblioteca de Excel. Intenta recargar la página.';
+        } else if (error.message.includes('columnas')) {
+            errorMsg += 'El formato del archivo no es correcto. Asegúrate de usar la plantilla proporcionada.';
+        } else if (error.message.includes('vacío')) {
+            errorMsg += 'El archivo parece estar vacío o dañado.';
+        } else {
+            errorMsg += error.message;
+        }
+        
+        showErrorMessage(errorMsg);
         showLoadingState(false);
     }
 }
@@ -673,26 +719,56 @@ function readExcelFile(file) {
         
         reader.onload = function(e) {
             try {
+                // Verificar que XLSX esté definido
+                if (typeof XLSX === 'undefined') {
+                    throw new Error('La biblioteca XLSX no está cargada correctamente. Por favor, recarga la página.');
+                }
+                
                 const data = e.target.result;
-                const workbook = XLSX.read(data, { type: 'binary' });
-                
-                // Get first sheet
-                const sheetName = workbook.SheetNames[0];
-                const worksheet = workbook.Sheets[sheetName];
-                
-                // Convert to array of arrays
-                const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-                resolve(jsonData);
+                // Usar try-catch específico para la lectura del Excel
+                try {
+                    const workbook = XLSX.read(data, { type: 'array' }); // Cambiado de 'binary' a 'array' para mayor compatibilidad
+                    
+                    // Verificar que el workbook tenga hojas
+                    if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+                        throw new Error('El archivo Excel no contiene hojas de cálculo.');
+                    }
+                    
+                    // Get first sheet
+                    const sheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[sheetName];
+                    
+                    // Verificar que la hoja tenga datos
+                    if (!worksheet) {
+                        throw new Error('La hoja de cálculo está vacía.');
+                    }
+                    
+                    // Convert to array of arrays con opciones más robustas
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+                        header: 1,
+                        defval: '',  // Valor por defecto para celdas vacías
+                        blankrows: false // Ignorar filas vacías
+                    });
+                    
+                    console.log('Datos Excel leídos correctamente:', jsonData.length, 'filas');
+                    resolve(jsonData);
+                } catch (xlsxError) {
+                    console.error('Error al procesar el archivo Excel:', xlsxError);
+                    reject(new Error('Error al procesar el archivo Excel: ' + xlsxError.message));
+                }
             } catch (error) {
+                console.error('Error general al leer el archivo:', error);
                 reject(error);
             }
         };
         
         reader.onerror = function(error) {
+            console.error('Error en FileReader:', error);
             reject(error);
         };
         
-        reader.readAsBinaryString(file);
+        // Cambiar el método de lectura para mayor compatibilidad
+        reader.readAsArrayBuffer(file);
     });
 }
 

@@ -78,6 +78,8 @@
                 <button class="menu-tab" data-day="miercoles">Miércoles</button>
                 <button class="menu-tab" data-day="jueves">Jueves</button>
                 <button class="menu-tab" data-day="viernes">Viernes</button>
+                <button class="menu-tab" data-day="sabado">Sábado</button>
+                <button class="menu-tab" data-day="domingo">Domingo</button>
             </div>
 
             <!-- Weekly Menu -->
@@ -96,6 +98,12 @@
                 </div>
                 <div id="viernes-menu" class="daily-menu">
                     <!-- Menu items for Friday will be loaded here -->
+                </div>
+                <div id="sabado-menu" class="daily-menu">
+                    <!-- Menu items for Saturday will be loaded here -->
+                </div>
+                <div id="domingo-menu" class="daily-menu">
+                    <!-- Menu items for Sunday will be loaded here -->
                 </div>
             </div>
 
@@ -121,7 +129,14 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
-    
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-storage.js"></script>
+
+    <!-- Utility Scripts -->
+    <script src="../../js/utils/logger.js"></script>
+    <script src="../../js/utils/date-utils.js"></script>
+    <script src="../../js/utils/error-handler.js"></script>
+    <script src="../../js/utils/excel-handler.js"></script>
+
     <!-- Custom Scripts -->
     <script src="../../js/firebase-config.js"></script>
     <script src="../../js/auth.js"></script>

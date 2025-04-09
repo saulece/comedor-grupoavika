@@ -278,8 +278,27 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     
+    <!-- Utility Scripts -->
+    <script src="../../js/utils/logger.js"></script>
+    <script src="../../js/utils/date-utils.js"></script>
+    <script src="../../js/utils/error-handler.js"></script>
+    <script src="../../js/utils/excel-handler.js"></script>
+    
     <!-- External Libraries -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" integrity="sha256-6FAM1IaNkRJbyE+JXRTA245QZkS9fvuaAQECxmuxjhY=" crossorigin="anonymous"></script>
+    <!-- Script para verificar la carga de XLSX -->
+    <script>
+        window.addEventListener('DOMContentLoaded', function() {
+            setTimeout(function() {
+                if (typeof XLSX === 'undefined') {
+                    window.logger?.error('Error: La biblioteca XLSX no se ha cargado correctamente');
+                    window.errorHandler?.showUIError('Error al cargar la biblioteca para procesar archivos Excel. Por favor, recarga la página.');
+                } else {
+                    window.logger?.info('Biblioteca XLSX cargada correctamente:', XLSX.version);
+                }
+            }, 1000);
+        });
+    </script>
     
     <!-- Custom Scripts -->
     <script src="../../js/firebase-config.js"></script>

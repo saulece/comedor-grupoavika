@@ -6,8 +6,9 @@
  * @param {string} defaultMessage - Mensaje predeterminado si no se puede determinar el tipo de error
  * @returns {string} - Mensaje de error amigable
  */
-function handleFirestoreError(error, defaultMessage = "Ocurriu00f3 un error. Por favor intente de nuevo.") {
-    console.error('Error de Firestore:', error);
+function handleFirestoreError(error, defaultMessage = "Ocurrió un error. Por favor intente de nuevo.") {
+    // Usar el nuevo sistema de logging si está disponible
+    window.logger?.error('Error de Firestore:', error);
     
     if (!error) return defaultMessage;
     
@@ -76,8 +77,8 @@ function showUIError(message, duration = 5000) {
             }, duration);
         }
     } else {
-        // Si no hay elemento de alerta, mostramos en la consola
-        console.error('UI Error:', message);
+        // Si no hay elemento de alerta, usar el sistema de logging
+        window.logger?.error('UI Error:', message);
         // Y opcionalmente podemos usar alert para asegurarnos de que el usuario lo vea
         // alert(message);
     }
@@ -101,8 +102,8 @@ function showUISuccess(message, duration = 5000) {
             }, duration);
         }
     } else {
-        // Si no hay elemento de alerta, mostramos en la consola
-        console.log('UI Success:', message);
+        // Si no hay elemento de alerta, usar el sistema de logging
+        window.logger?.info('UI Success:', message);
     }
 }
 
@@ -123,9 +124,42 @@ function toggleLoadingIndicator(isLoading) {
     });
 }
 
+/**
+ * Maneja errores específicos de Excel
+ * @param {Error} error - Error ocurrido durante operaciones con Excel
+ * @param {string} defaultMessage - Mensaje predeterminado
+ * @returns {string} - Mensaje de error amigable
+ */
+function handleExcelError(error, defaultMessage = "Error al procesar el archivo Excel.") {
+    // Usar el manejador de Excel si está disponible
+    if (window.excelHandler?.handleExcelError) {
+        return window.excelHandler.handleExcelError(error);
+    }
+    
+    // Implementación de respaldo
+    window.logger?.error('Error de Excel:', error);
+    
+    if (!error) return defaultMessage;
+    
+    if (error.message) {
+        if (error.message.includes('XLSX') || error.message.includes('biblioteca')) {
+            return 'Error con la biblioteca de Excel. Por favor, recargue la página e intente nuevamente.';
+        }
+        if (error.message.includes('formato') || error.message.includes('columnas')) {
+            return 'El formato del archivo no es correcto. Asegúrese de usar la plantilla proporcionada.';
+        }
+        if (error.message.includes('vacío') || error.message.includes('vacía')) {
+            return 'El archivo parece estar vacío o dañado.';
+        }
+    }
+    
+    return defaultMessage;
+}
+
 // Exportar funciones
 window.errorHandler = {
     handleFirestoreError,
+    handleExcelError,
     showUIError,
     showUISuccess,
     toggleLoadingIndicator

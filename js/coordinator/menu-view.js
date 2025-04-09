@@ -15,7 +15,8 @@ document.addEventListener('DOMContentLoaded', () => {
             userName = userObj.displayName || userName;
         }
     } catch (error) {
-        console.error('Error parsing user data:', error);
+        // Usar el nuevo sistema de logging
+        window.logger?.error('Error al procesar datos del usuario:', error);
     }
     
     const userNameElement = document.getElementById('user-name');
@@ -45,11 +46,14 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Current week settings
-let currentWeek = getMonday(new Date()); // Default to current week
+// Usar la utilidad de fecha del nuevo módulo si está disponible
+let currentWeek = (window.dateUtils?.getMonday || getMonday)(new Date()); // Default to current week
 
-// Days of the week in Spanish
-const DAYS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
-const DAYS_DISPLAY = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+// Usar los formatos de días del nuevo módulo de utilidades si está disponible
+const DAYS = window.dateUtils?.DATE_FORMATS?.COORDINATOR || 
+    ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
+const DAYS_DISPLAY = window.dateUtils?.DATE_FORMATS?.ADMIN || 
+    ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
 // Format day name nicely with proper accents and capitalization
 function formatDayDisplay(day) {
@@ -91,7 +95,7 @@ function updateWeekDisplay() {
     // Get the week start and end dates
     const weekStart = new Date(currentWeek);
     const weekEnd = new Date(currentWeek);
-    weekEnd.setDate(weekEnd.getDate() + 4); // Show Monday-Friday
+    weekEnd.setDate(weekEnd.getDate() + 6); // Show Monday-Sunday (toda la semana)
     
     // Format dates
     const formattedStart = formatDateDisplay(weekStart);
@@ -107,7 +111,10 @@ function loadMenuForWeek() {
     showLoadingState(true);
     
     // Format date for Firestore query
-    const weekStartStr = formatDate(currentWeek);
+    const weekStartStr = (window.dateUtils?.formatDate || formatDate)(currentWeek);
+    
+    // Usar el nuevo sistema de logging
+    window.logger?.info('Cargando menú para la semana que comienza el:', weekStartStr);
     
     // Get menu from Firestore
     window.db.collection('menus').doc(weekStartStr)
@@ -115,22 +122,49 @@ function loadMenuForWeek() {
         .then(doc => {
             if (doc.exists) {
                 const menuData = doc.data();
-                console.log('Menú encontrado para la semana:', menuData);
+                window.logger?.debug('Menú encontrado para la semana:', menuData);
                 
                 // Verificar si hay elementos en el menú para al menos un día
                 let hasMenuItems = false;
-                DAYS.forEach(day => {
-                    if (menuData[day] && menuData[day].items && menuData[day].items.length > 0) {
-                        hasMenuItems = true;
-                    }
+                
+                // Normalizar los datos del menú para asegurar compatibilidad entre formatos
+                normalizeMenuData(menuData);
+                
+                // Verificar si hay elementos en el menú después de la normalización
+                hasMenuItems = DAYS.some(day => {
+                    return menuData[day] && menuData[day].items && menuData[day].items.length > 0;
                 });
+                
+                window.logger?.debug('¿Hay elementos en el menú?', hasMenuItems);
                 
                 if (hasMenuItems) {
                     // Display menu for each day
-                    DAYS.forEach((day, index) => {
-                        const dayData = menuData[day];
-                        displayDayMenu(day, dayData, index === 0); // Set first day as active
+                    DAYS.forEach(day => {
+                        // Get menu container for this day
+                        const dayContainer = document.getElementById(`${day}-menu`);
+                        if (dayContainer) {
+                            // Verificar si tenemos datos para este día
+                            let dayData = menuData[day];
+                            
+                            // Si no hay datos en formato coordinador, intentar con formato administrador
+                            if (!dayData || !dayData.items || dayData.items.length === 0) {
+                                const adminDay = DAYS_DISPLAY[DAYS.indexOf(day)];
+                                if (menuData[adminDay] && menuData[adminDay].items && menuData[adminDay].items.length > 0) {
+                                    dayData = menuData[adminDay];
+                                    console.log(`Usando datos del formato administrador para ${day}`);
+                                }
+                            }
+                            
+                            // Display menu items for this day
+                            displayDayMenu(day, dayData, day === 'lunes');
+                        }
                     });
+                    
+                    // Make sure the active tab is shown
+                    const activeTab = document.querySelector('.menu-tab.active');
+                    if (activeTab) {
+                        switchMenuTab(activeTab.getAttribute('data-day'));
+                    }
                     
                     // Show menu container
                     const menuContainer = document.getElementById('weekly-menu');
@@ -144,7 +178,7 @@ function loadMenuForWeek() {
                         noMenuMessage.style.display = 'none';
                     }
                 } else {
-                    // Menú existe pero no tiene elementos
+                    // No menu items found for this week
                     showNoMenuMessage();
                 }
             } else {
@@ -251,13 +285,46 @@ function showNoMenuMessage() {
 
 // Get Monday of the current week
 function getMonday(date) {
+    // Usar la función del módulo de utilidades si está disponible
+    if (window.dateUtils?.getMonday) {
+        return window.dateUtils.getMonday(date);
+    }
+    
     const day = date.getDay();
-    const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Sunday
+    const diff = date.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is Sunday
     return new Date(date.setDate(diff));
+}
+
+/**
+ * Normaliza los datos del menú para asegurar compatibilidad entre formatos
+ * @param {Object} menuData - Datos del menú a normalizar
+ */
+function normalizeMenuData(menuData) {
+    if (!menuData) return;
+    
+    // Para cada día en formato administrador, copiar los datos al formato coordinador
+    DAYS_DISPLAY.forEach((adminDay, index) => {
+        const coordDay = DAYS[index];
+        
+        // Si existe en formato administrador pero no en coordinador
+        if (menuData[adminDay] && menuData[adminDay].items && 
+            (!menuData[coordDay] || !menuData[coordDay].items || menuData[coordDay].items.length === 0)) {
+            
+            // Copiar los datos al formato coordinador
+            if (!menuData[coordDay]) menuData[coordDay] = {};
+            menuData[coordDay].items = menuData[adminDay].items;
+            window.logger?.debug(`Normalizado: ${adminDay} → ${coordDay}`, menuData[coordDay]);
+        }
+    });
 }
 
 // Format date as YYYY-MM-DD
 function formatDate(date) {
+    // Usar la función del módulo de utilidades si está disponible
+    if (window.dateUtils?.formatDate) {
+        return window.dateUtils.formatDate(date);
+    }
+    
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
@@ -266,6 +333,11 @@ function formatDate(date) {
 
 // Format date for display (DD/MM/YYYY)
 function formatDateDisplay(date) {
+    // Usar la función del módulo de utilidades si está disponible
+    if (window.dateUtils?.formatDateDisplay) {
+        return window.dateUtils.formatDateDisplay(date);
+    }
+    
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = date.getFullYear();
@@ -287,6 +359,13 @@ function showLoadingState(isLoading) {
 
 // Show error message
 function showErrorMessage(message) {
+    // Usar el manejador de errores global si está disponible
+    if (window.errorHandler?.showUIError) {
+        window.errorHandler.showUIError(message);
+        return;
+    }
+    
+    // Implementación de respaldo
     const errorAlert = document.getElementById('error-alert');
     if (errorAlert) {
         errorAlert.textContent = message;
@@ -297,7 +376,8 @@ function showErrorMessage(message) {
             errorAlert.style.display = 'none';
         }, 5000);
     } else {
-        console.error(message);
+        // Usar el nuevo sistema de logging
+        window.logger?.error(message);
         alert("Error: " + message);
     }
 }
