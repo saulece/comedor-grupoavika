@@ -12,8 +12,30 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Current user information
-let currentUser = JSON.parse(sessionStorage.getItem('user'));
+let currentUser = null;
 let currentEmployees = []; // Store employees list for the coordinator
+
+// Obtener la información del usuario desde sessionStorage
+try {
+    const userId = sessionStorage.getItem('userId');
+    const userName = sessionStorage.getItem('userName');
+    const userEmail = sessionStorage.getItem('userEmail');
+    const departmentId = sessionStorage.getItem('userDepartment');
+    
+    if (userId) {
+        currentUser = {
+            uid: userId,
+            displayName: userName,
+            email: userEmail,
+            departmentId: departmentId
+        };
+        console.log('Usuario cargado correctamente:', currentUser);
+    } else {
+        console.error('No se encontró información del usuario en la sesión');
+    }
+} catch (error) {
+    console.error('Error al obtener la información del usuario:', error);
+}
 
 // Setup event listeners
 function setupEventListeners() {
@@ -71,8 +93,14 @@ function setupEventListeners() {
 
 // Load employees for the coordinator's department
 function loadEmployees() {
-    // Usar el nuevo mu00f3dulo para mostrar el estado de carga
-    window.errorHandler.toggleLoadingIndicator(true);
+    // Mostrar estado de carga
+    if (window.errorHandler && window.errorHandler.toggleLoadingIndicator) {
+        window.errorHandler.toggleLoadingIndicator(true);
+    } else {
+        // Fallback si el módulo de error no está disponible
+        const loadingIndicator = document.getElementById('loading-indicator');
+        if (loadingIndicator) loadingIndicator.style.display = 'flex';
+    }
     
     console.log('Cargando empleados...');
     console.log('Usuario actual:', currentUser);
@@ -80,17 +108,76 @@ function loadEmployees() {
     // Clear employees list
     currentEmployees = [];
     
-    // Verificar si tenemos la informaciu00f3n del usuario actual
+    // Verificar si tenemos la información del usuario actual
     if (!currentUser || !currentUser.departmentId) {
-        console.error('No se encontru00f3 informaciu00f3n del usuario o departamento');
-        window.errorHandler.showUIError("Error: No se pudo identificar su departamento. Por favor inicie sesiu00f3n nuevamente.");
-        window.errorHandler.toggleLoadingIndicator(false);
-        return;
+        console.error('No se encontró información del usuario o departamento');
+        
+        // Intentar obtener la información del usuario nuevamente desde sessionStorage
+        try {
+            const userId = sessionStorage.getItem('userId');
+            const userName = sessionStorage.getItem('userName');
+            const userEmail = sessionStorage.getItem('userEmail');
+            const departmentId = sessionStorage.getItem('userDepartment');
+            
+            if (userId && departmentId) {
+                currentUser = {
+                    uid: userId,
+                    displayName: userName,
+                    email: userEmail,
+                    departmentId: departmentId
+                };
+                console.log('Usuario recuperado de sessionStorage:', currentUser);
+            } else {
+                // Mostrar error y salir si no hay información de departamento
+                if (window.errorHandler && window.errorHandler.showUIError) {
+                    window.errorHandler.showUIError("Error: No se pudo identificar su departamento. Por favor inicie sesión nuevamente.");
+                } else {
+                    alert("Error: No se pudo identificar su departamento. Por favor inicie sesión nuevamente.");
+                }
+                
+                if (window.errorHandler && window.errorHandler.toggleLoadingIndicator) {
+                    window.errorHandler.toggleLoadingIndicator(false);
+                } else {
+                    const loadingIndicator = document.getElementById('loading-indicator');
+                    if (loadingIndicator) loadingIndicator.style.display = 'none';
+                }
+                return;
+            }
+        } catch (error) {
+            console.error('Error al recuperar información del usuario:', error);
+            if (window.errorHandler && window.errorHandler.showUIError) {
+                window.errorHandler.showUIError("Error al recuperar información del usuario. Por favor inicie sesión nuevamente.");
+            } else {
+                alert("Error al recuperar información del usuario. Por favor inicie sesión nuevamente.");
+            }
+            
+            if (window.errorHandler && window.errorHandler.toggleLoadingIndicator) {
+                window.errorHandler.toggleLoadingIndicator(false);
+            } else {
+                const loadingIndicator = document.getElementById('loading-indicator');
+                if (loadingIndicator) loadingIndicator.style.display = 'none';
+            }
+            return;
+        }
     }
     
     console.log('Buscando empleados para departamento:', currentUser.departmentId);
     
-    // Usar el nuevo servicio de Firestore para obtener empleados
+    // Verificar si el servicio de Firestore está disponible
+    if (!window.firestoreServices || !window.firestoreServices.employee || !window.firestoreServices.employee.getEmployeesByDepartment) {
+        console.error('El servicio de Firestore no está disponible');
+        
+        // Fallback: usar directamente Firestore si el servicio no está disponible
+        const db = window.db || firebase.firestore();
+        db.collection('employees')
+            .where('departmentId', '==', currentUser.departmentId)
+            .get()
+            .then(processEmployees)
+            .catch(handleEmployeeLoadError);
+        return;
+    }
+    
+    // Usar el servicio de Firestore para obtener empleados
     window.firestoreServices.employee.getEmployeesByDepartment(currentUser.departmentId)
         .then(querySnapshot => {
             console.log(`Se encontraron ${querySnapshot.size} empleados`);
@@ -531,27 +618,57 @@ function showImportModal() {
 
 // Download Excel template for employee import
 function downloadExcelTemplate() {
-    // Define the template structure con solo tres columnas
-    const templateData = [
-        ['Nombre Completo*', 'Puesto', 'Estado*'],
-        ['Juan Pérez López', 'Operador', 'active'],
-        ['María González Ruiz', 'Supervisor', 'active']
-    ];
-    
-    // Create a new workbook
-    const workbook = XLSX.utils.book_new();
-    const worksheet = XLSX.utils.aoa_to_sheet(templateData);
-    
-    // Add the worksheet to the workbook
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Empleados');
-    
-    // Generate Excel file and trigger download
-    XLSX.writeFile(workbook, 'plantilla_importacion_empleados.xlsx');
-    
-    showSuccessMessage('Plantilla descargada correctamente.');
+    try {
+        // Usar el módulo excel-handler si está disponible
+        if (window.excelHandler && window.excelHandler.generateEmployeeTemplate) {
+            const templateBlob = window.excelHandler.generateEmployeeTemplate();
+            const url = URL.createObjectURL(templateBlob);
+            
+            // Crear un enlace temporal para la descarga
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'plantilla_empleados.xlsx';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            window.logger?.info('Plantilla de empleados descargada');
+            return;
+        }
+        
+        // Fallback si el módulo no está disponible
+        if (typeof XLSX === 'undefined') {
+            throw new Error('La biblioteca XLSX no está cargada correctamente. Por favor, recarga la página.');
+        }
+        
+        // Crear una hoja de cálculo
+        const worksheet = XLSX.utils.aoa_to_sheet([
+            ['Nombre Completo', 'Puesto', 'Estado'],
+            ['Juan Pérez López', 'Operador', 'active'],
+            ['María González Ruiz', 'Supervisor', 'active']
+        ]);
+        
+        // Crear un libro de trabajo y añadir la hoja
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Empleados');
+        
+        // Generar el archivo
+        XLSX.writeFile(workbook, 'plantilla_empleados.xlsx');
+        window.logger?.info('Plantilla de empleados descargada (método fallback)');
+    } catch (error) {
+        window.logger?.error('Error al generar la plantilla', error);
+        
+        // Usar el módulo de manejo de errores si está disponible
+        if (window.errorHandler && window.errorHandler.showUIError) {
+            window.errorHandler.showUIError('Error al generar la plantilla: ' + error.message);
+        } else {
+            showErrorMessage('Error al generar la plantilla: ' + error.message);
+        }
+    }
 }
 
-// Validar formato del archivo Excel
+// Validar formato del archivo Excel - Función mantenida para compatibilidad
 function validateExcelFormat(data) {
     // Verificar que haya datos
     if (!data || !Array.isArray(data) || data.length < 2) {
@@ -580,139 +697,194 @@ async function importEmployeesFromExcel(event) {
     event.preventDefault();
     
     try {
-        // Verificar que XLSX esté definido
-        if (typeof XLSX === 'undefined') {
-            showErrorMessage('La biblioteca XLSX no está cargada correctamente. Por favor, recarga la página.');
-            return;
+        // Usar el módulo de manejo de errores para mostrar el indicador de carga
+        if (window.errorHandler && window.errorHandler.toggleLoadingIndicator) {
+            window.errorHandler.toggleLoadingIndicator(true);
+        } else {
+            showLoadingState(true);
         }
         
         // Verificar que tengamos un usuario actual con departamento
         if (!currentUser || !currentUser.departmentId) {
-            console.error('No se encontró información del usuario o departamento');
-            showErrorMessage('Error: No se pudo identificar su departamento. Por favor inicie sesión nuevamente.');
-            return;
+            window.logger?.error('No se encontró información del usuario o departamento');
+            throw new Error('No se pudo identificar su departamento. Por favor inicie sesión nuevamente.');
         }
         
         const fileInput = document.getElementById('import-file');
         const file = fileInput.files[0];
         
         if (!file) {
-            showErrorMessage('Por favor selecciona un archivo Excel.');
-            return;
+            throw new Error('Por favor selecciona un archivo Excel.');
+        }
+        
+        // Verificar que la biblioteca XLSX esté disponible usando el módulo excel-handler
+        if (window.excelHandler && !window.excelHandler.isXLSXAvailable()) {
+            throw new Error('La biblioteca XLSX no está disponible. Por favor, recarga la página.');
         }
         
         // Check file extension
         const fileExt = file.name.split('.').pop().toLowerCase();
         if (fileExt !== 'xlsx' && fileExt !== 'xls') {
-            showErrorMessage('El archivo debe ser un documento Excel (.xlsx, .xls).');
-            return;
+            throw new Error('El archivo debe ser un documento Excel (.xlsx, .xls).');
         }
         
-        console.log('Procesando archivo:', file.name, 'tamaño:', file.size, 'bytes');
+        window.logger?.info('Procesando archivo Excel', { 
+            nombre: file.name, 
+            tamaño: file.size 
+        });
         
-        // Show loading state
-        showLoadingState(true);
-    } catch (error) {
-        console.error('Error en la validación inicial:', error);
-        showErrorMessage('Error: ' + error.message);
-        showLoadingState(false);
-        return;
-    }
-    
-    try {
-        // Read the Excel file
-        const excelData = await readExcelFile(file);
-        console.log('Datos leídos del Excel:', excelData);
-        
-        // Validar formato del Excel
-        const { nameIndex, positionIndex, statusIndex } = validateExcelFormat(excelData);
-        
-        // Get header row
-        const headers = excelData[0];
-        console.log('Encabezados encontrados:', headers);
-        console.log('Índices de columnas - Nombre:', nameIndex, 'Puesto:', positionIndex, 'Estado:', statusIndex);
-    
-        // Process data rows
-        const employees = [];
-        const errors = [];
-        
-        for (let i = 1; i < excelData.length; i++) {
-            const row = excelData[i];
-            
-            // Skip empty rows
-            if (!row.length || !row[nameIndex]) {
-                continue;
-            }
-            
-            // Validate required fields
-            if (!row[nameIndex]) {
-                errors.push(`Fila ${i+1}: Falta el nombre del empleado.`);
-                continue;
-            }
-            
-            if (!row[statusIndex] || (row[statusIndex] !== 'active' && row[statusIndex] !== 'inactive')) {
-                errors.push(`Fila ${i+1}: El estado debe ser 'active' o 'inactive'.`);
-                continue;
-            }
-            
-            // Generar un correo electrónico único basado en el nombre y un timestamp
-            const timestamp = new Date().getTime();
-            const nameParts = row[nameIndex].toLowerCase().split(' ');
-            const firstName = nameParts[0];
-            const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
-            const email = `${firstName}.${lastName}${timestamp}@generado.com`;
-            
-            // Create employee object
-            const employee = {
-                name: row[nameIndex],
-                email: email, // Correo generado automáticamente
-                position: row[positionIndex] || '',
-                status: row[statusIndex],
-                departmentId: currentUser.departmentId
-            };
-            
-            employees.push(employee);
+        // Leer el archivo Excel usando el módulo excel-handler si está disponible
+        let excelData;
+        if (window.excelHandler && window.excelHandler.readExcelFile) {
+            excelData = await window.excelHandler.readExcelFile(file);
+        } else {
+            excelData = await readExcelFile(file); // Fallback a la función local
         }
         
-        // Show errors if any
+        window.logger?.debug('Datos leídos del Excel', { filas: excelData.length });
+        
+        // Validar formato del Excel y procesar los datos
+        const { employees, errors } = processExcelData(excelData);
+        
+        // Mostrar errores si los hay
         if (errors.length > 0) {
-            showErrorMessage(`Se encontraron ${errors.length} errores en el archivo. Por favor corrige los errores y vuelve a intentarlo.`);
-            console.error('Errores de importación:', errors);
-            showLoadingState(false);
-            return;
+            window.logger?.error('Errores de importación de empleados', { errores: errors });
+            throw new Error(`Se encontraron ${errors.length} errores en el archivo. Por favor corrige los errores y vuelve a intentarlo.`);
         }
         
-        // Save employees to Firestore
+        // Guardar empleados en Firestore
         await saveEmployeesToFirestore(employees);
         
-        // Close modal and show success message
+        // Cerrar modal y mostrar mensaje de éxito
         closeModal();
-        showSuccessMessage(`Se importaron ${employees.length} empleados correctamente.`);
         
-        // Reload employees list
+        // Mostrar mensaje de éxito usando el módulo error-handler si está disponible
+        if (window.errorHandler && window.errorHandler.showUISuccess) {
+            window.errorHandler.showUISuccess(`Se importaron ${employees.length} empleados correctamente.`);
+        } else {
+            showSuccessMessage(`Se importaron ${employees.length} empleados correctamente.`);
+        }
+        
+        // Recargar lista de empleados
         loadEmployees();
         
     } catch (error) {
-        console.error('Error importing employees:', error);
-        let errorMsg = 'Error al importar empleados. ';
+        window.logger?.error('Error al importar empleados', error);
         
-        // Mensajes de error más específicos según el tipo de error
-        if (error.message.includes('XLSX')) {
-            errorMsg += 'Problema con la biblioteca de Excel. Intenta recargar la página.';
-        } else if (error.message.includes('columnas')) {
-            errorMsg += 'El formato del archivo no es correcto. Asegúrate de usar la plantilla proporcionada.';
-        } else if (error.message.includes('vacío')) {
-            errorMsg += 'El archivo parece estar vacío o dañado.';
+        // Usar el módulo de manejo de errores para mostrar el error
+        let errorMessage;
+        if (window.errorHandler && window.errorHandler.handleExcelError) {
+            errorMessage = window.errorHandler.handleExcelError(error);
         } else {
-            errorMsg += error.message;
+            errorMessage = error.message || 'Error desconocido al importar empleados';
         }
         
-        showErrorMessage(errorMsg);
-        showLoadingState(false);
+        if (window.errorHandler && window.errorHandler.showUIError) {
+            window.errorHandler.showUIError(errorMessage);
+        } else {
+            showErrorMessage(errorMessage);
+        }
+    } finally {
+        // Ocultar indicador de carga
+        if (window.errorHandler && window.errorHandler.toggleLoadingIndicator) {
+            window.errorHandler.toggleLoadingIndicator(false);
+        } else {
+            showLoadingState(false);
+        }
     }
 }
 
-// Read Excel file and return data as array
+/**
+ * Procesa los datos del Excel y crea objetos de empleado
+ * @param {Array} excelData - Datos del Excel como array de arrays
+ * @returns {Object} - Objeto con arrays de empleados y errores
+ */
+function processExcelData(excelData) {
+    // Validar que haya datos
+    if (!excelData || !Array.isArray(excelData) || excelData.length < 2) {
+        throw new Error('El archivo Excel está vacío o no tiene el formato correcto.');
+    }
+    
+    // Obtener índices de columnas
+    const headers = excelData[0];
+    const nameIndex = headers.findIndex(header => header && header.toString().includes('Nombre'));
+    const positionIndex = headers.findIndex(header => header && header.toString().includes('Puesto'));
+    const statusIndex = headers.findIndex(header => header && header.toString().includes('Estado'));
+    
+    // Verificar columnas requeridas
+    if (nameIndex === -1 || statusIndex === -1) {
+        throw new Error('El archivo Excel debe tener las columnas "Nombre Completo" y "Estado".');
+    }
+    
+    window.logger?.debug('Índices de columnas encontrados', { 
+        nombre: nameIndex, 
+        puesto: positionIndex, 
+        estado: statusIndex 
+    });
+    
+    const employees = [];
+    const errors = [];
+    
+    // Procesar filas de datos (omitir la fila de encabezados)
+    for (let i = 1; i < excelData.length; i++) {
+        const row = excelData[i];
+        
+        // Omitir filas vacías
+        if (!row.length || !row[nameIndex]) {
+            continue;
+        }
+        
+        // Validar campos requeridos
+        if (!row[nameIndex]) {
+            errors.push(`Fila ${i+1}: Falta el nombre del empleado.`);
+            continue;
+        }
+        
+        if (!row[statusIndex] || (row[statusIndex] !== 'active' && row[statusIndex] !== 'inactive')) {
+            errors.push(`Fila ${i+1}: El estado debe ser 'active' o 'inactive'.`);
+            continue;
+        }
+        
+        // Generar correo electrónico único
+        const email = generateUniqueEmail(row[nameIndex]);
+        
+        // Crear objeto de empleado
+        const employee = {
+            name: row[nameIndex],
+            email: email,
+            position: positionIndex !== -1 ? (row[positionIndex] || '') : '',
+            status: row[statusIndex],
+            departmentId: currentUser.departmentId
+        };
+        
+        employees.push(employee);
+    }
+    
+    return { employees, errors };
+}
+
+/**
+ * Genera un correo electrónico único basado en el nombre
+ * @param {string} fullName - Nombre completo del empleado
+ * @returns {string} - Correo electrónico único
+ */
+function generateUniqueEmail(fullName) {
+    const timestamp = new Date().getTime().toString().slice(-6); // Usar solo los últimos 6 dígitos
+    
+    // Normalizar el nombre (quitar acentos y caracteres especiales)
+    const normalizedName = fullName.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    
+    const nameParts = normalizedName.toLowerCase().split(' ').filter(part => part.length > 0);
+    const firstName = nameParts[0];
+    const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
+    
+    // Usar solo la primera letra del apellido si es muy largo
+    const lastNamePart = lastName.length > 10 ? lastName.substring(0, 1) : lastName;
+    
+    return `${firstName}.${lastNamePart}${timestamp}@generado.com`;
+}
+
+// Read Excel file and return data as array - Función mantenida para compatibilidad
 function readExcelFile(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -750,20 +922,44 @@ function readExcelFile(file) {
                         blankrows: false // Ignorar filas vacías
                     });
                     
-                    console.log('Datos Excel leídos correctamente:', jsonData.length, 'filas');
+                    // Usar logger si está disponible
+                    if (window.logger) {
+                        window.logger.info('Datos Excel leídos correctamente', { filas: jsonData.length });
+                    } else {
+                        console.log('Datos Excel leídos correctamente:', jsonData.length, 'filas');
+                    }
+                    
                     resolve(jsonData);
                 } catch (xlsxError) {
-                    console.error('Error al procesar el archivo Excel:', xlsxError);
+                    // Usar logger si está disponible
+                    if (window.logger) {
+                        window.logger.error('Error al procesar el archivo Excel', xlsxError);
+                    } else {
+                        console.error('Error al procesar el archivo Excel:', xlsxError);
+                    }
+                    
                     reject(new Error('Error al procesar el archivo Excel: ' + xlsxError.message));
                 }
             } catch (error) {
-                console.error('Error general al leer el archivo:', error);
+                // Usar logger si está disponible
+                if (window.logger) {
+                    window.logger.error('Error general al leer el archivo', error);
+                } else {
+                    console.error('Error general al leer el archivo:', error);
+                }
+                
                 reject(error);
             }
         };
         
         reader.onerror = function(error) {
-            console.error('Error en FileReader:', error);
+            // Usar logger si está disponible
+            if (window.logger) {
+                window.logger.error('Error en FileReader', error);
+            } else {
+                console.error('Error en FileReader:', error);
+            }
+            
             reject(error);
         };
         
@@ -802,4 +998,65 @@ async function saveEmployeesToFirestore(employees) {
     
     // Commit the batch
     return batch.commit();
+}
+
+/**
+ * Procesa los resultados de la consulta de empleados cuando se usa el fallback directo a Firestore
+ * @param {QuerySnapshot} querySnapshot - Resultados de la consulta de Firestore
+ */
+function processEmployees(querySnapshot) {
+    console.log(`Se encontraron ${querySnapshot.size} empleados`);
+    
+    querySnapshot.forEach(doc => {
+        const employee = doc.data();
+        employee.id = doc.id;
+        currentEmployees.push(employee);
+        console.log('Empleado cargado:', employee.name);
+    });
+    
+    // Ordenar localmente por nombre
+    currentEmployees.sort((a, b) => {
+        return (a.name || '').localeCompare(b.name || '');
+    });
+    
+    // Display employees
+    displayEmployees(currentEmployees);
+    
+    // Ocultar estado de carga
+    if (window.errorHandler && window.errorHandler.toggleLoadingIndicator) {
+        window.errorHandler.toggleLoadingIndicator(false);
+    } else {
+        const loadingIndicator = document.getElementById('loading-indicator');
+        if (loadingIndicator) loadingIndicator.style.display = 'none';
+    }
+    
+    // Actualizar contador de empleados
+    updateEmployeeCount(currentEmployees.length);
+}
+
+/**
+ * Maneja errores al cargar empleados cuando se usa el fallback directo a Firestore
+ * @param {Error} error - Error ocurrido durante la carga
+ */
+function handleEmployeeLoadError(error) {
+    console.error('Error al cargar empleados:', error);
+    
+    // Mostrar mensaje de error
+    if (window.errorHandler && window.errorHandler.showUIError) {
+        window.errorHandler.showUIError(`Error al cargar empleados: ${error.message}`);
+    } else {
+        alert(`Error al cargar empleados: ${error.message}`);
+    }
+    
+    // Ocultar estado de carga
+    if (window.errorHandler && window.errorHandler.toggleLoadingIndicator) {
+        window.errorHandler.toggleLoadingIndicator(false);
+    } else {
+        const loadingIndicator = document.getElementById('loading-indicator');
+        if (loadingIndicator) loadingIndicator.style.display = 'none';
+    }
+    
+    // Mostrar lista vacía
+    displayEmployees([]);
+    updateEmployeeCount(0);
 }
