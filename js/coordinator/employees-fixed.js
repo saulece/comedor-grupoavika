@@ -20,7 +20,19 @@ try {
     const userId = sessionStorage.getItem('userId');
     const userName = sessionStorage.getItem('userName');
     const userEmail = sessionStorage.getItem('userEmail');
-    const departmentId = sessionStorage.getItem('userDepartment');
+    
+    // Intentar obtener el departamento de múltiples fuentes posibles
+    const departmentId = sessionStorage.getItem('userDepartmentId') || 
+                         sessionStorage.getItem('userDepartment') || 
+                         sessionStorage.getItem('departmentId');
+    
+    console.log('Datos de sesión:', {
+        userId,
+        userName,
+        userEmail,
+        departmentId,
+        allKeys: Object.keys(sessionStorage)
+    });
     
     if (userId) {
         currentUser = {
@@ -119,7 +131,7 @@ function loadEmployees() {
             const userEmail = sessionStorage.getItem('userEmail');
             const departmentId = sessionStorage.getItem('userDepartment');
             
-            if (userId && departmentId) {
+            if (userId) {
                 currentUser = {
                     uid: userId,
                     displayName: userName,
@@ -704,10 +716,28 @@ async function importEmployeesFromExcel(event) {
             showLoadingState(true);
         }
         
-        // Verificar que tengamos un usuario actual con departamento
+        // Intentar obtener el departamento de múltiples fuentes si no está en currentUser
         if (!currentUser || !currentUser.departmentId) {
-            window.logger?.error('No se encontró información del usuario o departamento');
-            throw new Error('No se pudo identificar su departamento. Por favor inicie sesión nuevamente.');
+            console.log('Intentando recuperar información del departamento...');
+            
+            // Intentar obtener el ID del departamento de varias fuentes posibles
+            const departmentId = sessionStorage.getItem('userDepartmentId') || 
+                                 sessionStorage.getItem('userDepartment') || 
+                                 sessionStorage.getItem('departmentId');
+            
+            if (departmentId) {
+                console.log('Departamento recuperado de sessionStorage:', departmentId);
+                if (!currentUser) {
+                    currentUser = {
+                        departmentId: departmentId
+                    };
+                } else {
+                    currentUser.departmentId = departmentId;
+                }
+            } else {
+                console.error('No se encontró información del departamento en ninguna fuente');
+                throw new Error('No se pudo identificar su departamento. Por favor inicie sesión nuevamente.');
+            }
         }
         
         const fileInput = document.getElementById('import-file');
@@ -854,7 +884,9 @@ function processExcelData(excelData) {
             email: email,
             position: positionIndex !== -1 ? (row[positionIndex] || '') : '',
             status: row[statusIndex],
-            departmentId: currentUser.departmentId
+            departmentId: currentUser.departmentId,
+            department: currentUser.department,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         
         employees.push(employee);
@@ -882,6 +914,117 @@ function generateUniqueEmail(fullName) {
     const lastNamePart = lastName.length > 10 ? lastName.substring(0, 1) : lastName;
     
     return `${firstName}.${lastNamePart}${timestamp}@generado.com`;
+}
+
+// Save employees to Firestore
+async function saveEmployeesToFirestore(employees) {
+    try {
+        console.log('Guardando empleados en Firestore con departamento:', currentUser.departmentId);
+        
+        // Verificar que tengamos un ID de departamento válido
+        if (!currentUser || !currentUser.departmentId) {
+            throw new Error('No se pudo identificar el departamento para guardar los empleados');
+        }
+        
+        // Get existing employees to check for duplicates
+        const existingEmployees = await window.firestoreServices.employee.getEmployeesByDepartment(currentUser.departmentId);
+        const existingEmails = {};
+        
+        existingEmployees.forEach(doc => {
+            const employee = doc.data();
+            existingEmails[employee.email] = doc.id;
+        });
+        
+        // Create batch for Firestore operations
+        const batch = window.db.batch();
+        
+        // Process each employee
+        for (const employee of employees) {
+            // Asegurarse de que cada empleado tenga la información del departamento
+            employee.departmentId = currentUser.departmentId;
+            employee.department = currentUser.department || sessionStorage.getItem('userDepartmentName');
+            employee.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+            
+            // Check if employee with this email already exists
+            if (existingEmails[employee.email]) {
+                // Update existing employee
+                const docRef = window.db.collection('employees').doc(existingEmails[employee.email]);
+                batch.update(docRef, employee);
+            } else {
+                // Add new employee
+                employee.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                const docRef = window.db.collection('employees').doc();
+                batch.set(docRef, employee);
+            }
+        }
+        
+        // Commit the batch
+        return batch.commit();
+    } catch (error) {
+        console.error('Error al guardar empleados en Firestore:', error);
+        throw error; // Re-lanzar el error para manejarlo en la función que llamó a esta
+    }
+}
+
+/**
+ * Procesa los resultados de la consulta de empleados cuando se usa el fallback directo a Firestore
+ * @param {QuerySnapshot} querySnapshot - Resultados de la consulta de Firestore
+ */
+function processEmployees(querySnapshot) {
+    console.log(`Se encontraron ${querySnapshot.size} empleados`);
+    
+    querySnapshot.forEach(doc => {
+        const employee = doc.data();
+        employee.id = doc.id;
+        currentEmployees.push(employee);
+        console.log('Empleado cargado:', employee.name);
+    });
+    
+    // Ordenar localmente por nombre
+    currentEmployees.sort((a, b) => {
+        return (a.name || '').localeCompare(b.name || '');
+    });
+    
+    // Display employees
+    displayEmployees(currentEmployees);
+    
+    // Ocultar estado de carga
+    if (window.errorHandler && window.errorHandler.toggleLoadingIndicator) {
+        window.errorHandler.toggleLoadingIndicator(false);
+    } else {
+        const loadingIndicator = document.getElementById('loading-indicator');
+        if (loadingIndicator) loadingIndicator.style.display = 'none';
+    }
+    
+    // Actualizar contador de empleados
+    updateEmployeeCount(currentEmployees.length);
+}
+
+/**
+ * Maneja errores al cargar empleados cuando se usa el fallback directo a Firestore
+ * @param {Error} error - Error ocurrido durante la carga
+ */
+function handleEmployeeLoadError(error) {
+    console.error('Error al cargar empleados:', error);
+    
+    // Mostrar mensaje de error
+    if (window.errorHandler && window.errorHandler.showUIError) {
+        window.errorHandler.showUIError(`Error al cargar empleados: ${error.message}`);
+    } else {
+        alert(`Error al cargar empleados: ${error.message}`);
+    }
+    
+    // Ocultar estado de carga
+    if (window.errorHandler && window.errorHandler.toggleLoadingIndicator) {
+        window.errorHandler.toggleLoadingIndicator(false);
+    } else {
+        const loadingIndicator = document.getElementById('loading-indicator');
+        if (loadingIndicator) loadingIndicator.style.display = 'none';
+    }
+    
+    // Mostrar lista vacía
+    displayEmployees([]);
+    updateEmployeeCount(0);
 }
 
 // Read Excel file and return data as array - Función mantenida para compatibilidad
@@ -998,65 +1141,4 @@ async function saveEmployeesToFirestore(employees) {
     
     // Commit the batch
     return batch.commit();
-}
-
-/**
- * Procesa los resultados de la consulta de empleados cuando se usa el fallback directo a Firestore
- * @param {QuerySnapshot} querySnapshot - Resultados de la consulta de Firestore
- */
-function processEmployees(querySnapshot) {
-    console.log(`Se encontraron ${querySnapshot.size} empleados`);
-    
-    querySnapshot.forEach(doc => {
-        const employee = doc.data();
-        employee.id = doc.id;
-        currentEmployees.push(employee);
-        console.log('Empleado cargado:', employee.name);
-    });
-    
-    // Ordenar localmente por nombre
-    currentEmployees.sort((a, b) => {
-        return (a.name || '').localeCompare(b.name || '');
-    });
-    
-    // Display employees
-    displayEmployees(currentEmployees);
-    
-    // Ocultar estado de carga
-    if (window.errorHandler && window.errorHandler.toggleLoadingIndicator) {
-        window.errorHandler.toggleLoadingIndicator(false);
-    } else {
-        const loadingIndicator = document.getElementById('loading-indicator');
-        if (loadingIndicator) loadingIndicator.style.display = 'none';
-    }
-    
-    // Actualizar contador de empleados
-    updateEmployeeCount(currentEmployees.length);
-}
-
-/**
- * Maneja errores al cargar empleados cuando se usa el fallback directo a Firestore
- * @param {Error} error - Error ocurrido durante la carga
- */
-function handleEmployeeLoadError(error) {
-    console.error('Error al cargar empleados:', error);
-    
-    // Mostrar mensaje de error
-    if (window.errorHandler && window.errorHandler.showUIError) {
-        window.errorHandler.showUIError(`Error al cargar empleados: ${error.message}`);
-    } else {
-        alert(`Error al cargar empleados: ${error.message}`);
-    }
-    
-    // Ocultar estado de carga
-    if (window.errorHandler && window.errorHandler.toggleLoadingIndicator) {
-        window.errorHandler.toggleLoadingIndicator(false);
-    } else {
-        const loadingIndicator = document.getElementById('loading-indicator');
-        if (loadingIndicator) loadingIndicator.style.display = 'none';
-    }
-    
-    // Mostrar lista vacía
-    displayEmployees([]);
-    updateEmployeeCount(0);
 }
