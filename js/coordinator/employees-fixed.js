@@ -58,6 +58,15 @@ function setupEventListeners() {
     closeModalButtons.forEach(button => {
         button.addEventListener('click', closeModal);
     });
+    
+    // Logout button
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            logout(); // Función definida en auth.js
+        });
+    }
 }
 
 // Load employees for the coordinator's department
@@ -522,11 +531,11 @@ function showImportModal() {
 
 // Download Excel template for employee import
 function downloadExcelTemplate() {
-    // Define the template structure
+    // Define the template structure con solo tres columnas
     const templateData = [
-        ['Nombre Completo*', 'Correo Electrónico*', 'Teléfono', 'Puesto', 'Estado*'],
-        ['Juan Pérez López', 'juan.perez@ejemplo.com', '5512345678', 'Operador', 'active'],
-        ['María González Ruiz', 'maria.gonzalez@ejemplo.com', '5587654321', 'Supervisor', 'active']
+        ['Nombre Completo*', 'Puesto', 'Estado*'],
+        ['Juan Pérez López', 'Operador', 'active'],
+        ['María González Ruiz', 'Supervisor', 'active']
     ];
     
     // Create a new workbook
@@ -566,49 +575,45 @@ async function importEmployeesFromExcel(event) {
     
     try {
         // Read the Excel file
-        const data = await readExcelFile(file);
+        const excelData = await readExcelFile(file);
         
-        if (!data || data.length <= 1) {
-            showErrorMessage('El archivo está vacío o no contiene datos válidos.');
+        // Validate Excel data
+        if (!excelData || excelData.length < 2) {
+            showErrorMessage('El archivo Excel está vacío o no tiene el formato correcto.');
             showLoadingState(false);
             return;
         }
         
-        // Validate headers
-        const headers = data[0];
-        const requiredHeaders = ['Nombre Completo*', 'Correo Electrónico*', 'Estado*'];
+        // Get header row
+        const headers = excelData[0];
         
-        for (const header of requiredHeaders) {
-            if (!headers.includes(header)) {
-                showErrorMessage(`El archivo no tiene el formato correcto. Falta la columna "${header}".`);
-                showLoadingState(false);
-                return;
-            }
+        // Find column indexes - ahora solo necesitamos 3 columnas
+        const nameIndex = headers.findIndex(header => header.includes('Nombre'));
+        const positionIndex = headers.findIndex(header => header.includes('Puesto'));
+        const statusIndex = headers.findIndex(header => header.includes('Estado'));
+        
+        // Validate required columns
+        if (nameIndex === -1 || statusIndex === -1) {
+            showErrorMessage('El archivo Excel no tiene las columnas requeridas (Nombre, Estado).');
+            showLoadingState(false);
+            return;
         }
         
-        // Process employees data (skip header row)
+        // Process data rows
         const employees = [];
         const errors = [];
         
-        for (let i = 1; i < data.length; i++) {
-            const row = data[i];
-            const nameIndex = headers.indexOf('Nombre Completo*');
-            const emailIndex = headers.indexOf('Correo Electrónico*');
-            const phoneIndex = headers.indexOf('Teléfono');
-            const positionIndex = headers.indexOf('Puesto');
-            const statusIndex = headers.indexOf('Estado*');
+        for (let i = 1; i < excelData.length; i++) {
+            const row = excelData[i];
             
             // Skip empty rows
-            if (!row[nameIndex] && !row[emailIndex]) continue;
+            if (!row.length || !row[nameIndex]) {
+                continue;
+            }
             
             // Validate required fields
             if (!row[nameIndex]) {
                 errors.push(`Fila ${i+1}: Falta el nombre del empleado.`);
-                continue;
-            }
-            
-            if (!row[emailIndex]) {
-                errors.push(`Fila ${i+1}: Falta el correo electrónico del empleado.`);
                 continue;
             }
             
@@ -617,11 +622,17 @@ async function importEmployeesFromExcel(event) {
                 continue;
             }
             
+            // Generar un correo electrónico único basado en el nombre y un timestamp
+            const timestamp = new Date().getTime();
+            const nameParts = row[nameIndex].toLowerCase().split(' ');
+            const firstName = nameParts[0];
+            const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
+            const email = `${firstName}.${lastName}${timestamp}@generado.com`;
+            
             // Create employee object
             const employee = {
                 name: row[nameIndex],
-                email: row[emailIndex],
-                phone: row[phoneIndex] || '',
+                email: email, // Correo generado automáticamente
                 position: row[positionIndex] || '',
                 status: row[statusIndex],
                 departmentId: currentUser.departmentId
