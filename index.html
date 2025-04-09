@@ -57,32 +57,77 @@
     <script src="js/firebase-config.js"></script>
     <script src="js/auth.js"></script>
     <script>
-        // Handle form submission
-        document.getElementById("loginForm").addEventListener("submit", async (e) => {
-            e.preventDefault();
+        // Inicializar Firebase y configurar manejadores de eventos después de que el DOM esté listo
+        document.addEventListener("DOMContentLoaded", () => {
+            // Inicializar Firebase si está disponible
+            if (window.initializeFirebase) {
+                window.initializeFirebase();
+            }
             
-            // Clear previous error message
-            clearError();
+            // Configurar el formulario de inicio de sesión
+            const loginForm = document.getElementById("loginForm");
+            if (loginForm) {
+                loginForm.addEventListener("submit", handleLogin);
+            }
             
-            const email = document.getElementById("email").value.trim();
-            const password = document.getElementById("password").value;
-            
-            try {
-                await loginUser(email, password);
-            } catch (error) {
-                // Error handling is done in loginUser
-                console.error("Login process error:", error);
+            // Configurar el botón de inicio de sesión
+            const loginButton = document.getElementById("loginButton");
+            if (loginButton) {
+                loginButton.addEventListener("click", function(e) {
+                    // Solo si no es parte de un envío de formulario
+                    if (e.target === this && !e.submitter) {
+                        // No prevenir el comportamiento predeterminado aquí, dejar que el controlador de envío del formulario lo maneje
+                    }
+                });
             }
         });
         
-        // Additional direct button handler for better responsiveness
-        document.getElementById("loginButton").addEventListener("click", function(e) {
-            // Only if not already part of form submission
-            if (e.target === this && !e.submitter) {
-                // Don't prevent default here, let the form submission handle it
-                // The form submit event handler above will take care of the auth process
+        // Manejar el inicio de sesión
+        async function handleLogin(e) {
+            e.preventDefault();
+            
+            // Limpiar mensaje de error anterior
+            if (window.clearError) {
+                clearError();
+            } else {
+                const errorElement = document.getElementById("loginError");
+                if (errorElement) {
+                    errorElement.textContent = "";
+                    errorElement.style.display = "none";
+                }
             }
-        });
-    </script>
+            
+            // Obtener valores del formulario
+            const email = document.getElementById("email").value.trim();
+            const password = document.getElementById("password").value;
+            
+            // Verificar que tenemos la función de login
+            if (!window.loginUser) {
+                showError("Error: La función de inicio de sesión no está disponible. Por favor, recarga la página.");
+                return;
+            }
+            
+            try {
+            // Intentar iniciar sesión
+            await loginUser(email, password);
+        } catch (error) {
+            // El manejo de errores se hace en loginUser
+            console.error("Error en el proceso de inicio de sesión:", error);
+        }
+    }
+    
+    // Función de respaldo para mostrar errores si clearError no está disponible
+    function showError(message) {
+        const errorElement = document.getElementById("loginError");
+        if (errorElement) {
+            errorElement.textContent = message;
+            errorElement.style.display = "block";
+        } else {
+            // Mostrar error en consola y alert como respaldo
+            console.error(message);
+            alert(message);
+        }
+    }
+</script>
 </body>
 </html>

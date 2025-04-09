@@ -5,10 +5,6 @@
 let selectedEmployeeIds = [];
 let employeeList = [];
 let currentUser = null;
-
-// No declaramos variables globales aquí, sino que accedemos a ellas cuando sea necesario
-
-// Current user information
 let currentDate = new Date();
 
 /**
@@ -17,8 +13,19 @@ let currentDate = new Date();
 document.addEventListener('DOMContentLoaded', () => {
     console.log("Inicializando módulo de confirmaciones...");
     
-    // Check if user has correct role - we don't redefine USER_ROLES here, use the global one
-    if (!checkAuth('coordinator')) {
+    // Asegurarnos de que Firebase esté inicializado
+    if (window.initializeFirebase) {
+        window.initializeFirebase();
+    }
+    
+    // Check if user has correct role
+    if (!window.checkAuth) {
+        console.error('La función de autenticación no está disponible');
+        alert('Error: La función de autenticación no está disponible. Por favor recargue la página.');
+        return;
+    }
+    
+    if (!checkAuth(window.USER_ROLES ? window.USER_ROLES.COORDINATOR : 'coordinator')) {
         console.error('Acceso no autorizado a confirmaciones de coordinador');
         return;
     }
@@ -47,7 +54,14 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (!userId || !departmentId) {
             console.error('Datos de sesión de usuario incompletos');
-            alert('Error: No se pudo identificar su departamento. Por favor inicie sesión nuevamente.');
+            
+            // Usar error handler si está disponible
+            if (window.errorHandler) {
+                window.errorHandler.showUIError('Error: No se pudo identificar su departamento. Por favor inicie sesión nuevamente.');
+            } else {
+                alert('Error: No se pudo identificar su departamento. Por favor inicie sesión nuevamente.');
+            }
+            
             // Redirigir al login después de 2 segundos
             setTimeout(() => {
                 window.location.href = '../../index.html';
@@ -74,10 +88,17 @@ document.addEventListener('DOMContentLoaded', () => {
         // Initialize the application
         setTimeout(() => {
             initializeApp();
-        }, 500); // Pequeño retraso para asegurar que Firebase esté listo
+        }, 100); // Pequeño retraso para asegurar que Firebase esté listo
     } catch (error) {
         console.error('Error al procesar datos del usuario:', error);
-        alert('Error al cargar los datos del usuario. Por favor inicie sesión nuevamente.');
+        
+        // Usar error handler si está disponible
+        if (window.errorHandler) {
+            window.errorHandler.showUIError('Error al cargar los datos del usuario. Por favor inicie sesión nuevamente.');
+        } else {
+            alert('Error al cargar los datos del usuario. Por favor inicie sesión nuevamente.');
+        }
+        
         setTimeout(() => {
             window.location.href = '../../index.html';
         }, 2000);
@@ -114,7 +135,9 @@ function initializeDatePicker() {
     }
     
     const today = new Date();
-    const formattedToday = formatDateInput(today);
+    const formattedToday = window.dateUtils && window.dateUtils.formatDate ? 
+        window.dateUtils.formatDate(today) : 
+        formatDateInput(today);
     
     // Verificar si Flatpickr está disponible
     if (typeof flatpickr !== 'function') {
@@ -134,7 +157,7 @@ function initializeDatePicker() {
         return;
     }
     
-    // Inicializar Flatpickr directamente
+    // Inicializar Flatpickr
     try {
         // Definir nombres de días con acentos correctos usando Unicode
         const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Mi\u00e9rcoles', 'Jueves', 'Viernes', 'S\u00e1bado'];
@@ -224,8 +247,12 @@ function setupEventListeners() {
     const logoutButton = document.getElementById('logout-btn');
     if (logoutButton) {
         logoutButton.addEventListener('click', () => {
-            sessionStorage.clear();
-            window.location.href = '../../index.html';
+            if (window.logout) {
+                logout();
+            } else {
+                sessionStorage.clear();
+                window.location.href = '../../index.html';
+            }
         });
     }
 }
@@ -276,14 +303,21 @@ function isValidDateString(dateString) {
 function showDayOfWeek(dateString) {
     if (!dateString || !isValidDateString(dateString)) return;
     
-    const date = new Date(dateString);
-    const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    // Usar dateUtils si está disponible
+    let dayName;
+    if (window.dateUtils && window.dateUtils.getDayOfWeek) {
+        const date = new Date(dateString);
+        dayName = window.dateUtils.getDayOfWeek(date);
+    } else {
+        const date = new Date(dateString);
+        const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
+        
+        // Day names with correct accents
+        const dayNames = ['Domingo', 'Lunes', 'Martes', 'Mi\u00e9rcoles', 'Jueves', 'Viernes', 'S\u00e1bado'];
+        dayName = dayNames[dayOfWeek];
+    }
     
-    // Day names with correct accents
-    const dayNames = ['Domingo', 'Lunes', 'Martes', 'Mi\u00e9rcoles', 'Jueves', 'Viernes', 'S\u00e1bado'];
-    const dayName = dayNames[dayOfWeek];
-    
-    console.log(`D\u00eda seleccionado: ${dayName} (\u00edndice: ${dayOfWeek})`);
+    console.log(`Día seleccionado: ${dayName}`);
     
     // Display the day name
     const dayDisplay = document.createElement('div');
@@ -461,85 +495,121 @@ function updateEmployeeCount() {
  */
 function loadEmployees() {
     console.log("Cargando empleados...");
-    showLoadingState(true);
+    
+    // Mostrar estado de carga
+    if (window.errorHandler) {
+        window.errorHandler.toggleLoadingIndicator(true);
+    } else {
+        showLoadingState(true);
+    }
     
     // Verificar que tenemos el departamento del coordinador
     if (!currentUser || !currentUser.departmentId) {
-        console.error('No se pudo determinar el departamento del coordinador');
-        showErrorMessage('Error al cargar empleados: No se pudo determinar su departamento');
-        showLoadingState(false);
+        const errorMsg = 'No se pudo determinar el departamento del coordinador';
+        console.error(errorMsg);
+        
+        if (window.errorHandler) {
+            window.errorHandler.showUIError(errorMsg);
+        } else {
+            showErrorMessage(errorMsg);
+        }
+        
+        if (window.errorHandler) {
+            window.errorHandler.toggleLoadingIndicator(false);
+        } else {
+            showLoadingState(false);
+        }
         return;
     }
     
     console.log('Cargando empleados para departamento:', currentUser.departmentId);
     
-    // Verificar que Firebase está disponible
-    if (typeof firebase === 'undefined' || !firebase.firestore) {
-        console.error('Firebase o Firestore no están disponibles');
-        showErrorMessage('Error al cargar empleados: No se pudo conectar a la base de datos');
-        showLoadingState(false);
+    // Intentar usar servicios de Firestore si están disponibles
+    if (window.firestoreServices && window.firestoreServices.employee) {
+        window.firestoreServices.employee.getEmployeesByDepartment(currentUser.departmentId)
+            .then(querySnapshot => {
+                processEmployeeQueryResults(querySnapshot);
+            })
+            .catch(error => {
+                handleEmployeeLoadError(error);
+            });
         return;
     }
     
-    try {
-        // Obtener la colección de empleados directamente de Firestore
-        const db = firebase.firestore();
-        const employeesRef = db.collection('employees');
+    // Fallback al método directo si los servicios no están disponibles
+    const db = window.db || firebase.firestore();
+    db.collection('employees')
+        .where('departmentId', '==', currentUser.departmentId)
+        .get()
+        .then(processEmployeeQueryResults)
+        .catch(handleEmployeeLoadError);
+}
+
+/**
+ * Process query results for employees
+ * @param {FirebaseFirestore.QuerySnapshot} querySnapshot - Query results
+ */
+function processEmployeeQueryResults(querySnapshot) {
+    console.log(`Se encontraron ${querySnapshot.size} empleados`);
+    
+    employeeList = [];
+    querySnapshot.forEach(doc => {
+        const employee = doc.data();
+        employee.id = doc.id;
         
-        console.log('Intentando cargar empleados usando Firestore...');
-        
-        // Realizar la consulta
-        employeesRef
-            .where('departmentId', '==', currentUser.departmentId)
-            .get()
-            .then(querySnapshot => {
-                console.log(`Se encontraron ${querySnapshot.size} empleados`);
-                
-                const employees = [];
-                querySnapshot.forEach(doc => {
-                    const employee = doc.data();
-                    employee.id = doc.id;
-                    
-                    // Solo incluir empleados activos o sin estado definido
-                    if (employee.status !== 'inactive') {
-                        employees.push(employee);
-                    }
-                });
-                
-                // Ordenar empleados por nombre
-                employees.sort((a, b) => {
-                    return (a.name || '').localeCompare(b.name || '');
-                });
-                
-                // Guardar para uso posterior
-                employeeList = employees;
-                
-                // Mostrar empleados en la UI
-                displayEmployees(employees);
-                
-                // Actualizar contador de empleados
-                const totalEmployeesCount = document.getElementById('total-employees-count');
-                if (totalEmployeesCount) {
-                    totalEmployeesCount.textContent = employees.length;
-                }
-                
-                console.log("Empleados cargados correctamente:", employees.length);
-                showLoadingState(false);
-                
-                // Verificar fecha inicial
-                const datePicker = document.getElementById('confirmation-date');
-                if (datePicker && datePicker.value) {
-                    loadExistingConfirmations(datePicker.value);
-                }
-            })
-            .catch(error => {
-                console.error("Error al cargar empleados:", error);
-                showErrorMessage("Error al cargar la lista de empleados. Por favor intente de nuevo.");
-                showLoadingState(false);
-            });
-    } catch (error) {
-        console.error("Error general al cargar empleados:", error);
-        showErrorMessage("Error general al cargar empleados. Por favor recargue la página.");
+        // Solo incluir empleados activos o sin estado definido
+        if (employee.status !== 'inactive' && employee.active !== false) {
+            employeeList.push(employee);
+        }
+    });
+    
+    // Ordenar empleados por nombre
+    employeeList.sort((a, b) => {
+        return (a.name || '').localeCompare(b.name || '');
+    });
+    
+    // Mostrar empleados en la UI
+    displayEmployees(employeeList);
+    
+    // Actualizar contador de empleados
+    const totalEmployeesCount = document.getElementById('total-employees-count');
+    if (totalEmployeesCount) {
+        totalEmployeesCount.textContent = employeeList.length;
+    }
+    
+    console.log("Empleados cargados correctamente:", employeeList.length);
+    
+    // Ocultar estado de carga
+    if (window.errorHandler) {
+        window.errorHandler.toggleLoadingIndicator(false);
+    } else {
+        showLoadingState(false);
+    }
+    
+    // Verificar fecha inicial
+    const datePicker = document.getElementById('confirmation-date');
+    if (datePicker && datePicker.value) {
+        loadExistingConfirmations(datePicker.value);
+    }
+}
+
+/**
+ * Handle error when loading employees
+ * @param {Error} error - Error object
+ */
+function handleEmployeeLoadError(error) {
+    console.error("Error al cargar empleados:", error);
+    
+    // Usar error handler si está disponible
+    if (window.errorHandler) {
+        const errorMsg = window.errorHandler.handleFirestoreError(
+            error, 
+            "Error al cargar la lista de empleados. Por favor intente de nuevo."
+        );
+        window.errorHandler.showUIError(errorMsg);
+        window.errorHandler.toggleLoadingIndicator(false);
+    } else {
+        showErrorMessage("Error al cargar la lista de empleados. Por favor intente de nuevo.");
         showLoadingState(false);
     }
 }
@@ -632,7 +702,13 @@ function loadExistingConfirmations(dateString) {
     }
     
     console.log("Cargando confirmaciones para", dateString);
-    showLoadingState(true);
+    
+    // Mostrar estado de carga
+    if (window.errorHandler) {
+        window.errorHandler.toggleLoadingIndicator(true);
+    } else {
+        showLoadingState(true);
+    }
     
     // Clear existing selected employees
     selectedEmployeeIds = [];
@@ -650,88 +726,136 @@ function loadExistingConfirmations(dateString) {
         estadoElement.textContent = 'Cargando...';
     }
     
-    // Query existing confirmations for this date and department
-    firebase.firestore().collection('confirmations')
+    // Intentar usar servicios de Firestore si están disponibles
+    if (window.firestoreServices && window.firestoreServices.confirmation) {
+        window.firestoreServices.confirmation.getConfirmationByDateAndDepartment(dateString, currentUser.departmentId)
+            .then(processConfirmationsQueryResults)
+            .catch(handleConfirmationsLoadError);
+        return;
+    }
+    
+    // Fallback al método directo si los servicios no están disponibles
+    const db = window.db || firebase.firestore();
+    db.collection('confirmations')
         .where('date', '==', dateString)
         .where('departmentId', '==', currentUser.departmentId)
         .get()
-        .then(snapshot => {
-            if (snapshot.empty) {
-                console.log('No hay confirmaciones para esta fecha');
-                
-                // Update status
-                if (statusElement) {
-                    statusElement.textContent = 'No enviado';
-                    statusElement.className = 'status-pending';
-                }
-                
-                // Update estado en la interfaz principal
-                if (estadoElement) {
-                    estadoElement.textContent = 'No enviado';
-                }
-                
-                // Clear comments field
-                const commentsField = document.getElementById('confirmation-comments');
-                if (commentsField) {
-                    commentsField.value = '';
-                }
-                
-                // Uncheck all checkboxes
-                selectAllEmployees(false);
-                
-                showInfoMessage('No hay confirmaciones registradas para esta fecha');
-                showLoadingState(false);
-                return;
-            }
-            
-            // Get the first confirmation (should be only one per date/department)
-            const confirmationDoc = snapshot.docs[0];
-            const confirmationData = confirmationDoc.data();
-            
-            console.log('Confirmación encontrada:', confirmationData);
-            
-            // Load comments if they exist
-            const commentsField = document.getElementById('confirmation-comments');
-            if (commentsField && confirmationData.comments) {
-                commentsField.value = confirmationData.comments;
-            }
-            
-            // Update status
-            if (statusElement) {
-                statusElement.textContent = 'Enviado';
-                statusElement.className = 'status-completed';
-            }
-            
-            // Update estado en la interfaz principal
-            if (estadoElement) {
-                estadoElement.textContent = 'Enviado';
-            }
-            
-            // Get selected employees array
-            if (confirmationData.employees && Array.isArray(confirmationData.employees)) {
-                selectedEmployeeIds = [...confirmationData.employees];
-                
-                // Update UI checkboxes based on saved data
-                const employeeCheckboxes = document.querySelectorAll('.employee-select');
-                employeeCheckboxes.forEach(checkbox => {
-                    const employeeId = checkbox.getAttribute('data-employee-id');
-                    checkbox.checked = selectedEmployeeIds.includes(employeeId);
-                });
-                
-                // Update UI
-                updateSelectAllCheckboxState();
-                updateEmployeeCount();
-                
-                showInfoMessage(`Se cargó la confirmación existente con ${selectedEmployeeIds.length} empleados`);
-            }
-            
+        .then(processConfirmationsQueryResults)
+        .catch(handleConfirmationsLoadError);
+}
+
+/**
+ * Process query results for confirmations
+ * @param {FirebaseFirestore.QuerySnapshot} snapshot - Query results
+ */
+function processConfirmationsQueryResults(snapshot) {
+    // Update status indicator
+    const statusElement = document.getElementById('confirmation-status');
+    const estadoElement = document.querySelector('.Estado + div');
+    
+    // Clear comments field
+    const commentsField = document.getElementById('confirmation-comments');
+    if (commentsField) {
+        commentsField.value = '';
+    }
+    
+    if (snapshot.empty) {
+        console.log('No hay confirmaciones para esta fecha');
+        
+        // Update status
+        if (statusElement) {
+            statusElement.textContent = 'No enviado';
+            statusElement.className = 'status-pending';
+        }
+        
+        // Update estado en la interfaz principal
+        if (estadoElement) {
+            estadoElement.textContent = 'No enviado';
+        }
+        
+        // Uncheck all checkboxes
+        selectAllEmployees(false);
+        
+        if (window.errorHandler) {
+            window.errorHandler.toggleLoadingIndicator(false);
+        } else {
             showLoadingState(false);
-        })
-        .catch(error => {
-            console.error('Error al cargar confirmaciones existentes:', error);
-            showErrorMessage('Error al cargar confirmaciones existentes');
-            showLoadingState(false);
+            showInfoMessage('No hay confirmaciones registradas para esta fecha');
+        }
+        return;
+    }
+    
+    // Get the first confirmation (should be only one per date/department)
+    const confirmationDoc = snapshot.docs[0];
+    const confirmationData = confirmationDoc.data();
+    
+    console.log('Confirmación encontrada:', confirmationData);
+    
+    // Load comments if they exist
+    if (commentsField && confirmationData.comments) {
+        commentsField.value = confirmationData.comments;
+    }
+    
+    // Update status
+    if (statusElement) {
+        statusElement.textContent = 'Enviado';
+        statusElement.className = 'status-completed';
+    }
+    
+    // Update estado en la interfaz principal
+    if (estadoElement) {
+        estadoElement.textContent = 'Enviado';
+    }
+    
+    // Get selected employees array
+    if (confirmationData.employees && Array.isArray(confirmationData.employees)) {
+        selectedEmployeeIds = [...confirmationData.employees];
+        
+        // Update UI checkboxes based on saved data
+        const employeeCheckboxes = document.querySelectorAll('.employee-select');
+        employeeCheckboxes.forEach(checkbox => {
+            const employeeId = checkbox.getAttribute('data-employee-id');
+            checkbox.checked = selectedEmployeeIds.includes(employeeId);
         });
+        
+        // Update UI
+        updateSelectAllCheckboxState();
+        updateEmployeeCount();
+        
+        if (window.errorHandler) {
+            window.errorHandler.toggleLoadingIndicator(false);
+        } else {
+            showLoadingState(false);
+            showInfoMessage(`Se cargó la confirmación existente con ${selectedEmployeeIds.length} empleados`);
+        }
+    } else {
+        if (window.errorHandler) {
+            window.errorHandler.toggleLoadingIndicator(false);
+        } else {
+            showLoadingState(false);
+        }
+    }
+}
+
+/**
+ * Handle error when loading confirmations
+ * @param {Error} error - Error object
+ */
+function handleConfirmationsLoadError(error) {
+    console.error('Error al cargar confirmaciones existentes:', error);
+    
+    // Usar error handler si está disponible
+    if (window.errorHandler) {
+        const errorMsg = window.errorHandler.handleFirestoreError(
+            error, 
+            "Error al cargar confirmaciones existentes."
+        );
+        window.errorHandler.showUIError(errorMsg);
+        window.errorHandler.toggleLoadingIndicator(false);
+    } else {
+        showErrorMessage('Error al cargar confirmaciones existentes');
+        showLoadingState(false);
+    }
 }
 
 /**
@@ -749,7 +873,11 @@ async function saveConfirmation(event) {
     }
     
     // Show loading state
-    showLoadingState(true);
+    if (window.errorHandler) {
+        window.errorHandler.toggleLoadingIndicator(true);
+    } else {
+        showLoadingState(true);
+    }
     
     try {
         // Get form values
@@ -763,13 +891,7 @@ async function saveConfirmation(event) {
         
         console.log(`Guardando confirmación para ${date} con ${selectedEmployeeIds.length} empleados`);
         
-        // Check if we already have a confirmation for this date
-        const querySnapshot = await firebase.firestore().collection('confirmations')
-            .where('date', '==', date)
-            .where('departmentId', '==', currentUser.departmentId)
-            .get();
-        
-        // Prepare confirmation data
+        // Preparar datos de la confirmación
         const confirmationData = {
             date: date,
             departmentId: currentUser.departmentId,
@@ -784,18 +906,39 @@ async function saveConfirmation(event) {
         
         let confirmationId;
         
-        if (querySnapshot.empty) {
-            // Create new confirmation
-            confirmationData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-            const docRef = await firebase.firestore().collection('confirmations').add(confirmationData);
-            confirmationId = docRef.id;
-            showSuccessMessage('Confirmación guardada correctamente.');
+        // Intentar usar servicios de Firestore si están disponibles
+        if (window.firestoreServices && window.firestoreServices.confirmation) {
+            const snapshot = await window.firestoreServices.confirmation
+                .getConfirmationByDateAndDepartment(date, currentUser.departmentId);
+            
+            if (snapshot.empty) {
+                // Crear nueva confirmación
+                confirmationData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                await window.firestoreServices.confirmation.saveConfirmation(null, confirmationData);
+            } else {
+                // Actualizar confirmación existente
+                confirmationId = snapshot.docs[0].id;
+                await window.firestoreServices.confirmation.saveConfirmation(confirmationId, confirmationData);
+            }
         } else {
-            // Update existing confirmation
-            const docRef = querySnapshot.docs[0].ref;
-            confirmationId = docRef.id;
-            await docRef.update(confirmationData);
-            showSuccessMessage('Confirmación actualizada correctamente.');
+            // Fallback al método directo
+            // Check if we already have a confirmation for this date
+            const querySnapshot = await firebase.firestore().collection('confirmations')
+                .where('date', '==', date)
+                .where('departmentId', '==', currentUser.departmentId)
+                .get();
+            
+            if (querySnapshot.empty) {
+                // Create new confirmation
+                confirmationData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                const docRef = await firebase.firestore().collection('confirmations').add(confirmationData);
+                confirmationId = docRef.id;
+            } else {
+                // Update existing confirmation
+                const docRef = querySnapshot.docs[0].ref;
+                confirmationId = docRef.id;
+                await docRef.update(confirmationData);
+            }
         }
         
         // Update UI status
@@ -811,13 +954,34 @@ async function saveConfirmation(event) {
             estadoElement.textContent = 'Enviado';
         }
         
+        // Mostrar mensaje de éxito
+        if (window.errorHandler) {
+            window.errorHandler.showUISuccess("Confirmación guardada correctamente.");
+        } else {
+            showSuccessMessage("Confirmación guardada correctamente.");
+        }
+        
         console.log("Confirmación guardada exitosamente");
     } catch (error) {
         console.error("Error saving confirmation:", error);
-        showErrorMessage("Error al guardar la confirmación. Por favor intente de nuevo.");
+        
+        // Usar error handler si está disponible
+        if (window.errorHandler) {
+            const errorMsg = window.errorHandler.handleFirestoreError(
+                error, 
+                "Error al guardar la confirmación. Por favor intente de nuevo."
+            );
+            window.errorHandler.showUIError(errorMsg);
+        } else {
+            showErrorMessage("Error al guardar la confirmación. Por favor intente de nuevo.");
+        }
     } finally {
         // Hide loading state
-        showLoadingState(false);
+        if (window.errorHandler) {
+            window.errorHandler.toggleLoadingIndicator(false);
+        } else {
+            showLoadingState(false);
+        }
     }
 }
 
@@ -829,7 +993,11 @@ function validateConfirmationForm() {
     // Get form values
     const datePicker = document.getElementById('confirmation-date');
     if (!datePicker) {
-        showErrorMessage("Error: No se encontró el selector de fecha.");
+        if (window.errorHandler) {
+            window.errorHandler.showUIError("Error: No se encontró el selector de fecha.");
+        } else {
+            showErrorMessage("Error: No se encontró el selector de fecha.");
+        }
         return false;
     }
     
@@ -837,13 +1005,21 @@ function validateConfirmationForm() {
     
     // Check date
     if (!date) {
-        showErrorMessage("Por favor seleccione una fecha.");
+        if (window.errorHandler) {
+            window.errorHandler.showUIError("Por favor seleccione una fecha.");
+        } else {
+            showErrorMessage("Por favor seleccione una fecha.");
+        }
         return false;
     }
     
     // Check if at least one employee is selected
     if (selectedEmployeeIds.length === 0) {
-        showErrorMessage("Por favor seleccione al menos un empleado.");
+        if (window.errorHandler) {
+            window.errorHandler.showUIError("Por favor seleccione al menos un empleado.");
+        } else {
+            showErrorMessage("Por favor seleccione al menos un empleado.");
+        }
         return false;
     }
     
@@ -855,36 +1031,23 @@ function validateConfirmationForm() {
  * @param {boolean} isLoading - Whether to show or hide loading indicator
  */
 function showLoadingState(isLoading) {
-    const mainContent = document.querySelector('.main-content');
+    const loadingIndicator = document.getElementById('loading-indicator');
+    if (loadingIndicator) {
+        loadingIndicator.style.display = isLoading ? 'flex' : 'none';
+    }
     
-    // Espera un momento para asegurarnos que estamos en el mismo hilo de ejecución
-    setTimeout(() => {
-        // Mostrar mensaje de carga en la tabla
-        const employeeTableBody = document.getElementById('employees-table-body');
-        if (employeeTableBody && isLoading) {
-            // Solo si está cargando y no hay contenido
-            if (employeeTableBody.childElementCount === 0) {
-                employeeTableBody.innerHTML = `
-                    <tr>
-                        <td colspan="4" class="text-center">Cargando empleados...</td>
-                    </tr>
-                `;
-            }
+    // Disable interactive elements
+    const buttons = document.querySelectorAll('button');
+    buttons.forEach(button => {
+        button.disabled = isLoading;
+    });
+    
+    const inputs = document.querySelectorAll('input');
+    inputs.forEach(input => {
+        if (input.type !== 'checkbox') {
+            input.disabled = isLoading;
         }
-        
-        // Disable interactive elements
-        const buttons = document.querySelectorAll('button');
-        buttons.forEach(button => {
-            button.disabled = isLoading;
-        });
-        
-        const inputs = document.querySelectorAll('input');
-        inputs.forEach(input => {
-            if (input.type !== 'checkbox') {
-                input.disabled = isLoading;
-            }
-        });
-    }, 0);
+    });
 }
 
 /**
@@ -893,8 +1056,21 @@ function showLoadingState(isLoading) {
  * @param {number} duration - Duration in milliseconds to show the message
  */
 function showErrorMessage(message, duration = 5000) {
-    // Mostrar alerta con alert nativo (más sencillo y garantizado)
-    alert(`Error: ${message}`);
+    const errorAlert = document.getElementById('error-alert');
+    if (errorAlert) {
+        errorAlert.textContent = message;
+        errorAlert.style.display = 'block';
+        
+        // Hide after duration
+        if (duration > 0) {
+            setTimeout(() => {
+                errorAlert.style.display = 'none';
+            }, duration);
+        }
+    } else {
+        // Fallback a alert
+        alert(`Error: ${message}`);
+    }
     console.error(message);
 }
 
@@ -904,8 +1080,21 @@ function showErrorMessage(message, duration = 5000) {
  * @param {number} duration - Duration in milliseconds to show the message
  */
 function showSuccessMessage(message, duration = 3000) {
-    // Mostrar alerta con alert nativo (más sencillo y garantizado)
-    alert(`Éxito: ${message}`);
+    const successAlert = document.getElementById('success-alert');
+    if (successAlert) {
+        successAlert.textContent = message;
+        successAlert.style.display = 'block';
+        
+        // Hide after duration
+        if (duration > 0) {
+            setTimeout(() => {
+                successAlert.style.display = 'none';
+            }, duration);
+        }
+    } else {
+        // Fallback a alert
+        alert(`Éxito: ${message}`);
+    }
     console.log(message);
 }
 
@@ -915,6 +1104,17 @@ function showSuccessMessage(message, duration = 3000) {
  * @param {number} duration - Duration in milliseconds to show the message
  */
 function showInfoMessage(message, duration = 5000) {
+    const infoAlert = document.getElementById('info-alert');
+    if (infoAlert) {
+        infoAlert.textContent = message;
+        infoAlert.style.display = 'block';
+        
+        // Hide after duration
+        if (duration > 0) {
+            setTimeout(() => {
+                infoAlert.style.display = 'none';
+            }, duration);
+        }
+    }
     console.log("INFO:", message);
-    // No mostramos mensaje visual para no interrumpir al usuario
 }

@@ -164,15 +164,35 @@
     <script>
         // Admin Dashboard JavaScript
         document.addEventListener('DOMContentLoaded', () => {
-            if (!checkAuth(USER_ROLES.ADMIN)) {
+            if (!window.checkAuth) {
+                console.error('Function checkAuth is not available');
+                if (window.errorHandler) {
+                    window.errorHandler.showUIError('Error de autenticación. Por favor recargue la página.');
+                } else {
+                    alert('Error de autenticación. Por favor recargue la página.');
+                }
+                return;
+            }
+        
+            if (!checkAuth(window.USER_ROLES.ADMIN)) {
                 return;
             }
             
             // Set user name
-            const user = JSON.parse(sessionStorage.getItem('user'));
+            let userName = 'Administrador';
+            try {
+                const userJson = sessionStorage.getItem('user');
+                if (userJson) {
+                    const userObj = JSON.parse(userJson);
+                    userName = userObj.displayName || userName;
+                }
+            } catch (error) {
+                console.error('Error parsing user data:', error);
+            }
+            
             const userNameElement = document.getElementById('user-name');
-            if (userNameElement && user) {
-                userNameElement.textContent = user.displayName || 'Administrador';
+            if (userNameElement) {
+                userNameElement.textContent = userName;
             }
             
             // Setup logout button
@@ -180,7 +200,12 @@
             if (logoutBtn) {
                 logoutBtn.addEventListener('click', (e) => {
                     e.preventDefault();
-                    logout();
+                    if (window.logout) {
+                        logout();
+                    } else {
+                        sessionStorage.clear();
+                        window.location.href = '../../index.html';
+                    }
                 });
             }
             
@@ -192,7 +217,11 @@
         async function loadDashboardData() {
             try {
                 // Show loading state
-                showLoadingState(true);
+                if (window.errorHandler) {
+                    window.errorHandler.toggleLoadingIndicator(true);
+                } else {
+                    showLoadingState(true);
+                }
                 
                 // Load stats data in parallel
                 await Promise.all([
@@ -203,19 +232,42 @@
                 ]);
                 
                 // Hide loading state
-                showLoadingState(false);
+                if (window.errorHandler) {
+                    window.errorHandler.toggleLoadingIndicator(false);
+                } else {
+                    showLoadingState(false);
+                }
             } catch (error) {
                 console.error("Error loading dashboard data:", error);
-                showErrorMessage("Error al cargar los datos del dashboard.");
-                showLoadingState(false);
+                
+                if (window.errorHandler) {
+                    window.errorHandler.showUIError("Error al cargar los datos del dashboard.");
+                } else {
+                    showErrorMessage("Error al cargar los datos del dashboard.");
+                }
+                
+                if (window.errorHandler) {
+                    window.errorHandler.toggleLoadingIndicator(false);
+                } else {
+                    showLoadingState(false);
+                }
             }
         }
         
         // Load employee stats
         async function loadEmployeeStats() {
             try {
+                const collection = window.firestoreServices ? 
+                    window.firestoreServices.getCollection('employees') : 
+                    window.employeesCollection;
+                    
+                if (!collection) {
+                    throw new Error('No se pudo acceder a la colección de empleados');
+                }
+                
                 // Get total employees
-                const employeesSnapshot = await employeesCollection.get();
+                const employeesSnapshot = await collection.get();
+                
                 document.getElementById('total-employees').textContent = employeesSnapshot.size;
                 
                 // Get total departments
@@ -238,10 +290,20 @@
             try {
                 // Get today's date
                 const today = new Date();
-                const todayStr = formatDate(today);
+                const todayStr = window.dateUtils ? 
+                    window.dateUtils.formatDate(today) : 
+                    formatDate(today);
+                
+                const collection = window.firestoreServices ? 
+                    window.firestoreServices.getCollection('confirmations') : 
+                    window.confirmationsCollection;
+                    
+                if (!collection) {
+                    throw new Error('No se pudo acceder a la colección de confirmaciones');
+                }
                 
                 // Get today's confirmations
-                const confirmationsSnapshot = await confirmationsCollection
+                const confirmationsSnapshot = await collection
                     .where('date', '==', todayStr)
                     .get();
                 
@@ -261,18 +323,32 @@
         // Load menu stats
         async function loadMenuStats() {
             try {
+                // Get current week's menu status
+                const currentWeek = window.dateUtils ? 
+                    window.dateUtils.getMonday(new Date()) : 
+                    getMonday(new Date());
+                    
+                const weekStartStr = window.dateUtils ? 
+                    window.dateUtils.formatDate(currentWeek) : 
+                    formatDate(currentWeek);
+                
+                const collection = window.firestoreServices ? 
+                    window.firestoreServices.getCollection('menus') : 
+                    window.menusCollection;
+                    
+                if (!collection) {
+                    throw new Error('No se pudo acceder a la colección de menús');
+                }
+                
                 // Get published menus count
-                const menusSnapshot = await menuCollection
+                const menusSnapshot = await collection
                     .where('status', '==', 'published')
                     .get();
                 
                 document.getElementById('published-menus').textContent = menusSnapshot.size;
                 
-                // Get current week's menu status
-                const currentWeek = getMonday(new Date());
-                const weekStartStr = formatDate(currentWeek);
-                
-                const menuDoc = await menuCollection.doc(weekStartStr).get();
+                // Get current week's menu
+                const menuDoc = await collection.doc(weekStartStr).get();
                 const menuStatusContainer = document.getElementById('menu-status-container');
                 
                 if (menuStatusContainer) {
@@ -286,20 +362,30 @@
                         
                         if (isPublished && menuData.publishedAt) {
                             const publishedAtDate = menuData.publishedAt.toDate();
-                            publishedDate = formatDateDisplay(publishedAtDate);
+                            publishedDate = window.dateUtils ? 
+                                window.dateUtils.formatDateDisplay(publishedAtDate) : 
+                                formatDateDisplay(publishedAtDate);
                         }
+                        
+                        const formattedDate = window.dateUtils ? 
+                            window.dateUtils.formatDateDisplay(currentWeek) :
+                            formatDateDisplay(currentWeek);
                         
                         menuStatusContainer.innerHTML = `
                             <div class="menu-status ${statusClass}">
-                                <h4>Menú de la semana del ${formatDateDisplay(currentWeek)}</h4>
+                                <h4>Menú de la semana del ${formattedDate}</h4>
                                 <p>Estado: ${statusText}</p>
                                 ${publishedDate ? `<p>Publicado el: ${publishedDate}</p>` : ''}
                             </div>
                         `;
                     } else {
+                        const formattedDate = window.dateUtils ? 
+                            window.dateUtils.formatDateDisplay(currentWeek) :
+                            formatDateDisplay(currentWeek);
+                        
                         menuStatusContainer.innerHTML = `
                             <div class="menu-status menu-status-missing">
-                                <h4>Menú de la semana del ${formatDateDisplay(currentWeek)}</h4>
+                                <h4>Menú de la semana del ${formattedDate}</h4>
                                 <p>Estado: No creado</p>
                                 <p>No hay menú para esta semana</p>
                             </div>
@@ -315,8 +401,16 @@
         // Load recent confirmations
         async function loadRecentConfirmations() {
             try {
+                const collection = window.firestoreServices ? 
+                    window.firestoreServices.getCollection('confirmations') : 
+                    window.confirmationsCollection;
+                    
+                if (!collection) {
+                    throw new Error('No se pudo acceder a la colección de confirmaciones');
+                }
+                
                 // Get recent confirmations
-                const confirmationsSnapshot = await confirmationsCollection
+                const confirmationsSnapshot = await collection
                     .orderBy('createdAt', 'desc')
                     .limit(5)
                     .get();
@@ -335,14 +429,16 @@
                     let tableHTML = '';
                     confirmationsSnapshot.forEach(doc => {
                         const confirmation = doc.data();
-                        const formattedDate = formatDateDisplay(new Date(confirmation.date));
+                        const formattedDate = window.dateUtils ? 
+                            window.dateUtils.formatDateDisplay(new Date(confirmation.date)) : 
+                            formatDateDisplay(new Date(confirmation.date));
                         
                         tableHTML += `
                             <tr>
                                 <td>${formattedDate}</td>
-                                <td>${confirmation.coordinatorName}</td>
-                                <td>${confirmation.department}</td>
-                                <td>${confirmation.confirmedCount}</td>
+                                <td>${confirmation.coordinatorName || 'N/A'}</td>
+                                <td>${confirmation.department || 'N/A'}</td>
+                                <td>${confirmation.confirmedCount || 0}</td>
                             </tr>
                         `;
                     });
@@ -355,7 +451,13 @@
             }
         }
         
-        // Format date as YYYY-MM-DD
+        // Funciones de utilidad (como fallback si no están disponibles en dateUtils)
+        function getMonday(date) {
+            const day = date.getDay();
+            const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Sunday
+            return new Date(date.setDate(diff));
+        }
+        
         function formatDate(date) {
             const year = date.getFullYear();
             const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -363,7 +465,6 @@
             return `${year}-${month}-${day}`;
         }
         
-        // Format date for display (DD/MM/YYYY)
         function formatDateDisplay(date) {
             const day = String(date.getDate()).padStart(2, '0');
             const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -371,22 +472,20 @@
             return `${day}/${month}/${year}`;
         }
         
-        // Get Monday of the current week
-        function getMonday(date) {
-            const day = date.getDay();
-            const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Sunday
-            return new Date(date.setDate(diff));
-        }
-        
-        // Show loading state
+        // Funciones de manejo de estado (como fallback si errorHandler no está disponible)
         function showLoadingState(isLoading) {
             const loadingIndicator = document.getElementById('loading-indicator');
             if (loadingIndicator) {
                 loadingIndicator.style.display = isLoading ? 'flex' : 'none';
             }
+            
+            // Disable buttons while loading
+            const buttons = document.querySelectorAll('button');
+            buttons.forEach(button => {
+                button.disabled = isLoading;
+            });
         }
         
-        // Show error message
         function showErrorMessage(message) {
             const errorAlert = document.getElementById('error-alert');
             if (errorAlert) {
@@ -399,10 +498,6 @@
                 }, 5000);
             }
         }
-
-        // Asegurarse de que las colecciones estén disponibles
-        // Estas colecciones ya están definidas globalmente en firebase-config.js
-        // Así que solo verificamos que existan y las usamos directamente
-    </script>
+        </script>
 </body>
-</html> 
+</html>

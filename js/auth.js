@@ -12,6 +12,16 @@ const USER_ROLES = {
  * @returns {boolean} - Whether user has access
  */
 function checkAuth(requiredRole) {
+    // Asegúrate de que Firebase esté inicializado
+    if (window.initializeFirebase && !window.firebaseInitialized) {
+        window.initializeFirebase();
+    }
+    
+    // Normalizar el rol requerido
+    let normalizedRole = requiredRole;
+    if (requiredRole === 'admin') normalizedRole = USER_ROLES.ADMIN;
+    if (requiredRole === 'coordinator') normalizedRole = USER_ROLES.COORDINATOR;
+    
     const userRole = sessionStorage.getItem("userRole");
     const userId = sessionStorage.getItem("userId");
     
@@ -25,7 +35,7 @@ function checkAuth(requiredRole) {
         return false;
     }
     
-    if (requiredRole && userRole !== requiredRole) {
+    if (normalizedRole && userRole !== normalizedRole) {
         // Redirect to appropriate dashboard
         redirectBasedOnRole(userRole);
         return false;
@@ -78,6 +88,11 @@ function redirectBasedOnRole(role) {
  */
 async function loginUser(email, password) {
     try {
+        // Asegúrate de que Firebase esté inicializado
+        if (window.initializeFirebase && !window.firebaseInitialized) {
+            window.initializeFirebase();
+        }
+        
         // Show loader and disable button if they exist
         const loginButton = document.getElementById("loginButton");
         const loginLoader = document.getElementById("loginLoader");
@@ -178,6 +193,13 @@ function handleAuthError(error) {
  * @param {string} message - Error message to display
  */
 function showError(message) {
+    // Intenta usar el error handler global si está disponible
+    if (window.errorHandler && window.errorHandler.showUIError) {
+        window.errorHandler.showUIError(message);
+        return;
+    }
+    
+    // Fallback al método antiguo
     const errorElement = document.getElementById("loginError");
     if (errorElement) {
         errorElement.textContent = message;
@@ -217,50 +239,64 @@ function logout() {
 }
 
 // Check if user is already logged in when page loads
-firebase.auth().onAuthStateChanged(async (user) => {
-    // Only handle auth state if we're on the login page
-    const isLoginPage = window.location.pathname.endsWith("index.html") || 
-                        window.location.pathname === "/";
-                       
-    if (isLoginPage && user) {
-        try {
-            // Get user data including role
-            const userDoc = await firebase.firestore().collection("users").doc(user.uid).get();
-            
-            if (userDoc.exists) {
-                const userData = userDoc.data();
-                
-                // Save user data to session storage if not already there
-                if (!sessionStorage.getItem("userRole")) {
-                    // Create a user object
-                    const userObject = {
-                        uid: user.uid,
-                        email: user.email,
-                        displayName: userData.name,
-                        role: userData.role,
-                        branch: userData.branch || "",
-                        department: userData.department || "",
-                        departmentId: userData.departmentId || ""
-                    };
-                    
-                    // Save as JSON string
-                    sessionStorage.setItem("user", JSON.stringify(userObject));
-                    
-                    // Also save individual properties
-                    sessionStorage.setItem("userId", user.uid);
-                    sessionStorage.setItem("userEmail", user.email);
-                    sessionStorage.setItem("userName", userData.name);
-                    sessionStorage.setItem("userRole", userData.role);
-                    sessionStorage.setItem("userBranch", userData.branch || "");
-                    sessionStorage.setItem("userDepartment", userData.department || "");
-                    sessionStorage.setItem("userDepartmentId", userData.departmentId || "");
-                    
-                    // Redirect to appropriate dashboard
-                    redirectBasedOnRole(userData.role);
-                }
-            }
-        } catch (error) {
-            console.error("Error checking user role:", error);
-        }
+document.addEventListener('DOMContentLoaded', () => {
+    // Ensure Firebase is initialized
+    if (window.initializeFirebase) {
+        window.initializeFirebase();
     }
+    
+    firebase.auth().onAuthStateChanged(async (user) => {
+        // Only handle auth state if we're on the login page
+        const isLoginPage = window.location.pathname.endsWith("index.html") || 
+                            window.location.pathname === "/";
+                           
+        if (isLoginPage && user) {
+            try {
+                // Get user data including role
+                const userDoc = await firebase.firestore().collection("users").doc(user.uid).get();
+                
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    
+                    // Save user data to session storage if not already there
+                    if (!sessionStorage.getItem("userRole")) {
+                        // Create a user object
+                        const userObject = {
+                            uid: user.uid,
+                            email: user.email,
+                            displayName: userData.name,
+                            role: userData.role,
+                            branch: userData.branch || "",
+                            department: userData.department || "",
+                            departmentId: userData.departmentId || ""
+                        };
+                        
+                        // Save as JSON string
+                        sessionStorage.setItem("user", JSON.stringify(userObject));
+                        
+                        // Also save individual properties
+                        sessionStorage.setItem("userId", user.uid);
+                        sessionStorage.setItem("userEmail", user.email);
+                        sessionStorage.setItem("userName", userData.name);
+                        sessionStorage.setItem("userRole", userData.role);
+                        sessionStorage.setItem("userBranch", userData.branch || "");
+                        sessionStorage.setItem("userDepartment", userData.department || "");
+                        sessionStorage.setItem("userDepartmentId", userData.departmentId || "");
+                        
+                        // Redirect to appropriate dashboard
+                        redirectBasedOnRole(userData.role);
+                    }
+                }
+            } catch (error) {
+                console.error("Error checking user role:", error);
+            }
+        }
+    });
 });
+
+// Exportar constantes y funciones
+window.USER_ROLES = USER_ROLES;
+window.checkAuth = checkAuth;
+window.loginUser = loginUser;
+window.logout = logout;
+window.clearError = clearError;

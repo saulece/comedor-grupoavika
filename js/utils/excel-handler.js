@@ -51,20 +51,37 @@ function readExcelFile(file) {
                         blankrows: false // Ignorar filas vacías
                     });
                     
-                    window.logger?.info('Datos Excel leídos correctamente:', { rows: jsonData.length });
+                    if (window.logger && window.logger.info) {
+                        window.logger.info('Datos Excel leídos correctamente:', { rows: jsonData.length });
+                    } else {
+                        console.log('Datos Excel leídos correctamente:', jsonData.length, 'filas');
+                    }
+                    
                     resolve(jsonData);
                 } catch (xlsxError) {
-                    window.logger?.error('Error al procesar el archivo Excel:', xlsxError);
+                    if (window.logger && window.logger.error) {
+                        window.logger.error('Error al procesar el archivo Excel:', xlsxError);
+                    } else {
+                        console.error('Error al procesar el archivo Excel:', xlsxError);
+                    }
                     reject(new Error('Error al procesar el archivo Excel: ' + xlsxError.message));
                 }
             } catch (error) {
-                window.logger?.error('Error general al leer el archivo:', error);
+                if (window.logger && window.logger.error) {
+                    window.logger.error('Error general al leer el archivo:', error);
+                } else {
+                    console.error('Error general al leer el archivo:', error);
+                }
                 reject(error);
             }
         };
         
         reader.onerror = function(error) {
-            window.logger?.error('Error en FileReader:', error);
+            if (window.logger && window.logger.error) {
+                window.logger.error('Error en FileReader:', error);
+            } else {
+                console.error('Error en FileReader:', error);
+            }
             reject(error);
         };
         
@@ -130,10 +147,141 @@ function generateEmployeeTemplate() {
     return new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 }
 
-// Exportar funciones como un módulo global
+/**
+ * Genera una plantilla Excel para menú semanal
+ * @returns {Blob} - Archivo Excel como Blob
+ */
+function generateMenuTemplate() {
+    if (!isXLSXAvailable()) {
+        throw new Error('La biblioteca XLSX no está disponible. Por favor, recarga la página.');
+    }
+    
+    // Obtener los días de la semana
+    const days = window.dateUtils && window.dateUtils.DATE_FORMATS ? 
+        window.dateUtils.DATE_FORMATS.ADMIN : 
+        ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+    
+    // Crear un workbook con una hoja para cada día
+    const workbook = XLSX.utils.book_new();
+    
+    // Crear hojas para cada día
+    days.forEach(day => {
+        // Crear una hoja de cálculo para el día
+        const worksheet = XLSX.utils.aoa_to_sheet([
+            ['Nombre', 'Descripción'],
+            ['Ejemplo: Arroz con pollo', 'Descripción del plato'],
+            ['Ejemplo: Sopa de verduras', 'Otra descripción']
+        ]);
+        
+        // Añadir la hoja al libro
+        XLSX.utils.book_append_sheet(workbook, worksheet, day);
+    });
+    
+    // Generar el archivo
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    return new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+}
+
+/**
+ * Exporta datos a un archivo Excel
+ * @param {Array} data - Datos para exportar (array de arrays o array de objetos)
+ * @param {string} filename - Nombre del archivo (sin extensión)
+ * @param {string} sheetName - Nombre de la hoja
+ */
+function exportToExcel(data, filename, sheetName = 'Datos') {
+    if (!isXLSXAvailable()) {
+        throw new Error('La biblioteca XLSX no está disponible. Por favor, recarga la página.');
+    }
+    
+    // Crear una hoja de cálculo
+    let worksheet;
+    
+    if (data.length > 0 && typeof data[0] === 'object' && !Array.isArray(data[0])) {
+        // Si son objetos, convertir a hoja
+        worksheet = XLSX.utils.json_to_sheet(data);
+    } else {
+        // Si son arrays, usar aoa_to_sheet
+        worksheet = XLSX.utils.aoa_to_sheet(data);
+    }
+    
+    // Crear un libro de trabajo y añadir la hoja
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+    
+    // Guardar el archivo
+    XLSX.writeFile(workbook, `${filename}.xlsx`);
+}
+
+/**
+ * Procesa un archivo Excel y extrae datos de empleados
+ * @param {Array} data - Datos del Excel (array de arrays)
+ * @returns {Object} - Objetos con empleados válidos y errores
+ */
+function processEmployeeExcelData(data) {
+    // Validar que haya datos
+    if (!data || !Array.isArray(data) || data.length < 2) {
+        throw new Error('El archivo Excel está vacío o no tiene el formato correcto.');
+    }
+    
+    // Obtener índices de columnas
+    const headers = data[0];
+    const nameIndex = headers.findIndex(header => header && 
+        header.toString().toLowerCase().includes('nombre'));
+    const positionIndex = headers.findIndex(header => header && 
+        header.toString().toLowerCase().includes('puesto'));
+    const statusIndex = headers.findIndex(header => header && 
+        header.toString().toLowerCase().includes('estado'));
+    
+    // Verificar columnas requeridas
+    if (nameIndex === -1 || statusIndex === -1) {
+        throw new Error('El archivo Excel debe tener las columnas "Nombre Completo" y "Estado".');
+    }
+    
+    const employees = [];
+    const errors = [];
+    
+    // Procesar filas de datos (omitir la fila de encabezados)
+    for (let i = 1; i < data.length; i++) {
+        const row = data[i];
+        
+        // Omitir filas vacías
+        if (!row.length || !row[nameIndex]) {
+            continue;
+        }
+        
+        // Validar campos requeridos
+        if (!row[nameIndex]) {
+            errors.push(`Fila ${i+1}: Falta el nombre del empleado.`);
+            continue;
+        }
+        
+        const status = row[statusIndex] ? row[statusIndex].toString().toLowerCase() : null;
+        if (!status || (status !== 'active' && status !== 'inactive')) {
+            errors.push(`Fila ${i+1}: El estado debe ser 'active' o 'inactive'.`);
+            continue;
+        }
+        
+        // Crear objeto de empleado
+        const employee = {
+            name: row[nameIndex],
+            position: positionIndex !== -1 ? (row[positionIndex] || '') : '',
+            status: status,
+            active: status === 'active'
+        };
+        
+        employees.push(employee);
+    }
+    
+    return { employees, errors };
+}
+
+// Exportar funciones
 window.excelHandler = {
     isXLSXAvailable,
     readExcelFile,
     handleExcelError,
-    generateEmployeeTemplate
+    generateEmployeeTemplate,
+    generateMenuTemplate,
+    exportToExcel,
+    processEmployeeExcelData
 };

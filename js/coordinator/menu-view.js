@@ -2,7 +2,22 @@
 
 // Ensure coordinator only access
 document.addEventListener('DOMContentLoaded', () => {
-    if (!checkAuth(USER_ROLES.COORDINATOR)) {
+    // Asegurar que Firebase se inicialice
+    if (window.initializeFirebase) {
+        window.initializeFirebase();
+    }
+    
+    // Verificar permisos de acceso
+    if (!window.checkAuth) {
+        console.error('La función de autenticación no está disponible');
+        alert('Error: La función de autenticación no está disponible. Por favor recargue la página.');
+        return;
+    }
+    
+    // Normalizar rol para compatibilidad
+    const requiredRole = window.USER_ROLES ? window.USER_ROLES.COORDINATOR : 'coordinator';
+    
+    if (!checkAuth(requiredRole)) {
         return;
     }
     
@@ -15,8 +30,12 @@ document.addEventListener('DOMContentLoaded', () => {
             userName = userObj.displayName || userName;
         }
     } catch (error) {
-        // Usar el nuevo sistema de logging
-        window.logger?.error('Error al procesar datos del usuario:', error);
+        // Usar el sistema de logging si está disponible
+        if (window.logger && window.logger.error) {
+            window.logger.error('Error al procesar datos del usuario:', error);
+        } else {
+            console.error('Error al procesar datos del usuario:', error);
+        }
     }
     
     const userNameElement = document.getElementById('user-name');
@@ -29,7 +48,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (logoutBtn) {
         logoutBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            logout();
+            if (window.logout) {
+                logout();
+            } else {
+                // Fallback si logout no está disponible
+                sessionStorage.clear();
+                window.location.href = '../../index.html';
+            }
         });
     }
     
@@ -46,13 +71,17 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Current week settings
-// Usar la utilidad de fecha del nuevo módulo si está disponible
-let currentWeek = (window.dateUtils?.getMonday || getMonday)(new Date()); // Default to current week
+// Usar la utilidad de fecha del módulo dateUtils si está disponible
+let currentWeek = (window.dateUtils && window.dateUtils.getMonday) ?
+    window.dateUtils.getMonday(new Date()) : getMonday(new Date());
 
-// Usar los formatos de días del nuevo módulo de utilidades si está disponible
-const DAYS = window.dateUtils?.DATE_FORMATS?.COORDINATOR || 
+// Usar los formatos de días del módulo de utilidades si está disponible
+const DAYS = (window.dateUtils && window.dateUtils.DATE_FORMATS) ?
+    window.dateUtils.DATE_FORMATS.COORDINATOR : 
     ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
-const DAYS_DISPLAY = window.dateUtils?.DATE_FORMATS?.ADMIN || 
+
+const DAYS_DISPLAY = (window.dateUtils && window.dateUtils.DATE_FORMATS) ?
+    window.dateUtils.DATE_FORMATS.ADMIN : 
     ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
 // Format day name nicely with proper accents and capitalization
@@ -97,9 +126,16 @@ function updateWeekDisplay() {
     const weekEnd = new Date(currentWeek);
     weekEnd.setDate(weekEnd.getDate() + 6); // Show Monday-Sunday (toda la semana)
     
-    // Format dates
-    const formattedStart = formatDateDisplay(weekStart);
-    const formattedEnd = formatDateDisplay(weekEnd);
+    // Format dates using dateUtils if available
+    let formattedStart, formattedEnd;
+    
+    if (window.dateUtils && window.dateUtils.formatDateDisplay) {
+        formattedStart = window.dateUtils.formatDateDisplay(weekStart);
+        formattedEnd = window.dateUtils.formatDateDisplay(weekEnd);
+    } else {
+        formattedStart = formatDateDisplay(weekStart);
+        formattedEnd = formatDateDisplay(weekEnd);
+    }
     
     // Update display
     weekDisplay.textContent = `${formattedStart} - ${formattedEnd}`;
@@ -108,92 +144,159 @@ function updateWeekDisplay() {
 // Load menu for selected week
 function loadMenuForWeek() {
     // Show loading state
-    showLoadingState(true);
+    if (window.errorHandler && window.errorHandler.toggleLoadingIndicator) {
+        window.errorHandler.toggleLoadingIndicator(true);
+    } else {
+        showLoadingState(true);
+    }
     
     // Format date for Firestore query
-    const weekStartStr = (window.dateUtils?.formatDate || formatDate)(currentWeek);
+    const weekStartStr = window.dateUtils && window.dateUtils.formatDate ? 
+        window.dateUtils.formatDate(currentWeek) : 
+        formatDate(currentWeek);
     
-    // Usar el nuevo sistema de logging
-    window.logger?.info('Cargando menú para la semana que comienza el:', weekStartStr);
+    // Log usando el sistema de logging si está disponible
+    if (window.logger && window.logger.info) {
+        window.logger.info('Cargando menú para la semana que comienza el:', weekStartStr);
+    } else {
+        console.log('Cargando menú para la semana que comienza el:', weekStartStr);
+    }
     
-    // Get menu from Firestore
-    window.db.collection('menus').doc(weekStartStr)
-        .get()
-        .then(doc => {
-            if (doc.exists) {
-                const menuData = doc.data();
-                window.logger?.debug('Menú encontrado para la semana:', menuData);
-                
-                // Verificar si hay elementos en el menú para al menos un día
-                let hasMenuItems = false;
-                
-                // Normalizar los datos del menú para asegurar compatibilidad entre formatos
-                normalizeMenuData(menuData);
-                
-                // Verificar si hay elementos en el menú después de la normalización
-                hasMenuItems = DAYS.some(day => {
-                    return menuData[day] && menuData[day].items && menuData[day].items.length > 0;
-                });
-                
-                window.logger?.debug('¿Hay elementos en el menú?', hasMenuItems);
-                
-                if (hasMenuItems) {
-                    // Display menu for each day
-                    DAYS.forEach(day => {
-                        // Get menu container for this day
-                        const dayContainer = document.getElementById(`${day}-menu`);
-                        if (dayContainer) {
-                            // Verificar si tenemos datos para este día
-                            let dayData = menuData[day];
-                            
-                            // Si no hay datos en formato coordinador, intentar con formato administrador
-                            if (!dayData || !dayData.items || dayData.items.length === 0) {
-                                const adminDay = DAYS_DISPLAY[DAYS.indexOf(day)];
-                                if (menuData[adminDay] && menuData[adminDay].items && menuData[adminDay].items.length > 0) {
-                                    dayData = menuData[adminDay];
-                                    console.log(`Usando datos del formato administrador para ${day}`);
-                                }
-                            }
-                            
-                            // Display menu items for this day
-                            displayDayMenu(day, dayData, day === 'lunes');
-                        }
-                    });
-                    
-                    // Make sure the active tab is shown
-                    const activeTab = document.querySelector('.menu-tab.active');
-                    if (activeTab) {
-                        switchMenuTab(activeTab.getAttribute('data-day'));
-                    }
-                    
-                    // Show menu container
-                    const menuContainer = document.getElementById('weekly-menu');
-                    if (menuContainer) {
-                        menuContainer.style.display = 'block';
-                    }
-                    
-                    // Hide "no menu" message
-                    const noMenuMessage = document.getElementById('no-menu-message');
-                    if (noMenuMessage) {
-                        noMenuMessage.style.display = 'none';
-                    }
-                } else {
-                    // No menu items found for this week
-                    showNoMenuMessage();
-                }
+    // Intentar usar los servicios de Firestore si están disponibles
+    if (window.firestoreServices && window.firestoreServices.menu) {
+        window.firestoreServices.menu.getMenuForWeek(weekStartStr)
+            .then(processMenuDocument)
+            .catch(handleMenuLoadError);
+    } else {
+        // Fallback al método directo si los servicios no están disponibles
+        window.db.collection('menus').doc(weekStartStr)
+            .get()
+            .then(processMenuDocument)
+            .catch(handleMenuLoadError);
+    }
+}
+
+/**
+ * Process menu document
+ * @param {FirebaseFirestore.DocumentSnapshot} doc - Menu document
+ */
+function processMenuDocument(doc) {
+    if (doc.exists) {
+        const menuData = doc.data();
+        
+        // Log usando el sistema de logging si está disponible
+        if (window.logger && window.logger.debug) {
+            window.logger.debug('Menú encontrado para la semana:', menuData);
+        } else {
+            console.log('Menú encontrado para la semana:', menuData);
+        }
+        
+        // Verificar si el menú está publicado
+        if (menuData.status !== 'published') {
+            // El menú existe pero no está publicado
+            showNoMenuMessage();
+            
+            if (window.errorHandler && window.errorHandler.toggleLoadingIndicator) {
+                window.errorHandler.toggleLoadingIndicator(false);
             } else {
-                // No hay menú para esta semana
-                showNoMenuMessage();
+                showLoadingState(false);
+            }
+            return;
+        }
+        
+        // Verificar si hay elementos en el menú para al menos un día
+        let hasMenuItems = false;
+        
+        // Normalizar los datos del menú para asegurar compatibilidad entre formatos
+        let normalizedMenuData;
+        if (window.firestoreServices && window.firestoreServices.menu.normalizeMenuData) {
+            normalizedMenuData = window.firestoreServices.menu.normalizeMenuData(menuData);
+        } else {
+            // Implementación de respaldo
+            normalizedMenuData = normalizeMenuData(menuData);
+        }
+        
+        // Verificar si hay elementos en el menú después de la normalización
+        hasMenuItems = DAYS.some(day => {
+            return normalizedMenuData[day] && 
+                normalizedMenuData[day].items && 
+                normalizedMenuData[day].items.length > 0;
+        });
+        
+        // Log usando el sistema de logging si está disponible
+        if (window.logger && window.logger.debug) {
+            window.logger.debug('¿Hay elementos en el menú?', hasMenuItems);
+        } else {
+            console.log('¿Hay elementos en el menú?', hasMenuItems);
+        }
+        
+        if (hasMenuItems) {
+            // Display menu for each day
+            DAYS.forEach(day => {
+                // Get menu container for this day
+                const dayContainer = document.getElementById(`${day}-menu`);
+                if (dayContainer) {
+                    // Verificar si tenemos datos para este día
+                    let dayData = normalizedMenuData[day];
+                    
+                    // Display menu items for this day
+                    displayDayMenu(day, dayData, day === 'lunes');
+                }
+            });
+            
+            // Make sure the active tab is shown
+            const activeTab = document.querySelector('.menu-tab.active');
+            if (activeTab) {
+                switchMenuTab(activeTab.getAttribute('data-day'));
             }
             
-            // Hide loading state
-            showLoadingState(false);
-        })
-        .catch(error => {
-            console.error("Error loading menu:", error);
-            showErrorMessage("Error al cargar el menú. Por favor intente de nuevo.");
-            showLoadingState(false);
-        });
+            // Show menu container
+            const menuContainer = document.getElementById('weekly-menu');
+            if (menuContainer) {
+                menuContainer.style.display = 'block';
+            }
+            
+            // Hide "no menu" message
+            const noMenuMessage = document.getElementById('no-menu-message');
+            if (noMenuMessage) {
+                noMenuMessage.style.display = 'none';
+            }
+        } else {
+            // No menu items found for this week
+            showNoMenuMessage();
+        }
+    } else {
+        // No hay menú para esta semana
+        showNoMenuMessage();
+    }
+    
+    // Hide loading state
+    if (window.errorHandler && window.errorHandler.toggleLoadingIndicator) {
+        window.errorHandler.toggleLoadingIndicator(false);
+    } else {
+        showLoadingState(false);
+    }
+}
+
+/**
+ * Handle error when loading menu
+ * @param {Error} error - Error object
+ */
+function handleMenuLoadError(error) {
+    console.error("Error loading menu:", error);
+    
+    // Usar error handler si está disponible
+    if (window.errorHandler) {
+        const errorMsg = window.errorHandler.handleFirestoreError(
+            error, 
+            "Error al cargar el menú. Por favor intente de nuevo."
+        );
+        window.errorHandler.showUIError(errorMsg);
+        window.errorHandler.toggleLoadingIndicator(false);
+    } else {
+        showErrorMessage("Error al cargar el menú. Por favor intente de nuevo.");
+        showLoadingState(false);
+    }
 }
 
 // Display menu for a specific day
@@ -273,78 +376,76 @@ function showNoMenuMessage() {
     const noMenuMessage = document.getElementById('no-menu-message');
     if (noMenuMessage) {
         noMenuMessage.style.display = 'block';
+        
+        // Format date for display
+        let formattedDate;
+        if (window.dateUtils && window.dateUtils.formatDateDisplay) {
+            formattedDate = window.dateUtils.formatDateDisplay(currentWeek);
+        } else {
+            formattedDate = formatDateDisplay(currentWeek);
+        }
+        
         noMenuMessage.innerHTML = `
             <div class="card-body empty-state">
                 <i class="fas fa-utensils empty-icon"></i>
-                <p>No hay menú publicado para la semana del ${formatDateDisplay(currentWeek)}.</p>
+                <p>No hay menú publicado para la semana del ${formattedDate}.</p>
                 <p>Por favor, contacte al administrador para más información.</p>
             </div>
         `;
     }
 }
 
-// Get Monday of the current week
-function getMonday(date) {
-    // Usar la función del módulo de utilidades si está disponible
-    if (window.dateUtils?.getMonday) {
-        return window.dateUtils.getMonday(date);
-    }
+// Normalize menu data to ensure compatibility between formats
+function normalizeMenuData(menuData) {
+    if (!menuData) return {};
     
+    const normalizedData = {...menuData};
+    
+    // Para cada día, asegurarnos de que exista la estructura adecuada
+    DAYS.forEach(day => {
+        if (!normalizedData[day]) {
+            normalizedData[day] = { items: [] };
+        } else if (!normalizedData[day].items) {
+            normalizedData[day].items = [];
+        }
+        
+        // También verificar la versión con mayúsculas/acentos
+        const adminDay = formatDayDisplay(day);
+        if (normalizedData[adminDay] && normalizedData[adminDay].items && 
+            normalizedData[adminDay].items.length > 0 && 
+            (!normalizedData[day].items || normalizedData[day].items.length === 0)) {
+            // Copiar los elementos
+            normalizedData[day].items = normalizedData[adminDay].items;
+        }
+    });
+    
+    return normalizedData;
+}
+
+// Get Monday of the current week - Respaldo si no está disponible en dateUtils
+function getMonday(date) {
     const day = date.getDay();
-    const diff = date.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is Sunday
+    const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Sunday
     return new Date(date.setDate(diff));
 }
 
-/**
- * Normaliza los datos del menú para asegurar compatibilidad entre formatos
- * @param {Object} menuData - Datos del menú a normalizar
- */
-function normalizeMenuData(menuData) {
-    if (!menuData) return;
-    
-    // Para cada día en formato administrador, copiar los datos al formato coordinador
-    DAYS_DISPLAY.forEach((adminDay, index) => {
-        const coordDay = DAYS[index];
-        
-        // Si existe en formato administrador pero no en coordinador
-        if (menuData[adminDay] && menuData[adminDay].items && 
-            (!menuData[coordDay] || !menuData[coordDay].items || menuData[coordDay].items.length === 0)) {
-            
-            // Copiar los datos al formato coordinador
-            if (!menuData[coordDay]) menuData[coordDay] = {};
-            menuData[coordDay].items = menuData[adminDay].items;
-            window.logger?.debug(`Normalizado: ${adminDay} → ${coordDay}`, menuData[coordDay]);
-        }
-    });
-}
-
-// Format date as YYYY-MM-DD
+// Format date as YYYY-MM-DD - Respaldo si no está disponible en dateUtils
 function formatDate(date) {
-    // Usar la función del módulo de utilidades si está disponible
-    if (window.dateUtils?.formatDate) {
-        return window.dateUtils.formatDate(date);
-    }
-    
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
 }
 
-// Format date for display (DD/MM/YYYY)
+// Format date for display (DD/MM/YYYY) - Respaldo si no está disponible en dateUtils
 function formatDateDisplay(date) {
-    // Usar la función del módulo de utilidades si está disponible
-    if (window.dateUtils?.formatDateDisplay) {
-        return window.dateUtils.formatDateDisplay(date);
-    }
-    
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = date.getFullYear();
     return `${day}/${month}/${year}`;
 }
 
-// Show loading state
+// Función de respaldo para mostrar estado de carga
 function showLoadingState(isLoading) {
     const loadingIndicator = document.getElementById('loading-indicator');
     if (loadingIndicator) {
@@ -357,10 +458,10 @@ function showLoadingState(isLoading) {
     });
 }
 
-// Show error message
+// Función de respaldo para mostrar errores
 function showErrorMessage(message) {
-    // Usar el manejador de errores global si está disponible
-    if (window.errorHandler?.showUIError) {
+    // Intentar usar el error handler global si está disponible
+    if (window.errorHandler && window.errorHandler.showUIError) {
         window.errorHandler.showUIError(message);
         return;
     }
@@ -376,8 +477,12 @@ function showErrorMessage(message) {
             errorAlert.style.display = 'none';
         }, 5000);
     } else {
-        // Usar el nuevo sistema de logging
-        window.logger?.error(message);
+        // Usar el sistema de logging
+        if (window.logger && window.logger.error) {
+            window.logger.error(message);
+        } else {
+            console.error(message);
+        }
         alert("Error: " + message);
     }
 }

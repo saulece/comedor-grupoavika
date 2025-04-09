@@ -12,41 +12,50 @@ const firebaseConfig = {
   measurementId: "G-P3ZDJJQVW9"
 };
 
-// Initialize Firebase only if it hasn't been initialized already
-if (typeof firebase !== 'undefined') {
-  if (!firebase.apps || firebase.apps.length === 0) {
-    firebase.initializeApp(firebaseConfig);
-    console.log("Firebase inicializado correctamente");
-  } else {
-    console.log("Firebase ya estaba inicializado");
+// Initialize Firebase
+let firebaseInitialized = false;
+
+function initializeFirebase() {
+  if (firebaseInitialized) return;
+  
+  try {
+    if (typeof firebase === 'undefined') {
+      console.error("Firebase no está disponible. Asegúrese de incluir los scripts de Firebase.");
+      return;
+    }
+    
+    if (!firebase.apps || firebase.apps.length === 0) {
+      firebase.initializeApp(firebaseConfig);
+      console.log("Firebase inicializado correctamente");
+    } else {
+      console.log("Firebase ya estaba inicializado");
+    }
+    
+    // Inicializar Firestore
+    window.db = firebase.firestore();
+    
+    // Inicializar colecciones
+    window.employeesCollection = window.db.collection('employees');
+    window.menusCollection = window.db.collection('menus');
+    window.confirmationsCollection = window.db.collection('confirmations');
+    
+    firebaseInitialized = true;
+    
+    // Disparar evento cuando Firebase está listo
+    const event = new CustomEvent('firebase-ready');
+    window.dispatchEvent(event);
+    
+    return true;
+  } catch (error) {
+    console.error("Error al inicializar Firebase:", error);
+    return false;
   }
-} else {
-  console.error("Firebase no está disponible. Verifica que los scripts se hayan cargado correctamente.");
 }
 
-// Get Firebase services
-let db;
-try {
-  db = firebase.firestore();
-  console.log("Firestore inicializado correctamente");
-} catch (error) {
-  console.error("Error al inicializar Firestore:", error);
-}
+// Ejecutar la inicialización
+document.addEventListener('DOMContentLoaded', () => {
+  initializeFirebase();
+});
 
-// Create references to collections
-try {
-  // Initialize collections
-  const employeesCollection = db.collection('employees');
-  const menusCollection = db.collection('menus');
-  const confirmationsCollection = db.collection('confirmations');
-  
-  // Make collections available globally
-  window.db = db;
-  window.employeesCollection = employeesCollection;
-  window.menusCollection = menusCollection;
-  window.confirmationsCollection = confirmationsCollection;
-  
-  console.log("Colecciones de Firestore inicializadas correctamente");
-} catch (error) {
-  console.error("Error al inicializar colecciones de Firestore:", error);
-}
+// Exportar la función para que pueda ser llamada manualmente si es necesario
+window.initializeFirebase = initializeFirebase;
