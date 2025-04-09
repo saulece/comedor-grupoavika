@@ -1,23 +1,23 @@
-/**
- * Confirmaciones de comedor - Módulo para coordinadores
- * Permite gestionar las confirmaciones diarias de comedor
- */
+// Confirmaciones de comedor - Módulo para coordinadores
+// Permite gestionar las confirmaciones diarias de comedor
+
+// Variables globales
+let selectedEmployeeIds = [];
+let employeeList = [];
+let currentUser = null;
 
 // Referencias a servicios y colecciones de Firebase
 // Acceder a los objetos globales sin redeclararlos
-const employeesCollection = window.employeesCollection;
 const confirmationsCollection = window.confirmationsCollection;
 
 // Current user information
-let currentUser = null;
-let employeeList = []; // Store employee list for the coordinator
-let selectedEmployeeIds = []; // Track selected employee IDs for easier operations
+let currentDate = new Date();
 
 /**
  * Initialize the module when DOM is ready
  */
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("Inicializando m\u00f3dulo de confirmaciones...");
+    console.log("Inicializando módulo de confirmaciones...");
     
     // Check if user has correct role - we don't redefine USER_ROLES here, use the global one
     if (!checkAuth('coordinator')) {
@@ -74,7 +74,9 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('Usuario cargado correctamente:', currentUser);
         
         // Initialize the application
-        initializeApp();
+        setTimeout(() => {
+            initializeApp();
+        }, 500); // Pequeño retraso para asegurar que Firebase esté listo
     } catch (error) {
         console.error('Error al procesar datos del usuario:', error);
         alert('Error al cargar los datos del usuario. Por favor inicie sesión nuevamente.');
@@ -109,59 +111,77 @@ function initializeDatePicker() {
     
     const datePicker = document.getElementById('confirmation-date');
     if (!datePicker) {
-        console.warn('Elemento de selector de fecha no encontrado');
+        console.error('No se encontró el elemento del selector de fecha');
         return;
     }
     
-    // Set default to today
     const today = new Date();
     const formattedToday = formatDateInput(today);
     
-    // Verificar si Flatpickr ya está inicializado
-    if (typeof flatpickr === 'function' && !datePicker._flatpickr) {
-        console.log("Inicializando Flatpickr desde confirmations.js");
-        try {
-            // Define day names with correct accents
-            const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Mi\u00e9rcoles', 'Jueves', 'Viernes', 'S\u00e1bado'];
-            
-            flatpickr(datePicker, {
-                dateFormat: "Y-m-d",
-                locale: {
-                    firstDayOfWeek: 1,
-                    weekdays: {
-                        shorthand: ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'],
-                        longhand: diasSemana
-                    }
-                },
-                defaultDate: formattedToday,
-                minDate: formattedToday,
-                maxDate: new Date().fp_incr(14), // 14 days from today
-                onChange: function(selectedDates, dateStr) {
-                    console.log("Fecha seleccionada:", dateStr);
-                    showDayOfWeek(dateStr);
-                    loadExistingConfirmations(dateStr);
-                }
-            });
-            console.log("Flatpickr inicializado correctamente");
-        } catch (error) {
-            console.error("Error al inicializar Flatpickr:", error);
-        }
-    } else {
-        console.log("Flatpickr ya está inicializado o no está disponible");
-        // Si ya está inicializado, solo agregar el evento change
-        if (datePicker._flatpickr) {
-            datePicker.addEventListener('change', function() {
-                const dateStr = this.value;
-                console.log("Fecha cambiada:", dateStr);
-                showDayOfWeek(dateStr);
-                loadExistingConfirmations(dateStr);
-            });
-        }
+    // Verificar si Flatpickr está disponible
+    if (typeof flatpickr !== 'function') {
+        console.error('Flatpickr no está disponible');
+        // Usar input nativo como fallback
+        datePicker.type = 'date';
+        datePicker.value = formattedToday;
+        datePicker.min = formattedToday;
+        
+        // Agregar evento change
+        datePicker.addEventListener('change', function() {
+            const dateStr = this.value;
+            console.log("Fecha cambiada:", dateStr);
+            showDayOfWeek(dateStr);
+            loadExistingConfirmations(dateStr);
+        });
+        return;
     }
     
-    // Trigger initial load with today's date
-    loadExistingConfirmations(formattedToday);
-    showDayOfWeek(formattedToday);
+    // Inicializar Flatpickr directamente
+    try {
+        // Definir nombres de días con acentos correctos usando Unicode
+        const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Mi\u00e9rcoles', 'Jueves', 'Viernes', 'S\u00e1bado'];
+        
+        // Crear nueva instancia de Flatpickr
+        const fp = flatpickr(datePicker, {
+            dateFormat: "Y-m-d",
+            locale: {
+                firstDayOfWeek: 1,
+                weekdays: {
+                    shorthand: ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'],
+                    longhand: diasSemana
+                }
+            },
+            defaultDate: formattedToday,
+            minDate: formattedToday,
+            onChange: function(selectedDates, dateStr) {
+                console.log("Fecha seleccionada:", dateStr);
+                showDayOfWeek(dateStr);
+                loadExistingConfirmations(dateStr);
+            }
+        });
+        
+        console.log("Flatpickr inicializado correctamente:", fp);
+        
+        // Trigger inicial con la fecha actual
+        if (formattedToday) {
+            showDayOfWeek(formattedToday);
+            loadExistingConfirmations(formattedToday);
+        }
+    } catch (error) {
+        console.error("Error al inicializar Flatpickr:", error);
+        // Usar input nativo como fallback
+        datePicker.type = 'date';
+        datePicker.value = formattedToday;
+        datePicker.min = formattedToday;
+        
+        // Agregar evento change
+        datePicker.addEventListener('change', function() {
+            const dateStr = this.value;
+            console.log("Fecha cambiada:", dateStr);
+            showDayOfWeek(dateStr);
+            loadExistingConfirmations(dateStr);
+        });
+    }
 }
 
 /**
@@ -445,7 +465,7 @@ function loadEmployees() {
     console.log("Cargando empleados...");
     showLoadingState(true);
     
-    // Verify we have the coordinator's department
+    // Verificar que tenemos el departamento del coordinador
     if (!currentUser || !currentUser.departmentId) {
         console.error('No se pudo determinar el departamento del coordinador');
         showErrorMessage('Error al cargar empleados: No se pudo determinar su departamento');
@@ -455,18 +475,30 @@ function loadEmployees() {
     
     console.log('Cargando empleados para departamento:', currentUser.departmentId);
     
+    // Verificar que Firebase está disponible
+    if (typeof firebase === 'undefined' || !firebase.firestore) {
+        console.error('Firebase o Firestore no están disponibles');
+        showErrorMessage('Error al cargar empleados: No se pudo conectar a la base de datos');
+        showLoadingState(false);
+        return;
+    }
+    
     try {
-        // Verificar que employeesCollection esté disponible
-        if (!window.employeesCollection) {
-            console.error('Error: employeesCollection no está disponible');
-            showErrorMessage('Error al cargar empleados: No se pudo conectar a la base de datos');
+        // Obtener la colección de empleados directamente de Firestore
+        const db = firebase.firestore();
+        const employeesRef = db.collection('employees');
+        
+        if (!employeesRef) {
+            console.error('Error: No se pudo acceder a la colección de empleados');
+            showErrorMessage('Error al cargar empleados: No se pudo acceder a la base de datos');
             showLoadingState(false);
             return;
         }
         
-        // Use Firestore to get employees
         console.log('Intentando cargar empleados usando Firestore...');
-        window.employeesCollection
+        
+        // Realizar la consulta
+        employeesRef
             .where('departmentId', '==', currentUser.departmentId)
             .get()
             .then(querySnapshot => {
@@ -483,18 +515,18 @@ function loadEmployees() {
                     }
                 });
                 
-                // Sort employees by name
+                // Ordenar empleados por nombre
                 employees.sort((a, b) => {
                     return (a.name || '').localeCompare(b.name || '');
                 });
                 
-                // Store for later use
+                // Guardar para uso posterior
                 employeeList = employees;
                 
-                // Display employees in UI
+                // Mostrar empleados en la UI
                 displayEmployees(employees);
                 
-                // Update total employees count
+                // Actualizar contador de empleados
                 const totalEmployeesCount = document.getElementById('total-employees-count');
                 if (totalEmployeesCount) {
                     totalEmployeesCount.textContent = employees.length;
@@ -503,20 +535,20 @@ function loadEmployees() {
                 console.log("Empleados cargados correctamente:", employees.length);
                 showLoadingState(false);
                 
-                // Trigger initial date check
+                // Verificar fecha inicial
                 const datePicker = document.getElementById('confirmation-date');
                 if (datePicker && datePicker.value) {
                     loadExistingConfirmations(datePicker.value);
                 }
             })
             .catch(error => {
-                console.error("Error loading employees:", error);
+                console.error("Error al cargar empleados:", error);
                 showErrorMessage("Error al cargar la lista de empleados. Por favor intente de nuevo.");
                 showLoadingState(false);
             });
     } catch (error) {
-        console.error("Error al cargar empleados:", error);
-        showErrorMessage("Error al cargar empleados. Por favor intente de nuevo.");
+        console.error("Error general al cargar empleados:", error);
+        showErrorMessage("Error general al cargar empleados. Por favor recargue la página.");
         showLoadingState(false);
     }
 }

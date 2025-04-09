@@ -6,40 +6,49 @@ const firebaseConfig = {
   authDomain: "comedor-grupoavika.firebaseapp.com",
   databaseURL: "https://comedor-grupoavika-default-rtdb.firebaseio.com",
   projectId: "comedor-grupoavika",
-  storageBucket: "comedor-grupoavika.firebasestorage.app",
+  storageBucket: "comedor-grupoavika.appspot.com",
   messagingSenderId: "277401445097",
   appId: "1:277401445097:web:f1da7e5c8b3f3ab3570678",
   measurementId: "G-P3ZDJJQVW9"
 };
 
 // Initialize Firebase only if it hasn't been initialized already
-if (typeof firebase !== 'undefined' && !firebase.apps.length) {
-  firebase.initializeApp(firebaseConfig);
+if (typeof firebase !== 'undefined') {
+  if (!firebase.apps || !firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+    console.log("Firebase inicializado correctamente");
+  } else {
+    console.log("Firebase ya estaba inicializado");
+  }
+} else {
+  console.error("Firebase no está disponible. Verifica que los scripts se hayan cargado correctamente.");
 }
 
 // Get Firebase services
-const db = firebase.firestore();
-const auth = firebase.auth();
-
-// Initialize analytics if available
-let analytics = null;
+let db;
 try {
-  if (firebase.analytics) {
-    analytics = firebase.analytics();
-  }
-} catch (e) {
-  console.warn("Firebase analytics not available: ", e);
+  db = firebase.firestore();
+  console.log("Firestore inicializado correctamente");
+} catch (error) {
+  console.error("Error al inicializar Firestore:", error);
 }
 
-// Make services and collections available globally
-window.db = db;
-window.auth = auth;
-window.analytics = analytics;
-window.employeesCollection = db.collection("employees");
-window.confirmationsCollection = db.collection("confirmations");
-window.menuCollection = db.collection("menus");
+// Create references to collections
+let employeesCollection, menusCollection, confirmationsCollection;
 
-// Also expose as variables for direct imports
-const employeesCollection = db.collection("employees");
-const confirmationsCollection = db.collection("confirmations");
-const menuCollection = db.collection("menus");
+try {
+  // Initialize collections
+  employeesCollection = db.collection('employees');
+  menusCollection = db.collection('menus');
+  confirmationsCollection = db.collection('confirmations');
+  
+  // Make collections available globally
+  window.db = db;
+  window.employeesCollection = employeesCollection;
+  window.menusCollection = menusCollection;
+  window.confirmationsCollection = confirmationsCollection;
+  
+  console.log("Colecciones de Firestore inicializadas correctamente");
+} catch (error) {
+  console.error("Error al inicializar colecciones de Firestore:", error);
+}
