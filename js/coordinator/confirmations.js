@@ -600,9 +600,9 @@ function showInfoMessage(message, duration = 5000) {
     }
 }
 
-// Export functions for use in other modules if needed
-export {
+// Expose functions for use in other modules if needed
+window.confirmationsModule = {
     loadEmployees,
     saveConfirmation,
     formatDateInput
-}; 
+};

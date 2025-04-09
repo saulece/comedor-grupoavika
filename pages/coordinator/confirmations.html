@@ -198,7 +198,7 @@
     <div id="success-alert" class="alert-message success-message" style="display: none;"></div>
     <div id="info-alert" class="alert-message info-message" style="display: none;"></div>
 
-    <!-- Firebase Scripts - cambiar a v8 -->
+    <!-- Firebase Scripts -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
@@ -208,9 +208,19 @@
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
 
-    <!-- Custom Scripts - quitar type="module" -->
+    <!-- Firebase Config - Debe cargarse después de Firebase pero antes de los módulos de utilidad -->
     <script src="../../js/firebase-config.js"></script>
+    
+    <!-- Utility Scripts - Módulos de utilidad en orden de dependencia -->
+    <script src="../../js/utils/logger.js"></script>
+    <script src="../../js/utils/date-utils.js"></script>
+    <script src="../../js/utils/error-handler.js"></script>
+    
+    <!-- Servicios y autenticación -->
+    <script src="../../js/services/firestore.js"></script>
     <script src="../../js/auth.js"></script>
+    
+    <!-- Script principal de la página -->
     <script src="../../js/coordinator/confirmations.js"></script>
 </body>
 </html>
