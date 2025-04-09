@@ -562,7 +562,7 @@ function displayEmployees(employees) {
     
     const employeeTableBody = document.getElementById('employees-table-body');
     if (!employeeTableBody) {
-        console.error('No se encontr\u00f3 el elemento employees-table-body');
+        console.error('No se encontró el elemento employees-table-body');
         return;
     }
     
@@ -636,7 +636,7 @@ function displayEmployees(employees) {
  */
 function loadExistingConfirmations(dateString) {
     if (!dateString || !isValidDateString(dateString)) {
-        console.error('Fecha inv\u00e1lida para cargar confirmaciones');
+        console.error('Fecha inválida para cargar confirmaciones');
         return;
     }
     
@@ -697,7 +697,7 @@ function loadExistingConfirmations(dateString) {
             const confirmationDoc = snapshot.docs[0];
             const confirmationData = confirmationDoc.data();
             
-            console.log('Confirmaci\u00f3n encontrada:', confirmationData);
+            console.log('Confirmación encontrada:', confirmationData);
             
             // Load comments if they exist
             const commentsField = document.getElementById('confirmation-comments');
@@ -731,7 +731,7 @@ function loadExistingConfirmations(dateString) {
                 updateSelectAllCheckboxState();
                 updateEmployeeCount();
                 
-                showInfoMessage(`Se carg\u00f3 la confirmaci\u00f3n existente con ${selectedEmployeeIds.length} empleados`);
+                showInfoMessage(`Se cargó la confirmación existente con ${selectedEmployeeIds.length} empleados`);
             }
             
             showLoadingState(false);
@@ -750,7 +750,7 @@ function loadExistingConfirmations(dateString) {
 async function saveConfirmation(event) {
     if (event) event.preventDefault();
     
-    console.log("Guardando confirmaci\u00f3n...");
+    console.log("Guardando confirmación...");
     
     // Validate form
     if (!validateConfirmationForm()) {
@@ -770,7 +770,7 @@ async function saveConfirmation(event) {
         const date = dateInput.value;
         const comments = commentsInput ? commentsInput.value.trim() : '';
         
-        console.log(`Guardando confirmaci\u00f3n para ${date} con ${selectedEmployeeIds.length} empleados`);
+        console.log(`Guardando confirmación para ${date} con ${selectedEmployeeIds.length} empleados`);
         
         // Check if we already have a confirmation for this date
         const querySnapshot = await confirmationsCollection
@@ -798,13 +798,13 @@ async function saveConfirmation(event) {
             confirmationData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
             const docRef = await confirmationsCollection.add(confirmationData);
             confirmationId = docRef.id;
-            showSuccessMessage('Confirmaci\u00f3n guardada correctamente.');
+            showSuccessMessage('Confirmación guardada correctamente.');
         } else {
             // Update existing confirmation
             const docRef = querySnapshot.docs[0].ref;
             confirmationId = docRef.id;
             await docRef.update(confirmationData);
-            showSuccessMessage('Confirmaci\u00f3n actualizada correctamente.');
+            showSuccessMessage('Confirmación actualizada correctamente.');
         }
         
         // Update UI status
@@ -820,10 +820,10 @@ async function saveConfirmation(event) {
             estadoElement.textContent = 'Enviado';
         }
         
-        console.log("Confirmaci\u00f3n guardada exitosamente");
+        console.log("Confirmación guardada exitosamente");
     } catch (error) {
         console.error("Error saving confirmation:", error);
-        showErrorMessage("Error al guardar la confirmaci\u00f3n. Por favor intente de nuevo.");
+        showErrorMessage("Error al guardar la confirmación. Por favor intente de nuevo.");
     } finally {
         // Hide loading state
         showLoadingState(false);
@@ -838,7 +838,7 @@ function validateConfirmationForm() {
     // Get form values
     const datePicker = document.getElementById('confirmation-date');
     if (!datePicker) {
-        showErrorMessage("Error: No se encontr\u00f3 el selector de fecha.");
+        showErrorMessage("Error: No se encontró el selector de fecha.");
         return false;
     }
     
@@ -866,12 +866,12 @@ function validateConfirmationForm() {
 function showLoadingState(isLoading) {
     const mainContent = document.querySelector('.main-content');
     
-    // Espera un momento para asegurarnos que estamos en el mismo hilo de ejecuci\u00f3n
+    // Espera un momento para asegurarnos que estamos en el mismo hilo de ejecución
     setTimeout(() => {
         // Mostrar mensaje de carga en la tabla
         const employeeTableBody = document.getElementById('employees-table-body');
         if (employeeTableBody && isLoading) {
-            // Solo si est\u00e1 cargando y no hay contenido
+            // Solo si está cargando y no hay contenido
             if (employeeTableBody.childElementCount === 0) {
                 employeeTableBody.innerHTML = `
                     <tr>
@@ -902,7 +902,7 @@ function showLoadingState(isLoading) {
  * @param {number} duration - Duration in milliseconds to show the message
  */
 function showErrorMessage(message, duration = 5000) {
-    // Mostrar alerta con alert nativo (m\u00e1s sencillo y garantizado)
+    // Mostrar alerta con alert nativo (más sencillo y garantizado)
     alert(`Error: ${message}`);
     console.error(message);
 }
@@ -913,8 +913,8 @@ function showErrorMessage(message, duration = 5000) {
  * @param {number} duration - Duration in milliseconds to show the message
  */
 function showSuccessMessage(message, duration = 3000) {
-    // Mostrar alerta con alert nativo (m\u00e1s sencillo y garantizado)
-    alert(`\u00c9xito: ${message}`);
+    // Mostrar alerta con alert nativo (más sencillo y garantizado)
+    alert(`Éxito: ${message}`);
     console.log(message);
 }
 
