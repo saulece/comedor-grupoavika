@@ -3,15 +3,9 @@
  * Manages the registration of daily meal confirmations for employees
  */
 
-// Constants
-const USER_ROLES = {
-    ADMIN: 'admin',
-    COORDINATOR: 'coordinator'
-};
-
-// References a servicios y colecciones de Firebase
+// Referencias a servicios y colecciones de Firebase
+// Usar window para acceder a los objetos globales
 const db = window.db;
-const auth = window.auth;
 const employeesCollection = window.employeesCollection;
 const confirmationsCollection = window.confirmationsCollection;
 
@@ -24,25 +18,43 @@ let selectedEmployeeIds = []; // Track selected employee IDs for easier operatio
  * Initialize the module when DOM is ready
  */
 document.addEventListener('DOMContentLoaded', () => {
-    // Check if user has correct role
-    if (!checkAuth(USER_ROLES.COORDINATOR)) {
-        console.error('Unauthorized access to coordinator confirmations');
+    console.log("Inicializando módulo de confirmaciones...");
+    
+    // Check if user has correct role - we don't redefine USER_ROLES here, use the global one
+    if (!checkAuth('coordinator')) {
+        console.error('Acceso no autorizado a confirmaciones de coordinador');
         return;
     }
     
     // Get current user from session storage
     try {
         // Extract all possible user data from sessionStorage
-        const user = JSON.parse(sessionStorage.getItem('user') || '{}');
+        const userJson = sessionStorage.getItem('user');
+        let user = {};
+        
+        if (userJson) {
+            try {
+                user = JSON.parse(userJson);
+            } catch(e) {
+                console.error("Error al parsear datos de usuario:", e);
+            }
+        }
+        
         const userId = user.uid || sessionStorage.getItem('userId');
         const userName = user.displayName || sessionStorage.getItem('userName');
         const userEmail = user.email || sessionStorage.getItem('userEmail');
         const departmentId = user.departmentId || sessionStorage.getItem('userDepartmentId') || sessionStorage.getItem('userDepartment');
         const departmentName = user.department || sessionStorage.getItem('userDepartment');
         
+        console.log("Datos del usuario obtenidos:", { userId, userName, departmentId });
+        
         if (!userId || !departmentId) {
-            console.error('User session data incomplete');
-            window.location.href = '../../index.html';
+            console.error('Datos de sesión de usuario incompletos');
+            alert('Error: No se pudo identificar su departamento. Por favor inicie sesión nuevamente.');
+            // Redirigir al login después de 2 segundos
+            setTimeout(() => {
+                window.location.href = '../../index.html';
+            }, 2000);
             return;
         }
         
@@ -60,37 +72,158 @@ document.addEventListener('DOMContentLoaded', () => {
             userNameElement.textContent = userName || 'Coordinador';
         }
         
-        // Log successful user load
         console.log('Usuario cargado correctamente:', currentUser);
     } catch (error) {
         console.error('Error al procesar datos del usuario:', error);
-        window.location.href = '../../index.html';
+        alert('Error al cargar los datos del usuario. Por favor inicie sesión nuevamente.');
+        setTimeout(() => {
+            window.location.href = '../../index.html';
+        }, 2000);
         return;
     }
     
     // Initialize components
-    initializeDatePickers();
-    loadEmployees();
     setupEventListeners();
-    
-    // Check if there's a date in the URL query params
-    const urlParams = new URLSearchParams(window.location.search);
-    const dateParam = urlParams.get('date');
-    if (dateParam) {
-        const datePicker = document.getElementById('confirmation-date');
-        if (datePicker && isValidDateString(dateParam)) {
-            // If Flatpickr is initialized, use its API
-            if (datePicker._flatpickr) {
-                datePicker._flatpickr.setDate(dateParam);
-            } else {
-                // Fallback to standard input
-                datePicker.value = dateParam;
-                // Load existing confirmations for this date
-                loadExistingConfirmations(dateParam);
-            }
-        }
-    }
+    handleDatePicker();
+    loadEmployees();
 });
+
+/**
+ * Setup event listeners for interactive elements
+ */
+function setupEventListeners() {
+    console.log("Configurando manejadores de eventos...");
+    
+    // Save confirmation button
+    const saveButton = document.getElementById('submit-confirmation-btn');
+    if (saveButton) {
+        saveButton.addEventListener('click', saveConfirmation);
+    } else {
+        console.warn('Botón de guardar confirmación no encontrado');
+    }
+    
+    // Select all employees button
+    const selectAllButton = document.getElementById('select-all-btn');
+    if (selectAllButton) {
+        selectAllButton.addEventListener('click', () => selectAllEmployees(true));
+    }
+    
+    // Clear selection button
+    const clearSelectionButton = document.getElementById('clear-selection-btn');
+    if (clearSelectionButton) {
+        clearSelectionButton.addEventListener('click', () => selectAllEmployees(false));
+    }
+    
+    // Select all checkbox
+    const selectAllCheckbox = document.getElementById('select-all-employees');
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', toggleAllEmployees);
+    }
+    
+    // Employee search input
+    const searchInput = document.getElementById('employee-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', filterEmployees);
+    }
+    
+    // Logout button
+    const logoutButton = document.getElementById('logout-btn');
+    if (logoutButton) {
+        logoutButton.addEventListener('click', () => {
+            sessionStorage.clear();
+            window.location.href = '../../index.html';
+        });
+    }
+}
+
+/**
+ * Handle the date picker initialization
+ */
+function handleDatePicker() {
+    console.log("Inicializando selector de fecha...");
+    
+    const datePicker = document.getElementById('confirmation-date');
+    if (!datePicker) {
+        console.warn('Elemento de selector de fecha no encontrado');
+        return;
+    }
+    
+    // Set default to today
+    const today = new Date();
+    const formattedToday = formatDateInput(today);
+    
+    // Verificar si Flatpickr ya está inicializado
+    if (typeof flatpickr === 'function' && !datePicker._flatpickr) {
+        try {
+            // Define day names with correct accents
+            const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+            
+            flatpickr(datePicker, {
+                dateFormat: "Y-m-d",
+                locale: {
+                    firstDayOfWeek: 1,
+                    weekdays: {
+                        shorthand: ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'],
+                        longhand: diasSemana
+                    }
+                },
+                defaultDate: formattedToday,
+                minDate: formattedToday,
+                maxDate: new Date().fp_incr(14), // 14 days from today
+                disableMobile: true,
+                onChange: function(selectedDates, dateStr) {
+                    console.log('Fecha seleccionada:', dateStr);
+                    loadExistingConfirmations(dateStr);
+                    showDayOfWeek(dateStr);
+                }
+            });
+            
+            console.log('Flatpickr inicializado correctamente');
+        } catch (error) {
+            console.error('Error al inicializar Flatpickr:', error);
+            
+            // Fallback to native date input
+            datePicker.type = 'date';
+            datePicker.value = formattedToday;
+            datePicker.min = formattedToday;
+            datePicker.max = formatDateInput(new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000));
+            
+            datePicker.addEventListener('change', function() {
+                const selectedDate = this.value;
+                if (selectedDate) {
+                    loadExistingConfirmations(selectedDate);
+                    showDayOfWeek(selectedDate);
+                }
+            });
+        }
+    } else if (datePicker._flatpickr) {
+        console.log('Flatpickr ya inicializado, añadiendo manejador...');
+        const existingInstance = datePicker._flatpickr;
+        existingInstance.config.onChange.push((selectedDates, dateStr) => {
+            loadExistingConfirmations(dateStr);
+            showDayOfWeek(dateStr);
+        });
+    } else {
+        console.warn('Flatpickr no está disponible');
+        // Usar input nativo
+        datePicker.type = 'date';
+        datePicker.value = formattedToday;
+        datePicker.min = formattedToday;
+        datePicker.max = formatDateInput(new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000));
+        
+        datePicker.addEventListener('change', function() {
+            const selectedDate = this.value;
+            if (selectedDate) {
+                loadExistingConfirmations(selectedDate);
+                showDayOfWeek(selectedDate);
+            }
+        });
+    }
+    
+    // Trigger initial load with today's date
+    loadExistingConfirmations(formattedToday);
+    showDayOfWeek(formattedToday);
+}
 
 /**
  * Format date object to YYYY-MM-DD string
@@ -132,103 +265,6 @@ function isValidDateString(dateString) {
 }
 
 /**
- * Initialize date picker with appropriate constraints
- */
-function initializeDatePickers() {
-    const datePicker = document.getElementById('confirmation-date');
-    
-    if (!datePicker) {
-        console.warn('Date picker element not found');
-        return;
-    }
-    
-    // Set default to today
-    const today = new Date();
-    const formattedToday = formatDateInput(today);
-    
-    // Check if Flatpickr is already initialized from HTML
-    if (datePicker._flatpickr) {
-        console.log('Flatpickr ya está inicializado en HTML, usando instancia existente');
-        
-        // Add our custom onChange handler to existing instance
-        const existingInstance = datePicker._flatpickr;
-        const existingOnChange = existingInstance.config.onChange;
-        
-        existingInstance.config.onChange = function(selectedDates, dateStr, instance) {
-            // Call original onChange if it exists
-            if (existingOnChange) {
-                existingOnChange.call(this, selectedDates, dateStr, instance);
-            }
-            
-            console.log('Fecha seleccionada (handler añadido):', dateStr);
-            loadExistingConfirmations(dateStr);
-            showDayOfWeek(dateStr);
-        };
-        
-        // Trigger initial load
-        showDayOfWeek(formattedToday);
-        loadExistingConfirmations(formattedToday);
-        return;
-    }
-    
-    console.log('Inicializando nuevo Flatpickr desde JS');
-    
-    // Define day names with correct accents
-    const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-    
-    try {
-        // Initialize flatpickr
-        flatpickr(datePicker, {
-            dateFormat: "Y-m-d",
-            locale: {
-                firstDayOfWeek: 1,
-                weekdays: {
-                    shorthand: ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'],
-                    longhand: diasSemana
-                }
-            },
-            defaultDate: formattedToday,
-            minDate: formattedToday,
-            maxDate: new Date().fp_incr(14), // 14 days from today
-            disableMobile: true,
-            onChange: function(selectedDates, dateStr) {
-                console.log('Fecha seleccionada:', dateStr);
-                loadExistingConfirmations(dateStr);
-                showDayOfWeek(dateStr);
-            }
-        });
-        
-        // Show day of week for initial date
-        showDayOfWeek(formattedToday);
-        
-        // Load existing confirmations for initial date
-        loadExistingConfirmations(formattedToday);
-        
-        console.log('Flatpickr inicializado correctamente');
-    } catch (error) {
-        console.error('Error al inicializar Flatpickr:', error);
-        
-        // Fallback to native date input if Flatpickr fails
-        datePicker.type = 'date';
-        datePicker.value = formattedToday;
-        datePicker.min = formattedToday;
-        datePicker.max = formatDateInput(new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000));
-        
-        datePicker.addEventListener('change', function() {
-            const selectedDate = this.value;
-            if (selectedDate) {
-                loadExistingConfirmations(selectedDate);
-                showDayOfWeek(selectedDate);
-            }
-        });
-        
-        // Trigger initial load
-        loadExistingConfirmations(formattedToday);
-        showDayOfWeek(formattedToday);
-    }
-}
-
-/**
  * Display day of week for selected date
  * @param {string} dateString - Date in YYYY-MM-DD format
  */
@@ -261,71 +297,6 @@ function showDayOfWeek(dateString) {
     // Add the day display after the date input
     if (dateContainer) {
         dateContainer.appendChild(dayDisplay);
-    }
-}
-
-/**
- * Setup event listeners for interactive elements
- */
-function setupEventListeners() {
-    // Save confirmation button
-    const saveButton = document.getElementById('submit-confirmation-btn');
-    if (saveButton) {
-        saveButton.addEventListener('click', saveConfirmation);
-    }
-    
-    // Select all employees button
-    const selectAllButton = document.getElementById('select-all-btn');
-    if (selectAllButton) {
-        selectAllButton.addEventListener('click', () => selectAllEmployees(true));
-    }
-    
-    // Clear selection button
-    const clearSelectionButton = document.getElementById('clear-selection-btn');
-    if (clearSelectionButton) {
-        clearSelectionButton.addEventListener('click', () => selectAllEmployees(false));
-    }
-    
-    // Select all checkbox
-    const selectAllCheckbox = document.getElementById('select-all-employees');
-    if (selectAllCheckbox) {
-        selectAllCheckbox.addEventListener('change', toggleAllEmployees);
-    }
-    
-    // Employee search input
-    const searchInput = document.getElementById('employee-search');
-    if (searchInput) {
-        searchInput.addEventListener('input', filterEmployees);
-    }
-    
-    // Close modal buttons
-    const closeModalButtons = document.querySelectorAll('.close-modal');
-    closeModalButtons.forEach(button => {
-        button.addEventListener('click', () => {
-            const modal = document.getElementById('confirmation-success-modal');
-            if (modal) {
-                modal.style.display = 'none';
-            }
-        });
-    });
-    
-    // View dashboard button in success modal
-    const viewDashboardButton = document.getElementById('view-dashboard-btn');
-    if (viewDashboardButton) {
-        viewDashboardButton.addEventListener('click', () => {
-            window.location.href = 'dashboard.html';
-        });
-    }
-    
-    // Logout button
-    const logoutButton = document.getElementById('logout-btn');
-    if (logoutButton) {
-        logoutButton.addEventListener('click', () => {
-            // Clear session data
-            sessionStorage.clear();
-            // Redirect to login page
-            window.location.href = '../../index.html';
-        });
     }
 }
 
@@ -453,8 +424,9 @@ function filterEmployees() {
  */
 function updateEmployeeCount() {
     const selectedCount = selectedEmployeeIds.length;
-    const totalCount = document.querySelectorAll('.employee-select').length;
+    const totalCount = employeeList.length;
     
+    // Update selection count display
     const countDisplay = document.getElementById('selected-employee-count');
     if (countDisplay) {
         countDisplay.textContent = `${selectedCount} de ${totalCount} seleccionados`;
@@ -465,12 +437,25 @@ function updateEmployeeCount() {
     if (confirmedCountDisplay) {
         confirmedCountDisplay.textContent = selectedCount;
     }
+    
+    // Update the counter in the UI
+    const counterElement = document.querySelector('.Total.Empleados + div');
+    if (counterElement) {
+        counterElement.textContent = totalCount.toString();
+    }
+    
+    // Update the confirmed counter in the UI
+    const confirmedElement = document.querySelector('.Confirmados + div');
+    if (confirmedElement) {
+        confirmedElement.textContent = selectedCount.toString();
+    }
 }
 
 /**
  * Load employees for the coordinator's department
  */
 function loadEmployees() {
+    console.log("Cargando empleados...");
     showLoadingState(true);
     
     // Verify we have the coordinator's department
@@ -486,7 +471,6 @@ function loadEmployees() {
     // Use Firestore to get employees
     employeesCollection
         .where('departmentId', '==', currentUser.departmentId)
-        .where('status', '==', 'active')  // Only get active employees
         .get()
         .then(querySnapshot => {
             console.log(`Se encontraron ${querySnapshot.size} empleados`);
@@ -495,7 +479,11 @@ function loadEmployees() {
             querySnapshot.forEach(doc => {
                 const employee = doc.data();
                 employee.id = doc.id;
-                employees.push(employee);
+                
+                // Solo incluir empleados activos o sin estado definido
+                if (employee.status !== 'inactive') {
+                    employees.push(employee);
+                }
             });
             
             // Sort employees by name
@@ -515,8 +503,14 @@ function loadEmployees() {
                 totalEmployeesCount.textContent = employees.length;
             }
             
-            // Hide loading state
+            console.log("Empleados cargados correctamente:", employees.length);
             showLoadingState(false);
+            
+            // Trigger initial date check
+            const datePicker = document.getElementById('confirmation-date');
+            if (datePicker && datePicker.value) {
+                loadExistingConfirmations(datePicker.value);
+            }
         })
         .catch(error => {
             console.error("Error loading employees:", error);
@@ -530,6 +524,8 @@ function loadEmployees() {
  * @param {Array} employees - List of employee objects
  */
 function displayEmployees(employees) {
+    console.log("Mostrando empleados en la interfaz...");
+    
     const employeeTableBody = document.getElementById('employees-table-body');
     if (!employeeTableBody) {
         console.error('No se encontró el elemento employees-table-body');
@@ -543,6 +539,7 @@ function displayEmployees(employees) {
         const emptyRow = document.createElement('tr');
         emptyRow.innerHTML = `<td colspan="4" class="text-center">No hay empleados registrados</td>`;
         employeeTableBody.appendChild(emptyRow);
+        updateEmployeeCount();
         return;
     }
     
@@ -609,6 +606,7 @@ function loadExistingConfirmations(dateString) {
         return;
     }
     
+    console.log("Cargando confirmaciones para", dateString);
     showLoadingState(true);
     
     // Clear existing selected employees
@@ -619,6 +617,12 @@ function loadExistingConfirmations(dateString) {
     if (statusElement) {
         statusElement.textContent = 'Cargando...';
         statusElement.className = '';
+    }
+    
+    // Update estado en la interfaz principal
+    const estadoElement = document.querySelector('.Estado + div');
+    if (estadoElement) {
+        estadoElement.textContent = 'Cargando...';
     }
     
     // Query existing confirmations for this date and department
@@ -634,6 +638,11 @@ function loadExistingConfirmations(dateString) {
                 if (statusElement) {
                     statusElement.textContent = 'No enviado';
                     statusElement.className = 'status-pending';
+                }
+                
+                // Update estado en la interfaz principal
+                if (estadoElement) {
+                    estadoElement.textContent = 'No enviado';
                 }
                 
                 // Clear comments field
@@ -666,6 +675,11 @@ function loadExistingConfirmations(dateString) {
             if (statusElement) {
                 statusElement.textContent = 'Enviado';
                 statusElement.className = 'status-completed';
+            }
+            
+            // Update estado en la interfaz principal
+            if (estadoElement) {
+                estadoElement.textContent = 'Enviado';
             }
             
             // Get selected employees array
@@ -702,6 +716,8 @@ function loadExistingConfirmations(dateString) {
 async function saveConfirmation(event) {
     if (event) event.preventDefault();
     
+    console.log("Guardando confirmación...");
+    
     // Validate form
     if (!validateConfirmationForm()) {
         return;
@@ -719,6 +735,8 @@ async function saveConfirmation(event) {
         
         const date = dateInput.value;
         const comments = commentsInput ? commentsInput.value.trim() : '';
+        
+        console.log(`Guardando confirmación para ${date} con ${selectedEmployeeIds.length} empleados`);
         
         // Check if we already have a confirmation for this date
         const querySnapshot = await confirmationsCollection
@@ -762,17 +780,13 @@ async function saveConfirmation(event) {
             statusElement.className = 'status-completed';
         }
         
-        // Show success modal with count
-        const successModal = document.getElementById('confirmation-success-modal');
-        const modalConfirmedCount = document.getElementById('modal-confirmed-count');
-        
-        if (successModal && modalConfirmedCount) {
-            modalConfirmedCount.textContent = selectedEmployeeIds.length;
-            successModal.style.display = 'block';
+        // Update estado en la interfaz principal
+        const estadoElement = document.querySelector('.Estado + div');
+        if (estadoElement) {
+            estadoElement.textContent = 'Enviado';
         }
         
-        // Update confirmation history if it exists on the page
-        updateConfirmationHistory();
+        console.log("Confirmación guardada exitosamente");
     } catch (error) {
         console.error("Error saving confirmation:", error);
         showErrorMessage("Error al guardar la confirmación. Por favor intente de nuevo.");
@@ -783,58 +797,18 @@ async function saveConfirmation(event) {
 }
 
 /**
- * Update confirmation history table if it exists on the page
- */
-function updateConfirmationHistory() {
-    const historyBody = document.getElementById('confirmation-history-body');
-    if (!historyBody) return; // Not on this page
-    
-    // Query recent confirmations
-    confirmationsCollection
-        .where('coordinatorId', '==', currentUser.uid)
-        .orderBy('date', 'desc')
-        .limit(5)
-        .get()
-        .then(snapshot => {
-            if (snapshot.empty) {
-                historyBody.innerHTML = `
-                    <tr>
-                        <td colspan="4" class="text-center">No hay confirmaciones registradas</td>
-                    </tr>
-                `;
-                return;
-            }
-            
-            let historyHTML = '';
-            snapshot.forEach(doc => {
-                const confirmation = doc.data();
-                const confirmedCount = confirmation.confirmedCount || (confirmation.employees ? confirmation.employees.length : 0);
-                const createdDate = confirmation.createdAt ? new Date(confirmation.createdAt.seconds * 1000) : new Date();
-                
-                historyHTML += `
-                    <tr>
-                        <td>${confirmation.date}</td>
-                        <td>${confirmedCount}</td>
-                        <td class="status-completed">Enviado</td>
-                        <td>${createdDate.toLocaleString()}</td>
-                    </tr>
-                `;
-            });
-            
-            historyBody.innerHTML = historyHTML;
-        })
-        .catch(error => {
-            console.error('Error loading confirmation history:', error);
-        });
-}
-
-/**
  * Validate confirmation form inputs
  * @returns {boolean} - Whether the form is valid
  */
 function validateConfirmationForm() {
     // Get form values
-    const date = document.getElementById('confirmation-date').value;
+    const datePicker = document.getElementById('confirmation-date');
+    if (!datePicker) {
+        showErrorMessage("Error: No se encontró el selector de fecha.");
+        return false;
+    }
+    
+    const date = datePicker.value;
     
     // Check date
     if (!date) {
@@ -856,17 +830,36 @@ function validateConfirmationForm() {
  * @param {boolean} isLoading - Whether to show or hide loading indicator
  */
 function showLoadingState(isLoading) {
-    const loadingIndicator = document.getElementById('loading-indicator');
-    const mainContent = document.getElementById('main-content');
+    const mainContent = document.querySelector('.main-content');
     
-    if (loadingIndicator) {
-        loadingIndicator.style.display = isLoading ? 'flex' : 'none';
-    }
-    
-    if (mainContent) {
-        mainContent.style.opacity = isLoading ? '0.5' : '1';
-        mainContent.style.pointerEvents = isLoading ? 'none' : 'auto';
-    }
+    // Espera un momento para asegurarnos que estamos en el mismo hilo de ejecución
+    setTimeout(() => {
+        // Mostrar mensaje de carga en la tabla
+        const employeeTableBody = document.getElementById('employees-table-body');
+        if (employeeTableBody && isLoading) {
+            // Solo si está cargando y no hay contenido
+            if (employeeTableBody.childElementCount === 0) {
+                employeeTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="text-center">Cargando empleados...</td>
+                    </tr>
+                `;
+            }
+        }
+        
+        // Disable interactive elements
+        const buttons = document.querySelectorAll('button');
+        buttons.forEach(button => {
+            button.disabled = isLoading;
+        });
+        
+        const inputs = document.querySelectorAll('input');
+        inputs.forEach(input => {
+            if (input.type !== 'checkbox') {
+                input.disabled = isLoading;
+            }
+        });
+    }, 0);
 }
 
 /**
@@ -875,16 +868,9 @@ function showLoadingState(isLoading) {
  * @param {number} duration - Duration in milliseconds to show the message
  */
 function showErrorMessage(message, duration = 5000) {
-    const errorAlert = document.getElementById('error-alert');
-    if (errorAlert) {
-        errorAlert.textContent = message;
-        errorAlert.style.display = 'block';
-        
-        // Hide after specified duration
-        setTimeout(() => {
-            errorAlert.style.display = 'none';
-        }, duration);
-    }
+    // Mostrar alerta con alert nativo (más sencillo y garantizado)
+    alert(`Error: ${message}`);
+    console.error(message);
 }
 
 /**
@@ -893,16 +879,9 @@ function showErrorMessage(message, duration = 5000) {
  * @param {number} duration - Duration in milliseconds to show the message
  */
 function showSuccessMessage(message, duration = 3000) {
-    const successAlert = document.getElementById('success-alert');
-    if (successAlert) {
-        successAlert.textContent = message;
-        successAlert.style.display = 'block';
-        
-        // Hide after specified duration
-        setTimeout(() => {
-            successAlert.style.display = 'none';
-        }, duration);
-    }
+    // Mostrar alerta con alert nativo (más sencillo y garantizado)
+    alert(`Éxito: ${message}`);
+    console.log(message);
 }
 
 /**
@@ -911,21 +890,6 @@ function showSuccessMessage(message, duration = 3000) {
  * @param {number} duration - Duration in milliseconds to show the message
  */
 function showInfoMessage(message, duration = 5000) {
-    const infoAlert = document.getElementById('info-alert');
-    if (infoAlert) {
-        infoAlert.textContent = message;
-        infoAlert.style.display = 'block';
-        
-        // Hide after specified duration
-        setTimeout(() => {
-            infoAlert.style.display = 'none';
-        }, duration);
-    }
+    console.log("INFO:", message);
+    // No mostramos mensaje visual para no interrumpir al usuario
 }
-
-// Expose functions for use in other modules if needed
-window.confirmationsModule = {
-    loadEmployees,
-    saveConfirmation,
-    formatDateInput
-};
