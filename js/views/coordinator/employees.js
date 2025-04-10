@@ -1,880 +1,475 @@
-// Coordinator Employees Management for Comedor Grupo Avika
+// Employees.js - Coordinator Employee Management
 
-// Referencia al servicio centralizado de Firebase
-const firebaseService = window.firebaseService;
-
-// Ensure coordinator only access
 document.addEventListener('DOMContentLoaded', () => {
-    if (!checkAuth(USER_ROLES.COORDINATOR)) {
-        return;
-    }
-    
-    // Set user name
-    let userName = 'Coordinador';
-    try {
-        const user = getCurrentUser();
-        if (user) {
-            userName = user.displayName || userName;
+    // Check authentication and role
+    auth.onAuthStateChanged(async (user) => {
+        if (!user) {
+            // Redirect to login if not authenticated
+            window.location.href = '../../index.html';
+            return;
         }
-    } catch (error) {
-        console.error('Error obteniendo datos del usuario:', error);
-    }
+        
+        // Check if user is coordinator
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        if (!userDoc.exists || userDoc.data().role !== 'coordinator') {
+            // Redirect non-coordinator users
+            window.location.href = '../../index.html';
+            return;
+        }
+        
+        // Store user data
+        const userData = userDoc.data();
+        setCurrentUser(userData);
+        setUserRole(userData.role);
+        setUserBranch(userData.branch);
+        
+        // Display user info
+        document.getElementById('userName').textContent = userData.displayName || 'Coordinador';
+        
+        // Get branch details
+        const branchDoc = await db.collection('branches').doc(userData.branch).get();
+        if (branchDoc.exists) {
+            const branchData = branchDoc.data();
+            document.getElementById('branchName').textContent = branchData.name;
+            document.getElementById('branchNameTitle').textContent = branchData.name;
+        }
+        
+        // Initialize employee management
+        initEmployeeManagement(userData.branch, user.uid);
+    });
     
-    const userNameElement = document.getElementById('user-name');
-    if (userNameElement) {
-        userNameElement.textContent = userName;
-    }
-    
-    // Setup logout button
-    const logoutBtn = document.getElementById('logout-btn');
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            logout();
-        });
-    }
-    
-    // Initialize UI
-    loadEmployees();
-    setupEventListeners();
+    // Logout functionality
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+        try {
+            await logout();
+            window.location.href = '../../index.html';
+        } catch (error) {
+            console.error('Error logging out:', error);
+            showError('Error al cerrar sesión. Intente nuevamente.');
+        }
+    });
 });
 
-// Current user information
-let currentUser = getCurrentUser();
-if (!currentUser || Object.keys(currentUser).length === 0) {
-    console.error('No se pudo obtener la información del usuario actual');
-    currentUser = {};
-}
-
-let currentEmployees = []; // Store employees list for the coordinator
-let currentPage = 1;
-const PAGE_SIZE = 10;
-
-// Setup event listeners
-function setupEventListeners() {
+// Initialize employee management
+function initEmployeeManagement(branchId, coordinatorId) {
+    // DOM elements
+    const employeeTableBody = document.getElementById('employeeTableBody');
+    const searchInput = document.getElementById('searchEmployee');
+    const showInactiveCheckbox = document.getElementById('showInactiveEmployees');
+    const addEmployeeBtn = document.getElementById('addEmployeeBtn');
+    const importEmployeesBtn = document.getElementById('importEmployeesBtn');
+    const downloadTemplateBtn = document.getElementById('downloadTemplateBtn');
+    
+    // Modals
+    const employeeModal = document.getElementById('employeeModal');
+    const importModal = document.getElementById('importModal');
+    const deleteModal = document.getElementById('deleteModal');
+    
+    // Employee form elements
+    const employeeForm = document.getElementById('employeeForm');
+    const employeeIdInput = document.getElementById('employeeId');
+    const employeeNameInput = document.getElementById('employeeName');
+    const employeePositionInput = document.getElementById('employeePosition');
+    const employeeRestrictionsInput = document.getElementById('employeeRestrictions');
+    const employeeActiveInput = document.getElementById('employeeActive');
+    const modalTitle = document.getElementById('modalTitle');
+    const saveEmployeeBtn = document.getElementById('saveEmployeeBtn');
+    const cancelEmployeeBtn = document.getElementById('cancelEmployeeBtn');
+    
+    // Import elements
+    const excelFileInput = document.getElementById('excelFile');
+    const uploadExcelBtn = document.getElementById('uploadExcelBtn');
+    const previewContainer = document.getElementById('previewContainer');
+    const previewCount = document.getElementById('previewCount');
+    const previewTableBody = document.getElementById('previewTableBody');
+    const confirmImportBtn = document.getElementById('confirmImportBtn');
+    const cancelImportBtn = document.getElementById('cancelImportBtn');
+    
+    // Delete elements
+    const deleteEmployeeName = document.getElementById('deleteEmployeeName');
+    const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+    const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+    
+    // Close buttons for modals
+    const closeButtons = document.querySelectorAll('.close-modal');
+    
+    // State
+    let employees = [];
+    let filteredEmployees = [];
+    let importData = [];
+    let currentEmployeeId = null;
+    
+    // Load employees
+    loadEmployees();
+    
+    // Event listeners
+    
+    // Search input
+    searchInput.addEventListener('input', filterEmployees);
+    
+    // Show inactive checkbox
+    showInactiveCheckbox.addEventListener('change', filterEmployees);
+    
     // Add employee button
-    const addEmployeeBtn = document.getElementById('add-employee-btn');
-    if (addEmployeeBtn) {
-        addEmployeeBtn.addEventListener('click', showAddEmployeeModal);
-    }
-    
-    // Add employee form
-    const employeeForm = document.getElementById('employee-form');
-    if (employeeForm) {
-        employeeForm.addEventListener('submit', saveEmployee);
-    }
-    
-    // Search employees
-    const searchInput = document.getElementById('employee-search');
-    if (searchInput) {
-        searchInput.addEventListener('input', filterEmployees);
-    }
-    
-    // Close modal buttons
-    const closeModalButtons = document.querySelectorAll('.modal-close, .close-modal-btn, .cancel-modal');
-    closeModalButtons.forEach(button => {
-        button.addEventListener('click', closeModal);
+    addEmployeeBtn.addEventListener('click', () => {
+        // Reset form
+        employeeForm.reset();
+        employeeIdInput.value = '';
+        modalTitle.textContent = 'Agregar Empleado';
+        currentEmployeeId = null;
+        
+        // Show modal
+        employeeModal.style.display = 'block';
     });
     
-    // Import/Export buttons
-    const importBtn = document.getElementById('import-employees-btn');
-    if (importBtn) {
-        importBtn.addEventListener('click', showImportModal);
-    }
-    
-    const exportBtn = document.getElementById('export-employees-btn');
-    if (exportBtn) {
-        exportBtn.addEventListener('click', exportEmployees);
-    }
-    
-    // Pagination buttons
-    const prevPageBtn = document.getElementById('prev-page');
-    if (prevPageBtn) {
-        prevPageBtn.addEventListener('click', () => {
-            if (currentPage > 1) {
-                currentPage--;
-                displayEmployees(currentEmployees);
+    // Save employee button (form submit)
+    employeeForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        try {
+            // Validate form
+            if (!employeeNameInput.value.trim()) {
+                showError('Por favor ingrese el nombre del empleado.');
+                return;
             }
-        });
-    }
-    
-    const nextPageBtn = document.getElementById('next-page');
-    if (nextPageBtn) {
-        nextPageBtn.addEventListener('click', () => {
-            const totalPages = Math.ceil(currentEmployees.length / PAGE_SIZE);
-            if (currentPage < totalPages) {
-                currentPage++;
-                displayEmployees(currentEmployees);
+            
+            // Prepare employee data
+            const employeeData = {
+                name: employeeNameInput.value.trim(),
+                position: employeePositionInput.value.trim(),
+                dietaryRestrictions: employeeRestrictionsInput.value.trim(),
+                active: employeeActiveInput.checked,
+                branch: branchId
+            };
+            
+            if (currentEmployeeId) {
+                // Update existing employee
+                await updateEmployee(currentEmployeeId, employeeData);
+                showSuccess('Empleado actualizado correctamente.');
+            } else {
+                // Add new employee
+                await addEmployee(employeeData, coordinatorId);
+                showSuccess('Empleado agregado correctamente.');
             }
-        });
-    }
+            
+            // Close modal
+            employeeModal.style.display = 'none';
+            
+            // Reload employees
+            loadEmployees();
+        } catch (error) {
+            console.error('Error saving employee:', error);
+            showError('Error al guardar empleado. Intente nuevamente.');
+        }
+    });
     
-    // Download template button
-    const downloadTemplateBtn = document.getElementById('download-template-btn');
-    if (downloadTemplateBtn) {
-        downloadTemplateBtn.addEventListener('click', downloadEmployeeTemplate);
-    }
+    // Cancel employee button
+    cancelEmployeeBtn.addEventListener('click', () => {
+        employeeModal.style.display = 'none';
+    });
     
-    // Import form
-    const importForm = document.getElementById('import-form');
-    if (importForm) {
-        importForm.addEventListener('submit', importEmployees);
-    }
-}
-
-// Load employees for the coordinator's department
-function loadEmployees() {
-    // Show loading state
-    showLoadingState(true);
+    // Import employees button
+    importEmployeesBtn.addEventListener('click', () => {
+        // Reset form
+        excelFileInput.value = '';
+        previewContainer.style.display = 'none';
+        importData = [];
+        
+        // Show modal
+        importModal.style.display = 'block';
+    });
     
-    // Get department ID
-    const departmentId = currentUser.departmentId;
-    if (!departmentId) {
-        showErrorMessage('No se pudo determinar su departamento. Por favor, cierre sesión y vuelva a ingresar.');
-        showLoadingState(false);
-        return;
-    }
-    
-    // Verificar que el servicio de Firebase esté disponible
-    if (!firebaseService) {
-        showErrorMessage('Servicio de Firebase no disponible. Por favor, recargue la página.');
-        showLoadingState(false);
-        return;
-    }
-    
-    // Clear employees list
-    currentEmployees = [];
-    
-    // Usar el servicio de empleados si está disponible
-    if (window.firestoreServices && window.firestoreServices.employee && window.firestoreServices.employee.getEmployeesByDepartment) {
-        window.firestoreServices.employee.getEmployeesByDepartment(departmentId)
-            .then(employees => {
-                currentEmployees = employees;
-                displayEmployees(currentEmployees);
-                showLoadingState(false);
+    // Upload Excel button
+    uploadExcelBtn.addEventListener('click', () => {
+        const file = excelFileInput.files[0];
+        
+        if (!file) {
+            showError('Por favor seleccione un archivo Excel.');
+            return;
+        }
+        
+        // Check file extension
+        const fileExt = file.name.split('.').pop().toLowerCase();
+        if (fileExt !== 'xlsx') {
+            showError('Por favor seleccione un archivo con formato .xlsx');
+            return;
+        }
+        
+        // Parse Excel file
+        parseExcelFile(file)
+            .then(data => {
+                importData = data;
+                
+                // Show preview
+                showImportPreview(data);
             })
             .catch(error => {
-                console.error("Error loading employees:", error);
-                showErrorMessage("Error al cargar la lista de empleados. Por favor intente de nuevo.");
-                showLoadingState(false);
+                console.error('Error parsing Excel:', error);
+                showError(error.message || 'Error al procesar el archivo Excel.');
             });
-        return;
-    }
-    
-    // Implementación de respaldo usando el servicio centralizado
-    const employeesCollection = firebaseService.getCollection('employees');
-    employeesCollection
-        .where('departmentId', '==', departmentId)
-        .orderBy('name')
-        .get()
-        .then(querySnapshot => {
-            querySnapshot.forEach(doc => {
-                const employee = doc.data();
-                employee.id = doc.id;
-                currentEmployees.push(employee);
-            });
-            
-            // Display employees
-            displayEmployees(currentEmployees);
-            
-            // Hide loading state
-            showLoadingState(false);
-        })
-        .catch(error => {
-            console.error("Error loading employees:", error);
-            showErrorMessage("Error al cargar la lista de empleados. Por favor intente de nuevo.");
-            showLoadingState(false);
-        });
-}
-
-// Display employees in the table with pagination
-function displayEmployees(employees) {
-    const employeesTable = document.getElementById('employees-table-body');
-    if (!employeesTable) return;
-    
-    // Clear table
-    employeesTable.innerHTML = '';
-    
-    // Check if there are any employees
-    if (employees.length === 0) {
-        const emptyRow = document.createElement('tr');
-        emptyRow.innerHTML = `
-            <td colspan="6" class="text-center">No hay empleados asignados a su departamento.</td>
-        `;
-        employeesTable.appendChild(emptyRow);
-        updatePagination(0, 0, 0);
-        updateEmployeeCount(0);
-        return;
-    }
-    
-    // Calculate pagination
-    const totalEmployees = employees.length;
-    const totalPages = Math.ceil(totalEmployees / PAGE_SIZE);
-    
-    // Adjust current page if needed
-    if (currentPage > totalPages) {
-        currentPage = totalPages;
-    }
-    
-    // Calculate start and end indices
-    const startIndex = (currentPage - 1) * PAGE_SIZE;
-    const endIndex = Math.min(startIndex + PAGE_SIZE, totalEmployees);
-    
-    // Get current page of employees
-    const pageEmployees = employees.slice(startIndex, endIndex);
-    
-    // Display each employee
-    pageEmployees.forEach((employee, index) => {
-        const row = document.createElement('tr');
-        
-        row.innerHTML = `
-            <td>${startIndex + index + 1}</td>
-            <td>${employee.name || '-'}</td>
-            <td>${employee.position || '-'}</td>
-            <td>${employee.email || '-'}</td>
-            <td>${employee.active !== false ? 'Activo' : 'Inactivo'}</td>
-            <td class="employee-actions">
-                <button class="btn btn-sm btn-primary edit-employee-btn" data-id="${employee.id}">
-                    <i class="fas fa-edit"></i> Editar
-                </button>
-                <button class="btn btn-sm btn-danger delete-employee-btn" data-id="${employee.id}">
-                    <i class="fas fa-trash"></i> Eliminar
-                </button>
-            </td>
-        `;
-        
-        employeesTable.appendChild(row);
-        
-        // Add event listeners to action buttons
-        const editBtn = row.querySelector('.edit-employee-btn');
-        if (editBtn) {
-            editBtn.addEventListener('click', () => {
-                editEmployee(employee);
-            });
-        }
-        
-        const deleteBtn = row.querySelector('.delete-employee-btn');
-        if (deleteBtn) {
-            deleteBtn.addEventListener('click', () => {
-                confirmDeleteEmployee(employee);
-            });
-        }
     });
     
-    // Update pagination
-    updatePagination(startIndex + 1, endIndex, totalEmployees);
-    
-    // Update employee count
-    updateEmployeeCount(totalEmployees);
-}
-
-// Update pagination information
-function updatePagination(start, end, total) {
-    const pageInfo = document.getElementById('page-info');
-    if (pageInfo) {
-        pageInfo.textContent = `${start}-${end} de ${total}`;
-    }
-    
-    const pageNumber = document.getElementById('page-number');
-    if (pageNumber) {
-        const totalPages = Math.ceil(total / PAGE_SIZE);
-        pageNumber.textContent = `Página ${currentPage} de ${totalPages || 1}`;
-    }
-    
-    const prevPageBtn = document.getElementById('prev-page');
-    if (prevPageBtn) {
-        prevPageBtn.disabled = currentPage <= 1;
-    }
-    
-    const nextPageBtn = document.getElementById('next-page');
-    if (nextPageBtn) {
-        const totalPages = Math.ceil(total / PAGE_SIZE);
-        nextPageBtn.disabled = currentPage >= totalPages;
-    }
-}
-
-// Filter employees by search term
-function filterEmployees() {
-    const searchTerm = document.getElementById('employee-search').value.toLowerCase();
-    
-    if (!searchTerm) {
-        // Show all employees
-        displayEmployees(currentEmployees);
-        return;
-    }
-    
-    // Reset to first page
-    currentPage = 1;
-    
-    // Filter employees by name, position, or email
-    const filteredEmployees = currentEmployees.filter(employee => 
-        (employee.name && employee.name.toLowerCase().includes(searchTerm)) || 
-        (employee.position && employee.position.toLowerCase().includes(searchTerm)) ||
-        (employee.email && employee.email.toLowerCase().includes(searchTerm))
-    );
-    
-    // Display filtered employees
-    displayEmployees(filteredEmployees);
-}
-
-// Update employee count
-function updateEmployeeCount(count) {
-    const employeeCount = document.getElementById('employee-count');
-    if (employeeCount) {
-        employeeCount.textContent = count;
-    }
-}
-
-// Show add employee modal
-function showAddEmployeeModal() {
-    // Get modal element
-    const modal = document.getElementById('employee-modal');
-    if (!modal) return;
-    
-    // Set modal title
-    const modalTitle = document.getElementById('employee-modal-title');
-    if (modalTitle) {
-        modalTitle.textContent = 'Agregar Empleado';
-    }
-    
-    // Reset form
-    const form = document.getElementById('employee-form');
-    if (form) {
-        form.reset();
-        
-        // Reset hidden ID field
-        const idField = document.getElementById('employee-id');
-        if (idField) {
-            idField.value = '';
-        }
-    }
-    
-    // Set active status default to active
-    const statusSelect = document.getElementById('employee-status');
-    if (statusSelect) {
-        statusSelect.value = 'active';
-    }
-    
-    // Show modal
-    modal.classList.add('active');
-}
-
-// Edit employee
-function editEmployee(employee) {
-    // Get modal element
-    const modal = document.getElementById('employee-modal');
-    if (!modal) return;
-    
-    // Set modal title
-    const modalTitle = document.getElementById('employee-modal-title');
-    if (modalTitle) {
-        modalTitle.textContent = 'Editar Empleado';
-    }
-    
-    // Fill form with employee data
-    const form = document.getElementById('employee-form');
-    if (form) {
-        // Set employee ID in form
-        const idField = document.getElementById('employee-id');
-        if (idField) {
-            idField.value = employee.id;
+    // Confirm import button
+    confirmImportBtn.addEventListener('click', async () => {
+        if (importData.length === 0) {
+            showError('No hay datos para importar.');
+            return;
         }
         
-        // Fill form fields
-        const nameField = document.getElementById('employee-name');
-        if (nameField) nameField.value = employee.name || '';
-        
-        const emailField = document.getElementById('employee-email');
-        if (emailField) emailField.value = employee.email || '';
-        
-        const positionField = document.getElementById('employee-position');
-        if (positionField) positionField.value = employee.position || '';
-        
-        const statusSelect = document.getElementById('employee-status');
-        if (statusSelect) {
-            statusSelect.value = employee.active !== false ? 'active' : 'inactive';
-        }
-    }
-    
-    // Show modal
-    modal.classList.add('active');
-}
-
-// Close modal
-function closeModal(e) {
-    if (e && e.preventDefault) {
-        e.preventDefault();
-    }
-    
-    // Get all modals
-    document.querySelectorAll('.modal').forEach(modal => {
-        modal.classList.remove('active');
-    });
-}
-
-// Save employee
-async function saveEmployee(event) {
-    event.preventDefault();
-    
-    // Validate form
-    if (!validateEmployeeForm()) {
-        return;
-    }
-    
-    // Show loading state
-    showLoadingState(true);
-    
-    // Verificar que el servicio de Firebase esté disponible
-    if (!firebaseService) {
-        showErrorMessage('Servicio de Firebase no disponible. Por favor, recargue la página.');
-        showLoadingState(false);
-        return;
-    }
-    
-    // Get form values
-    const idField = document.getElementById('employee-id');
-    const employeeId = idField ? idField.value : '';
-    
-    const nameField = document.getElementById('employee-name');
-    const name = nameField ? nameField.value : '';
-    
-    const emailField = document.getElementById('employee-email');
-    const email = emailField ? emailField.value : '';
-    
-    const positionField = document.getElementById('employee-position');
-    const position = positionField ? positionField.value : '';
-    
-    const statusSelect = document.getElementById('employee-status');
-    const active = statusSelect ? statusSelect.value === 'active' : true;
-    
-    // Create employee object
-    const employee = {
-        name: name,
-        email: email,
-        position: position,
-        active: active,
-        departmentId: currentUser.departmentId || sessionStorage.getItem('userDepartmentId'),
-        department: currentUser.department || sessionStorage.getItem('userDepartment'),
-        updatedAt: firebaseService.firestore.FieldValue.serverTimestamp()
-    };
-    
-    try {
-        const employeesCollection = firebaseService.getCollection('employees');
-        
-        if (employeeId) {
-            // Update existing employee
-            await employeesCollection.doc(employeeId).update(employee);
-            showSuccessMessage('Empleado actualizado correctamente');
-        } else {
-            // Add new employee
-            employee.createdAt = firebaseService.firestore.FieldValue.serverTimestamp();
-            await employeesCollection.add(employee);
-            showSuccessMessage('Empleado agregado correctamente');
-        }
-        
-        // Close modal and reload employees
-        closeModal();
-        loadEmployees();
-    } catch (error) {
-        console.error('Error saving employee:', error);
-        showErrorMessage('Error al guardar el empleado. Por favor intente de nuevo.');
-    } finally {
-        showLoadingState(false);
-    }
-}
-
-// Confirm delete employee
-function confirmDeleteEmployee(employee) {
-    // Get or create modal
-    let modal = document.getElementById('delete-employee-modal');
-    
-    if (!modal) {
-        console.error("Delete modal not found");
-        if (confirm(`¿Está seguro de eliminar a ${employee.name}?`)) {
-            deleteEmployee(employee.id);
-        }
-        return;
-    }
-    
-    // Set employee name
-    const nameEl = document.getElementById('delete-employee-name');
-    if (nameEl) {
-        nameEl.textContent = employee.name || 'este empleado';
-    }
-    
-    // Set delete button action
-    const confirmBtn = document.getElementById('confirm-delete-employee-btn');
-    if (confirmBtn) {
-        // Remove previous event listeners
-        const newBtn = confirmBtn.cloneNode(true);
-        confirmBtn.parentNode.replaceChild(newBtn, confirmBtn);
-        
-        // Add new event listener
-        newBtn.addEventListener('click', () => {
-            deleteEmployee(employee.id);
-        });
-    }
-    
-    // Show modal
-    modal.classList.add('active');
-}
-
-// Delete employee
-async function deleteEmployee(employeeId) {
-    // Show loading state
-    showLoadingState(true);
-    
-    // Verificar que el servicio de Firebase esté disponible
-    if (!firebaseService) {
-        showErrorMessage('Servicio de Firebase no disponible. Por favor, recargue la página.');
-        showLoadingState(false);
-        return;
-    }
-    
-    try {
-        // Delete employee from Firestore usando el servicio centralizado
-        const employeesCollection = firebaseService.getCollection('employees');
-        await employeesCollection.doc(employeeId).delete();
-        
-        // Close modal
-        closeModal();
-        
-        // Show success message
-        showSuccessMessage('Empleado eliminado correctamente');
-        
-        // Reload employees
-        loadEmployees();
-    } catch (error) {
-        console.error('Error deleting employee:', error);
-        showErrorMessage('Error al eliminar el empleado. Por favor intente de nuevo.');
-    } finally {
-        showLoadingState(false);
-    }
-}
-
-// Show import modal
-function showImportModal() {
-    const modal = document.getElementById('import-employees-modal');
-    if (modal) {
-        modal.classList.add('active');
-    }
-}
-
-// Download employee template
-function downloadEmployeeTemplate() {
-    // Create CSV content
-    const csvContent = 'name,email,position\nJuan Pérez,juan@example.com,Analista\nMaría López,maria@example.com,Gerente';
-    
-    // Create download link
-    const encodedUri = encodeURI('data:text/csv;charset=utf-8,' + csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', 'plantilla_empleados.csv');
-    document.body.appendChild(link);
-    
-    // Trigger download
-    link.click();
-    
-    // Clean up
-    document.body.removeChild(link);
-}
-
-// Import employees from file
-function importEmployees(event) {
-    event.preventDefault();
-    
-    const fileInput = document.getElementById('import-file');
-    if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
-        showErrorMessage('Por favor seleccione un archivo para importar.');
-        return;
-    }
-    
-    const file = fileInput.files[0];
-    
-    // Show loading state
-    showLoadingState(true);
-    
-    // Create file reader
-    const reader = new FileReader();
-    
-    reader.onload = function(e) {
         try {
-            // Parse CSV
-            const data = e.target.result;
-            const employees = parseCSV(data);
+            // Import employees
+            const result = await importEmployees(importData, branchId, coordinatorId);
             
-            if (employees.length === 0) {
-                throw new Error('No se encontraron datos válidos en el archivo.');
-            }
+            // Close modal
+            importModal.style.display = 'none';
             
-            // Confirm import
-            if (confirm(`¿Desea importar ${employees.length} empleados?`)) {
-                importEmployeesToFirestore(employees);
-            } else {
-                showLoadingState(false);
-            }
+            // Show success message
+            showSuccess(`Se importaron ${result.total} empleados correctamente.`);
+            
+            // Reload employees
+            loadEmployees();
         } catch (error) {
-            console.error('Error parsing file:', error);
-            showErrorMessage('Error al procesar el archivo: ' + error.message);
-            showLoadingState(false);
+            console.error('Error importing employees:', error);
+            showError('Error al importar empleados. Intente nuevamente.');
         }
-    };
-    
-    reader.onerror = function() {
-        showErrorMessage('Error al leer el archivo.');
-        showLoadingState(false);
-    };
-    
-    // Read file as text
-    reader.readAsText(file);
-}
-
-// Parse CSV data
-function parseCSV(csvData) {
-    // Simple CSV parser (you might want to use a library like PapaParse)
-    const lines = csvData.split('\n');
-    const headers = lines[0].split(',').map(header => header.trim().toLowerCase());
-    
-    // Check required headers
-    const requiredHeaders = ['name'];
-    const missingHeaders = requiredHeaders.filter(header => !headers.includes(header));
-    
-    if (missingHeaders.length > 0) {
-        throw new Error(`Faltan columnas requeridas: ${missingHeaders.join(', ')}`);
-    }
-    
-    // Parse rows
-    const employees = [];
-    for (let i = 1; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue;
-        
-        const values = line.split(',');
-        
-        // Skip if no name
-        if (!values[headers.indexOf('name')]) continue;
-        
-        const employee = {
-            name: values[headers.indexOf('name')] || '',
-            email: headers.includes('email') ? values[headers.indexOf('email')] || '' : '',
-            position: headers.includes('position') ? values[headers.indexOf('position')] || '' : '',
-            active: true
-        };
-        
-        employees.push(employee);
-    }
-    
-    return employees;
-}
-
-// Import employees to Firestore
-async function importEmployeesToFirestore(employees) {
-    // Verificar que el servicio de Firebase esté disponible
-    if (!firebaseService) {
-        showErrorMessage('Servicio de Firebase no disponible. Por favor, recargue la página.');
-        return;
-    }
-    
-    try {
-        // Get batch
-        const batch = firebaseService.db.batch();
-        
-        // Add department info to each employee
-        const departmentId = currentUser.departmentId || sessionStorage.getItem('userDepartmentId');
-        const department = currentUser.department || sessionStorage.getItem('userDepartment');
-        
-        const timestamp = firebaseService.firestore.FieldValue.serverTimestamp();
-        
-        // Add employees to batch
-        employees.forEach(employee => {
-            const employeesCollection = firebaseService.getCollection('employees');
-            const employeeRef = employeesCollection.doc();
-            batch.set(employeeRef, {
-                ...employee,
-                departmentId: departmentId,
-                department: department,
-                createdAt: timestamp,
-                updatedAt: timestamp
-            });
-        });
-        
-        // Commit batch
-        await batch.commit();
-        
-        // Show success message
-        showSuccessMessage(`${employees.length} empleados importados correctamente`);
-        
-        // Close modal
-        closeModal();
-        
-        // Reload employees
-        loadEmployees();
-    } catch (error) {
-        console.error('Error importing employees:', error);
-        showErrorMessage('Error al importar empleados. Por favor intente de nuevo.');
-    }
-}
-
-// Export employees to CSV
-function exportEmployees() {
-    // Show loading state
-    showLoadingState(true);
-    
-    try {
-        // Create CSV headers
-        let csvContent = 'data:text/csv;charset=utf-8,';
-        csvContent += 'Nombre,Email,Posición,Estado\n';
-        
-        // Add employees
-        currentEmployees.forEach(employee => {
-            const row = [
-                employee.name || '',
-                employee.email || '',
-                employee.position || '',
-                employee.active !== false ? 'Activo' : 'Inactivo'
-            ];
-            
-            // Escape fields if needed
-            const escapedRow = row.map(field => {
-                field = String(field).replace(/"/g, '""');
-                return field.includes(',') ? `"${field}"` : field;
-            });
-            
-            csvContent += escapedRow.join(',') + '\n';
-        });
-        
-        // Create download link
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement('a');
-        link.setAttribute('href', encodedUri);
-        link.setAttribute('download', `empleados_${formatDateForFile(new Date())}.csv`);
-        document.body.appendChild(link);
-        
-        // Trigger download
-        link.click();
-        
-        // Clean up
-        document.body.removeChild(link);
-        
-        // Show success message
-        showSuccessMessage('Empleados exportados correctamente.');
-    } catch (error) {
-        console.error('Error exporting employees:', error);
-        showErrorMessage('Error al exportar los empleados: ' + error.message);
-    } finally {
-        showLoadingState(false);
-    }
-}
-
-// Format date for file names (YYYYMMDD)
-function formatDateForFile(date) {
-    // Usar la utilidad compartida si está disponible
-    if (window.DateUtils && window.DateUtils.formatDateForFile) {
-        return window.DateUtils.formatDateForFile(date);
-    }
-    
-    // Implementación de respaldo
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}${month}${day}`;
-}
-
-// Validate employee form
-function validateEmployeeForm() {
-    // Usar la utilidad compartida si está disponible
-    if (window.EmployeeUtils && window.EmployeeUtils.validateEmployee) {
-        const employeeData = {
-            name: document.getElementById('employee-name')?.value.trim() || '',
-            email: document.getElementById('employee-email')?.value.trim() || '',
-            departmentId: currentUser.departmentId
-        };
-        
-        const validation = window.EmployeeUtils.validateEmployee(employeeData);
-        if (!validation.isValid) {
-            showErrorMessage(validation.errors[0] || "Error en la validación del empleado.");
-            return false;
-        }
-        return true;
-    }
-    
-    // Implementación de respaldo
-    const nameField = document.getElementById('employee-name');
-    
-    if (!nameField || !nameField.value.trim()) {
-        showErrorMessage("El nombre del empleado es requerido.");
-        return false;
-    }
-    
-    const emailField = document.getElementById('employee-email');
-    if (emailField && emailField.value.trim()) {
-        // Validate email format
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(emailField.value.trim())) {
-            showErrorMessage("Por favor ingrese un email válido.");
-            return false;
-        }
-    }
-    
-    return true;
-}
-
-// Show loading state
-function showLoadingState(isLoading) {
-    // Usar la utilidad compartida si está disponible
-    if (window.UIMessageUtils && window.UIMessageUtils.toggleLoading) {
-        window.UIMessageUtils.toggleLoading(isLoading);
-        return;
-    }
-    
-    // Implementación de respaldo
-    const loadingIndicator = document.getElementById('loading-indicator');
-    if (loadingIndicator) {
-        loadingIndicator.style.display = isLoading ? 'block' : 'none';
-    }
-    
-    // Disable buttons while loading
-    document.querySelectorAll('button').forEach(button => {
-        button.disabled = isLoading;
     });
-}
-
-// Show error message
-function showErrorMessage(message) {
-    // Usar la utilidad compartida si está disponible
-    if (window.UIMessageUtils && window.UIMessageUtils.showError) {
-        window.UIMessageUtils.showError(message);
-        return;
+    
+    // Cancel import button
+    cancelImportBtn.addEventListener('click', () => {
+        importModal.style.display = 'none';
+    });
+    
+    // Download template button
+    downloadTemplateBtn.addEventListener('click', () => {
+        downloadEmployeeTemplate();
+    });
+    
+    // Close buttons for all modals
+    closeButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            employeeModal.style.display = 'none';
+            importModal.style.display = 'none';
+            deleteModal.style.display = 'none';
+        });
+    });
+    
+    // Close modals when clicking outside
+    window.addEventListener('click', (e) => {
+        if (e.target === employeeModal) {
+            employeeModal.style.display = 'none';
+        } else if (e.target === importModal) {
+            importModal.style.display = 'none';
+        } else if (e.target === deleteModal) {
+            deleteModal.style.display = 'none';
+        }
+    });
+    
+    // Confirm delete button
+    confirmDeleteBtn.addEventListener('click', async () => {
+        if (!currentEmployeeId) return;
+        
+        try {
+            // Delete employee
+            await deleteEmployee(currentEmployeeId);
+            
+            // Close modal
+            deleteModal.style.display = 'none';
+            
+            // Show success message
+            showSuccess('Empleado eliminado correctamente.');
+            
+            // Reload employees
+            loadEmployees();
+        } catch (error) {
+            console.error('Error deleting employee:', error);
+            showError('Error al eliminar empleado. Intente nuevamente.');
+        }
+    });
+    
+    // Cancel delete button
+    cancelDeleteBtn.addEventListener('click', () => {
+        deleteModal.style.display = 'none';
+    });
+    
+    // Load employees from Firestore
+    async function loadEmployees() {
+        try {
+            employeeTableBody.innerHTML = '<tr><td colspan="5" class="text-center">Cargando empleados...</td></tr>';
+            
+            // Get employees for branch
+            const employeesSnapshot = await db.collection('employees')
+                .where('branch', '==', branchId)
+                .orderBy('name')
+                .get();
+            
+            employees = [];
+            
+            employeesSnapshot.forEach(doc => {
+                employees.push({
+                    id: doc.id,
+                    ...doc.data()
+                });
+            });
+            
+            // Update state
+            setCurrentEmployees(employees);
+            
+            // Filter and display employees
+            filterEmployees();
+        } catch (error) {
+            console.error('Error loading employees:', error);
+            employeeTableBody.innerHTML = `
+                <tr>
+                    <td colspan="5" class="text-center">
+                        Error al cargar empleados. Intente nuevamente.
+                    </td>
+                </tr>
+            `;
+        }
     }
     
-    // Implementación de respaldo
-    const errorAlert = document.getElementById('error-alert');
-    if (errorAlert) {
-        errorAlert.textContent = message;
-        errorAlert.style.display = 'block';
+    // Filter employees based on search and active status
+    function filterEmployees() {
+        const searchTerm = searchInput.value.toLowerCase().trim();
+        const showInactive = showInactiveCheckbox.checked;
         
-        // Hide after 5 seconds
-        setTimeout(() => {
-            errorAlert.style.display = 'none';
-        }, 5000);
-    } else {
-        console.error('Error:', message);
+        filteredEmployees = employees.filter(employee => {
+            // Filter by active status
+            if (!showInactive && !employee.active) {
+                return false;
+            }
+            
+            // Filter by search term
+            if (searchTerm) {
+                return (
+                    employee.name.toLowerCase().includes(searchTerm) ||
+                    (employee.position && employee.position.toLowerCase().includes(searchTerm)) ||
+                    (employee.dietaryRestrictions && employee.dietaryRestrictions.toLowerCase().includes(searchTerm))
+                );
+            }
+            
+            return true;
+        });
+        
+        // Display filtered employees
+        displayEmployees();
     }
+    
+    // Display employees in table
+    function displayEmployees() {
+        if (filteredEmployees.length === 0) {
+            employeeTableBody.innerHTML = `
+                <tr>
+                    <td colspan="5" class="text-center">
+                        No se encontraron empleados.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+        
+        // Build table rows
+        let html = '';
+        
+        filteredEmployees.forEach(employee => {
+            html += `
+                <tr>
+                    <td>${employee.name}</td>
+                    <td>${employee.position || '-'}</td>
+                    <td>${employee.dietaryRestrictions || '-'}</td>
+                    <td>${employee.active ? 
+                        '<span class="status-badge status-active">Activo</span>' : 
+                        '<span class="status-badge status-inactive">Inactivo</span>'
+                    }</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn btn-outline btn-sm" onclick="editEmployee('${employee.id}')">
+                                <i class="material-icons">edit</i>
+                            </button>
+                            <button class="btn btn-outline btn-sm" onclick="showDeleteConfirmation('${employee.id}', '${employee.name}')">
+                                <i class="material-icons">delete</i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        employeeTableBody.innerHTML = html;
+    }
+    
+    // Show import preview
+    function showImportPreview(data) {
+        if (data.length === 0) {
+            showError('No hay datos para importar en el archivo.');
+            return;
+        }
+        
+        // Update preview count
+        previewCount.textContent = data.length;
+        
+        // Build preview table
+        let html = '';
+        
+        data.forEach(employee => {
+            html += `
+                <tr>
+                    <td>${employee.name}</td>
+                    <td>${employee.position || '-'}</td>
+                    <td>${employee.dietaryRestrictions || '-'}</td>
+                    <td>${employee.active ? 'Sí' : 'No'}</td>
+                </tr>
+            `;
+        });
+        
+        previewTableBody.innerHTML = html;
+        
+        // Show preview container
+        previewContainer.style.display = 'block';
+    }
+    
+    // Make functions available globally for event handlers
+    window.editEmployee = function(employeeId) {
+        // Find employee
+        const employee = employees.find(emp => emp.id === employeeId);
+        
+        if (!employee) return;
+        
+        // Fill form
+        employeeIdInput.value = employee.id;
+        employeeNameInput.value = employee.name || '';
+        employeePositionInput.value = employee.position || '';
+        employeeRestrictionsInput.value = employee.dietaryRestrictions || '';
+        employeeActiveInput.checked = employee.active;
+        
+        // Update modal title
+        modalTitle.textContent = 'Editar Empleado';
+        
+        // Store current employee ID
+        currentEmployeeId = employeeId;
+        
+        // Show modal
+        employeeModal.style.display = 'block';
+    };
+    
+    window.showDeleteConfirmation = function(employeeId, employeeName) {
+        // Set employee details
+        deleteEmployeeName.textContent = employeeName;
+        
+        // Store current employee ID
+        currentEmployeeId = employeeId;
+        
+        // Show modal
+        deleteModal.style.display = 'block';
+    };
 }
 
-// Show success message
-function showSuccessMessage(message) {
-    const successAlert = document.getElementById('success-alert');
-    if (successAlert) {
-        successAlert.textContent = message;
-        successAlert.style.display = 'block';
-        
-        // Hide after 5 seconds
-        setTimeout(() => {
-            successAlert.style.display = 'none';
-        }, 5000);
-    } else {
-        // Fallback to alert
-        alert('Éxito: ' + message);
-    }
+// Helper function to show success notification
+function showSuccess(message) {
+    showNotification(message, { type: 'success' });
+}
+
+// Helper function to show error notification
+function showError(message) {
+    showNotification(message, { type: 'error' });
 }

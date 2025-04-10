@@ -1,0 +1,231 @@
+/* Form Component Styles */
+
+/* Form layouts */
+.form-row {
+    display: flex;
+    flex-wrap: wrap;
+    margin: 0 -8px;
+}
+
+.form-row .form-group {
+    flex: 1;
+    padding: 0 8px;
+    min-width: 250px;
+}
+
+/* Custom form elements */
+.form-group {
+    margin-bottom: var(--spacing-md);
+}
+
+label {
+    display: block;
+    margin-bottom: var(--spacing-sm);
+    font-weight: 500;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="date"],
+select,
+textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--light-gray);
+    border-radius: var(--border-radius);
+    font-family: var(--font-family);
+    font-size: 1rem;
+    transition: border-color 0.3s;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(0, 109, 119, 0.1);
+}
+
+input:disabled,
+select:disabled,
+textarea:disabled {
+    background-color: var(--light-gray);
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+/* Checkbox and radio */
+.checkbox-group,
+.radio-group {
+    margin-bottom: var(--spacing-sm);
+}
+
+.checkbox-label,
+.radio-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    margin-bottom: var(--spacing-xs);
+}
+
+.checkbox-label input,
+.radio-label input {
+    margin-right: var(--spacing-sm);
+}
+
+/* Form validation */
+.form-group.error input,
+.form-group.error select,
+.form-group.error textarea {
+    border-color: var(--error);
+}
+
+.form-error {
+    color: var(--error);
+    font-size: 0.9rem;
+    margin-top: var(--spacing-xs);
+}
+
+/* Form actions */
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-lg);
+}
+
+/* Message containers */
+.message-container {
+    margin-top: var(--spacing-md);
+    padding: var(--spacing-sm);
+    border-radius: var(--border-radius);
+    font-size: 0.9rem;
+}
+
+.message-success {
+    background-color: rgba(76, 175, 80, 0.1);
+    color: #2e7d32;
+    border-left: 3px solid #2e7d32;
+}
+
+.message-error {
+    background-color: rgba(244, 67, 54, 0.1);
+    color: #d32f2f;
+    border-left: 3px solid #d32f2f;
+}
+
+.message-info {
+    background-color: rgba(33, 150, 243, 0.1);
+    color: #1976d2;
+    border-left: 3px solid #1976d2;
+}
+
+/* Menu form specific styles */
+.menu-status-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-lg);
+    background-color: var(--white);
+    padding: var(--spacing-md);
+    border-radius: var(--border-radius);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.menu-status h2 {
+    margin-bottom: var(--spacing-xs);
+    display: flex;
+    align-items: center;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 16px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    margin-left: var(--spacing-sm);
+}
+
+.status-badge.pending {
+    background-color: #fff3e0;
+    color: #e65100;
+}
+
+.status-badge.in-progress {
+    background-color: #e3f2fd;
+    color: #0d47a1;
+}
+
+.status-badge.completed {
+    background-color: #e8f5e9;
+    color: #1b5e20;
+}
+
+.menu-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+.confirmation-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-md);
+}
+
+.stat-item {
+    background-color: #f5f5f5;
+    padding: var(--spacing-md);
+    border-radius: var(--border-radius);
+    min-width: 180px;
+    flex: 1;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: var(--gray);
+    margin-bottom: var(--spacing-xs);
+}
+
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: 500;
+}
+
+.info-text {
+    font-size: 0.9rem;
+    color: var(--gray);
+    margin-top: var(--spacing-xs);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .form-row {
+        flex-direction: column;
+    }
+    
+    .menu-status-container {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .menu-actions {
+        margin-top: var(--spacing-md);
+        width: 100%;
+    }
+    
+    .menu-actions .btn {
+        flex: 1;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+    
+    .form-actions .btn {
+        width: 100%;
+    }
+}

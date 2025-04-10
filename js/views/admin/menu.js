@@ -1,967 +1,563 @@
-/**
- * Módulo de gestión de menús para administradores
- * Permite crear, editar y publicar menús semanales
- * 
- * Optimizado con:
- * - Caché local para consultas frecuentes
- * - Escuchas en tiempo real para actualizaciones
- * - Selección de campos específicos
- * - Transacciones para operaciones críticas
- */
+// Menu.js - Admin Menu Management
 
-// Estado local para este módulo
-const menuState = window.StateManager.createModuleState('menu', {
-    currentUser: null,
-    currentWeek: null,
-    menuData: null,
-    isEditing: false,
-    isDirty: false,
-    unsubscribeListeners: [] // Para almacenar funciones de cancelación de escuchas
+document.addEventListener('DOMContentLoaded', () => {
+    // Check authentication and role
+    auth.onAuthStateChanged(async (user) => {
+        if (!user) {
+            // Redirect to login if not authenticated
+            window.location.href = '../../index.html';
+            return;
+        }
+        
+        // Check if user is admin
+        const isAdmin = await isUserAdmin();
+        
+        if (!isAdmin) {
+            // Redirect non-admin users
+            window.location.href = '../../index.html';
+            return;
+        }
+        
+        // Display user name
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        if (userDoc.exists) {
+            document.getElementById('userName').textContent = userDoc.data().displayName || 'Administrador';
+        }
+        
+        // Initialize menu management
+        initMenuManagement();
+    });
+    
+    // Logout functionality
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+        try {
+            await logout();
+            window.location.href = '../../index.html';
+        } catch (error) {
+            console.error('Error logging out:', error);
+        }
+    });
 });
 
-// Constantes
-const DAYS = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes'];
-const MENU_STATUS = {
-    DRAFT: 'draft',
-    PUBLISHED: 'published',
-    ARCHIVED: 'archived'
-};
-
-/**
- * Inicializar la página de menú
- * Configura el estado inicial, verifica servicios necesarios y carga datos del menú
- * 
- * @async
- * @returns {Promise<void>}
- * @throws {Error} Si los servicios necesarios no están disponibles o no hay usuario en sesión
- */
-async function initMenuPage() {
-    try {
-        window.errorService.toggleLoading(true);
-        
-        // Verificar servicios necesarios
-        if (!window.firestoreService) {
-            throw new Error('Servicio de Firestore no disponible');
-        }
-        
-        // Obtener usuario actual
-        menuState.setValue('currentUser', getCurrentUser());
-        
-        const currentUser = menuState.getValue('currentUser');
-        if (!currentUser || !currentUser.uid) {
-            throw new Error('No hay usuario en sesión');
-        }
-        
-        // Verificar rol de administrador
-        if (currentUser.role !== 'admin') {
-            throw new Error('Acceso no autorizado: se requiere rol de administrador');
-        }
-        
-        // Establecer semana actual (comenzando en lunes)
-        menuState.setValue('currentWeek', getMonday(new Date()));
-        
-        // Cargar menú para la semana actual
-        await loadMenuData();
-        
-        // Configurar escucha en tiempo real
-        setupRealTimeListener();
-        
-        // Configurar eventos
-        setupEventListeners();
-        
-        // Renderizar UI
-        renderMenuUI();
-        
-    } catch (error) {
-        window.errorService.handleError(
-            error,
-            'Error al inicializar la página de menú',
-            ERROR_TYPES.UNKNOWN,
-            ERROR_SEVERITY.ERROR
-        );
-    } finally {
-        window.errorService.toggleLoading(false);
-    }
-}
-
-/**
- * Cargar datos del menú para la semana actual
- * Obtiene el menú de la semana actual desde Firestore o crea uno nuevo si no existe
- * 
- * @async
- * @returns {Promise<Object>} Datos del menú cargado
- * @throws {Error} Si hay problemas al cargar los datos
- */
-async function loadMenuData() {
-    try {
-        const currentWeek = menuState.getValue('currentWeek');
-        
-        // Usar la utilidad compartida para formatear la fecha
-        const weekStr = window.DateUtils && window.DateUtils.formatDate 
-            ? window.DateUtils.formatDate(currentWeek) 
-            : formatDate(currentWeek);
-        
-        // Usar el servicio de menús si está disponible
-        if (window.firestoreServices && window.firestoreServices.menu && window.firestoreServices.menu.getMenuByWeek) {
-            try {
-                const menuDoc = await window.firestoreServices.menu.getMenuByWeek(weekStr);
-                
-                if (menuDoc) {
-                    // Normalizar datos del menú si está disponible la utilidad
-                    const normalizedMenu = window.MenuUtils && window.MenuUtils.normalizeMenuData
-                        ? window.MenuUtils.normalizeMenuData(menuDoc)
-                        : menuDoc;
-                        
-                    // Menú encontrado, guardar en estado
-                    menuState.setValue('menuData', normalizedMenu);
-                    menuState.setValue('isEditing', false);
-                    menuState.setValue('isDirty', false);
-                } else {
-                    // Menú no encontrado, crear uno nuevo
-                    const newMenu = window.MenuUtils && window.MenuUtils.createEmptyMenu
-                        ? window.MenuUtils.createEmptyMenu(weekStr)
-                        : createEmptyMenu(weekStr);
-                        
-                    menuState.setValue('menuData', newMenu);
-                    menuState.setValue('isEditing', true);
-                    menuState.setValue('isDirty', true);
-                }
-                
-                return menuState.getValue('menuData');
-            } catch (error) {
-                console.error('Error al cargar el menú usando el servicio centralizado:', error);
-                // Continuar con la implementación de respaldo
-            }
-        }
-        
-        // Implementación de respaldo - Intentar obtener menú de la semana actual con caché
-        const menuDoc = await window.firestoreService.getDocument(
-            'menus', 
-            weekStr, 
-            {
-                useCache: true,
-                cacheExpiration: 10 // 10 minutos
-            }
-        );
-        
-        if (menuDoc) {
-            // Menú encontrado, guardar en estado
-            menuState.setValue('menuData', menuDoc);
-            menuState.setValue('isEditing', false);
-            menuState.setValue('isDirty', false);
-        } else {
-            // Menú no encontrado, crear uno nuevo
-            const newMenu = createEmptyMenu(weekStr);
-            menuState.setValue('menuData', newMenu);
-            menuState.setValue('isEditing', true);
-            menuState.setValue('isDirty', true);
-        }
-        
-    } catch (error) {
-        console.error('Error al cargar datos del menú:', error);
-        throw error;
-    }
-}
-
-/**
- * Configurar escucha en tiempo real para el menú actual
- * Establece un listener para detectar cambios en el menú de la semana actual
- * 
- * @returns {Function} Función para cancelar la escucha
- */
-function setupRealTimeListener() {
-    try {
-        const currentWeek = menuState.getValue('currentWeek');
-        const weekStr = formatDate(currentWeek);
-        
-        // Cancelar escuchas anteriores
-        cancelRealTimeListeners();
-        
-        // Configurar nueva escucha
-        const unsubscribe = window.firestoreService.listenForDocument(
-            'menus',
-            weekStr,
-            (error, menuDoc) => {
-                if (error) {
-                    console.error('Error en escucha de menú:', error);
-                    return;
-                }
-                
-                // Si el menú existe y no estamos editando, actualizar UI
-                if (menuDoc && !menuState.getValue('isEditing')) {
-                    menuState.setValue('menuData', menuDoc);
-                    renderMenuUI();
-                }
-            }
-        );
-        
-        // Guardar función para cancelar escucha
-        const unsubscribeListeners = menuState.getValue('unsubscribeListeners');
-        unsubscribeListeners.push(unsubscribe);
-        menuState.setValue('unsubscribeListeners', unsubscribeListeners);
-        
-    } catch (error) {
-        console.error('Error al configurar escucha en tiempo real:', error);
-    }
-}
-
-/**
- * Cancelar escuchas en tiempo real
- * Limpia todas las escuchas activas para evitar fugas de memoria
- */
-function cancelRealTimeListeners() {
-    const unsubscribeListeners = menuState.getValue('unsubscribeListeners');
+// Initialize menu management
+function initMenuManagement() {
+    // DOM elements
+    const weekDatesElement = document.getElementById('weekDates');
+    const statusBadgeElement = document.getElementById('statusBadge');
+    const createMenuBtn = document.getElementById('createMenuBtn');
+    const publishMenuBtn = document.getElementById('publishMenuBtn');
+    const saveMenuBtn = document.getElementById('saveMenuBtn');
+    const dayTabs = document.querySelectorAll('.day-tab');
+    const menuFormMessage = document.getElementById('menuFormMessage');
     
-    // Ejecutar todas las funciones de cancelación
-    unsubscribeListeners.forEach(unsubscribe => {
-        if (typeof unsubscribe === 'function') {
-            unsubscribe();
-        }
-    });
+    // Modal elements
+    const createMenuModal = document.getElementById('createMenuModal');
+    const menuStartDateInput = document.getElementById('menuStartDate');
+    const confirmCreateMenuBtn = document.getElementById('confirmCreateMenu');
+    const cancelCreateMenuBtn = document.getElementById('cancelCreateMenu');
+    const closeModalBtn = document.querySelector('.close-modal');
     
-    // Limpiar lista
-    menuState.setValue('unsubscribeListeners', []);
-}
-
-/**
- * Crear un menú vacío
- * Genera la estructura básica de un menú con todos los días de la semana
- * incluyendo el día "miércoles" con acento
- * 
- * @param {string} weekStr - Fecha de inicio de la semana en formato YYYY-MM-DD
- * @returns {Object} Menú vacío con estructura completa
- */
-function createEmptyMenu(weekStr) {
-    const currentUser = menuState.getValue('currentUser');
-    const now = new Date().toISOString();
+    // Stats elements
+    const totalEmployeesElement = document.getElementById('totalEmployees');
+    const confirmedEmployeesElement = document.getElementById('confirmedEmployees');
+    const confirmationPercentageElement = document.getElementById('confirmationPercentage');
+    const timeRemainingElement = document.getElementById('timeRemaining');
     
-    // Crear estructura básica del menú
-    const menu = {
-        id: weekStr,
-        weekStart: weekStr,
-        status: MENU_STATUS.DRAFT,
-        createdBy: currentUser.uid,
-        createdAt: now,
-        updatedBy: currentUser.uid,
-        updatedAt: now
-    };
+    // Form inputs
+    const mainDishInput = document.getElementById('mainDish');
+    const sideDishInput = document.getElementById('sideDish');
+    const dessertInput = document.getElementById('dessert');
+    const vegetarianOptionInput = document.getElementById('vegetarianOption');
     
-    // Agregar días de la semana
-    DAYS.forEach(day => {
-        menu[day] = {
-            items: []
-        };
-    });
+    // Current state
+    let currentWeekId = null;
+    let currentDay = 'monday';
+    let menuData = null;
+    let countdownInterval = null;
     
-    return menu;
-}
-
-/**
- * Renderizar la interfaz del menú
- * Actualiza toda la UI del menú, incluyendo los días con acentos como "miércoles"
- */
-function renderMenuUI() {
-    const menuData = menuState.getValue('menuData');
-    const isEditing = menuState.getValue('isEditing');
+    // Get current menu or create a new one
+    loadCurrentMenu();
     
-    // Actualizar título con fecha de la semana
-    updateWeekTitle();
-    
-    // Actualizar estado del menú
-    updateMenuStatus();
-    
-    // Renderizar días de la semana
-    DAYS.forEach(day => {
-        renderDayMenu(day, menuData[day], isEditing);
-    });
-    
-    // Actualizar botones de acción
-    updateActionButtons();
-}
-
-/**
- * Actualizar título con fecha de la semana
- * Muestra el rango de fechas de la semana actual
- */
-function updateWeekTitle() {
-    const currentWeek = menuState.getValue('currentWeek');
-    const weekEnd = new Date(currentWeek);
-    weekEnd.setDate(weekEnd.getDate() + 4); // Viernes
-    
-    const weekStartStr = formatDateDisplay(currentWeek);
-    const weekEndStr = formatDateDisplay(weekEnd);
-    
-    const titleElement = document.getElementById('week-title');
-    if (titleElement) {
-        titleElement.textContent = `Menú: Semana del ${weekStartStr} al ${weekEndStr}`;
-    }
-}
-
-/**
- * Actualizar indicador de estado del menú
- * Muestra visualmente el estado actual del menú (borrador, publicado, archivado)
- */
-function updateMenuStatus() {
-    const menuData = menuState.getValue('menuData');
-    const statusElement = document.getElementById('menu-status');
-    
-    if (statusElement) {
-        let statusText = '';
-        let statusClass = '';
-        
-        switch (menuData.status) {
-            case MENU_STATUS.PUBLISHED:
-                statusText = 'Publicado';
-                statusClass = 'status-published';
-                break;
-            case MENU_STATUS.ARCHIVED:
-                statusText = 'Archivado';
-                statusClass = 'status-archived';
-                break;
-            default:
-                statusText = 'Borrador';
-                statusClass = 'status-draft';
-        }
-        
-        statusElement.textContent = statusText;
-        statusElement.className = `menu-status ${statusClass}`;
-    }
-}
-
-/**
- * Renderizar menú de un día específico
- * Genera la interfaz para un día del menú, manejando correctamente los nombres
- * de días con acentos como "miércoles"
- * 
- * @param {string} day - Día de la semana (lunes, martes, miércoles, etc.)
- * @param {Object} dayData - Datos del menú para ese día
- * @param {boolean} isEditing - Si estamos en modo edición
- */
-function renderDayMenu(day, dayData, isEditing) {
-    const dayContainer = document.getElementById(`${day}-menu`);
-    if (!dayContainer) return;
-    
-    // Limpiar contenedor
-    dayContainer.innerHTML = '';
-    
-    // Si no hay datos para este día, mostrar mensaje
-    if (!dayData || !dayData.items || dayData.items.length === 0) {
-        const emptyMessage = document.createElement('p');
-        emptyMessage.className = 'empty-menu-message';
-        emptyMessage.textContent = 'No hay platillos definidos para este día';
-        dayContainer.appendChild(emptyMessage);
-        
-        // Agregar botón para agregar platillo en modo edición
-        if (isEditing) {
-            const addButton = document.createElement('button');
-            addButton.className = 'btn btn-sm btn-primary add-item-btn';
-            addButton.textContent = 'Agregar platillo';
-            addButton.dataset.day = day;
-            addButton.addEventListener('click', () => addMenuItem(day));
-            dayContainer.appendChild(addButton);
-        }
-        
-        return;
-    }
-    
-    // Crear lista de platillos
-    const menuList = document.createElement('ul');
-    menuList.className = 'menu-items-list';
-    
-    // Agregar cada platillo
-    dayData.items.forEach((item, index) => {
-        const listItem = document.createElement('li');
-        listItem.className = 'menu-item';
-        
-        if (isEditing) {
-            // Modo edición
-            const itemInput = document.createElement('input');
-            itemInput.type = 'text';
-            itemInput.className = 'form-control menu-item-input';
-            itemInput.value = item.name || '';
-            itemInput.dataset.day = day;
-            itemInput.dataset.index = index;
-            itemInput.addEventListener('change', (e) => updateMenuItem(day, index, e.target.value));
+    // Event listeners for day tabs
+    dayTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            // Deactivate all tabs
+            dayTabs.forEach(t => t.classList.remove('active'));
             
-            const removeBtn = document.createElement('button');
-            removeBtn.className = 'btn btn-sm btn-danger remove-item-btn';
-            removeBtn.innerHTML = '<i class="fas fa-trash"></i>';
-            removeBtn.dataset.day = day;
-            removeBtn.dataset.index = index;
-            removeBtn.addEventListener('click', () => removeMenuItem(day, index));
+            // Activate clicked tab
+            tab.classList.add('active');
             
-            listItem.appendChild(itemInput);
-            listItem.appendChild(removeBtn);
-        } else {
-            // Modo visualización
-            listItem.textContent = item.name || 'Sin nombre';
-        }
-        
-        menuList.appendChild(listItem);
+            // Update current day and load day menu
+            currentDay = tab.dataset.day;
+            loadDayMenu();
+        });
     });
     
-    dayContainer.appendChild(menuList);
-    
-    // Agregar botón para agregar platillo en modo edición
-    if (isEditing) {
-        const addButton = document.createElement('button');
-        addButton.className = 'btn btn-sm btn-primary add-item-btn';
-        addButton.textContent = 'Agregar platillo';
-        addButton.dataset.day = day;
-        addButton.addEventListener('click', () => addMenuItem(day));
-        dayContainer.appendChild(addButton);
-    }
-}
-
-/**
- * Actualizar botones de acción según estado
- * Habilita o deshabilita botones según el estado actual del menú
- */
-function updateActionButtons() {
-    const menuData = menuState.getValue('menuData');
-    const isEditing = menuState.getValue('isEditing');
-    const isDirty = menuState.getValue('isDirty');
-    
-    // Botón de editar
-    const editButton = document.getElementById('edit-menu-btn');
-    if (editButton) {
-        editButton.style.display = isEditing ? 'none' : 'inline-block';
-    }
-    
-    // Botón de guardar
-    const saveButton = document.getElementById('save-menu-btn');
-    if (saveButton) {
-        saveButton.style.display = isEditing ? 'inline-block' : 'none';
-        saveButton.disabled = !isDirty;
-    }
-    
-    // Botón de cancelar
-    const cancelButton = document.getElementById('cancel-menu-btn');
-    if (cancelButton) {
-        cancelButton.style.display = isEditing ? 'inline-block' : 'none';
-    }
-    
-    // Botón de publicar
-    const publishButton = document.getElementById('publish-menu-btn');
-    if (publishButton) {
-        const canPublish = menuData.status !== MENU_STATUS.PUBLISHED && !isEditing;
-        publishButton.style.display = canPublish ? 'inline-block' : 'none';
-    }
-    
-    // Botón de archivar
-    const archiveButton = document.getElementById('archive-menu-btn');
-    if (archiveButton) {
-        const canArchive = menuData.status === MENU_STATUS.PUBLISHED && !isEditing;
-        archiveButton.style.display = canArchive ? 'inline-block' : 'none';
-    }
-    
-    // Botones de navegación de semana
-    const prevWeekBtn = document.getElementById('prev-week-btn');
-    const nextWeekBtn = document.getElementById('next-week-btn');
-    
-    if (prevWeekBtn) {
-        prevWeekBtn.disabled = isEditing;
-    }
-    
-    if (nextWeekBtn) {
-        nextWeekBtn.disabled = isEditing;
-    }
-}
-
-/**
- * Agregar un nuevo platillo al menú
- * Añade un platillo vacío al día especificado y actualiza la UI
- * Maneja correctamente los días con acentos como "miércoles"
- * 
- * @param {string} day - Día de la semana (lunes, martes, miércoles, etc.)
- */
-function addMenuItem(day) {
-    const menuData = menuState.getValue('menuData');
-    
-    // Asegurarse de que exista la estructura para este día
-    if (!menuData[day]) {
-        menuData[day] = { items: [] };
-    }
-    
-    if (!menuData[day].items) {
-        menuData[day].items = [];
-    }
-    
-    // Agregar nuevo platillo
-    menuData[day].items.push({
-        name: '',
-        id: generateId()
-    });
-    
-    // Actualizar estado
-    menuState.setValue('menuData', menuData);
-    menuState.setValue('isDirty', true);
-    
-    // Actualizar UI
-    renderDayMenu(day, menuData[day], true);
-    updateActionButtons();
-}
-
-/**
- * Actualizar un platillo existente
- * Modifica el valor de un platillo en el día especificado
- * Maneja correctamente los días con acentos como "miércoles"
- * 
- * @param {string} day - Día de la semana (lunes, martes, miércoles, etc.)
- * @param {number} index - Índice del platillo
- * @param {string} value - Nuevo valor
- */
-function updateMenuItem(day, index, value) {
-    const menuData = menuState.getValue('menuData');
-    
-    // Verificar que exista el platillo
-    if (menuData[day] && menuData[day].items && menuData[day].items[index]) {
-        menuData[day].items[index].name = value;
+    // Save menu button
+    saveMenuBtn.addEventListener('click', async () => {
+        if (!currentWeekId || !currentDay) return;
         
-        // Actualizar estado
-        menuState.setValue('menuData', menuData);
-        menuState.setValue('isDirty', true);
-        
-        // Actualizar botones
-        updateActionButtons();
-    }
-}
-
-/**
- * Eliminar un platillo del menú
- * Quita un platillo del día especificado y actualiza la UI
- * Maneja correctamente los días con acentos como "miércoles"
- * 
- * @param {string} day - Día de la semana (lunes, martes, miércoles, etc.)
- * @param {number} index - Índice del platillo
- */
-function removeMenuItem(day, index) {
-    const menuData = menuState.getValue('menuData');
-    
-    // Verificar que exista el platillo
-    if (menuData[day] && menuData[day].items && menuData[day].items[index]) {
-        // Eliminar platillo
-        menuData[day].items.splice(index, 1);
-        
-        // Actualizar estado
-        menuState.setValue('menuData', menuData);
-        menuState.setValue('isDirty', true);
-        
-        // Actualizar UI
-        renderDayMenu(day, menuData[day], true);
-        updateActionButtons();
-    }
-}
-
-/**
- * Guardar el menú actual
- * Almacena los cambios del menú en Firestore
- * Normaliza los datos para manejar correctamente los días con acentos
- * 
- * @async
- * @returns {Promise<void>}
- * @throws {Error} Si hay problemas al guardar los datos
- */
-async function saveMenu() {
-    try {
-        window.errorService.toggleLoading(true);
-        
-        const menuData = menuState.getValue('menuData');
-        const currentUser = menuState.getValue('currentUser');
-        
-        // Actualizar timestamp
-        menuData.updatedAt = new Date().toISOString();
-        menuData.updatedBy = currentUser.uid;
-        
-        // Guardar en Firestore
-        await window.firestoreService.setDocument('menus', menuData.id, menuData);
-        
-        // Actualizar estado
-        menuState.setValue('isEditing', false);
-        menuState.setValue('isDirty', false);
-        
-        // Actualizar UI
-        renderMenuUI();
-        
-        // Mostrar mensaje de éxito
-        window.errorService.showSuccessMessage('Menú guardado correctamente');
-        
-    } catch (error) {
-        window.errorService.handleError(
-            error,
-            'Error al guardar el menú',
-            ERROR_TYPES.DATABASE,
-            ERROR_SEVERITY.ERROR
-        );
-    } finally {
-        window.errorService.toggleLoading(false);
-    }
-}
-
-/**
- * Publicar el menú actual
- * Cambia el estado del menú a publicado y lo guarda en Firestore
- * 
- * @async
- * @returns {Promise<void>}
- * @throws {Error} Si hay problemas al publicar el menú
- */
-async function publishMenu() {
-    try {
-        window.errorService.toggleLoading(true);
-        
-        const menuData = menuState.getValue('menuData');
-        const currentUser = menuState.getValue('currentUser');
-        
-        // Actualizar estado y timestamp
-        menuData.status = MENU_STATUS.PUBLISHED;
-        menuData.publishedAt = new Date().toISOString();
-        menuData.publishedBy = currentUser.uid;
-        menuData.updatedAt = new Date().toISOString();
-        menuData.updatedBy = currentUser.uid;
-        
-        // Guardar en Firestore
-        await window.firestoreService.setDocument('menus', menuData.id, menuData);
-        
-        // Actualizar estado
-        menuState.setValue('menuData', menuData);
-        
-        // Actualizar UI
-        renderMenuUI();
-        
-        // Mostrar mensaje de éxito
-        window.errorService.showSuccessMessage('Menú publicado correctamente');
-        
-    } catch (error) {
-        window.errorService.handleError(
-            error,
-            'Error al publicar el menú',
-            ERROR_TYPES.DATABASE,
-            ERROR_SEVERITY.ERROR
-        );
-    } finally {
-        window.errorService.toggleLoading(false);
-    }
-}
-
-/**
- * Archivar el menú actual
- * Cambia el estado del menú a archivado y lo guarda en Firestore
- * 
- * @async
- * @returns {Promise<void>}
- * @throws {Error} Si hay problemas al archivar el menú
- */
-async function archiveMenu() {
-    try {
-        window.errorService.toggleLoading(true);
-        
-        const menuData = menuState.getValue('menuData');
-        const currentUser = menuState.getValue('currentUser');
-        
-        // Actualizar estado y timestamp
-        menuData.status = MENU_STATUS.ARCHIVED;
-        menuData.archivedAt = new Date().toISOString();
-        menuData.archivedBy = currentUser.uid;
-        menuData.updatedAt = new Date().toISOString();
-        menuData.updatedBy = currentUser.uid;
-        
-        // Guardar en Firestore
-        await window.firestoreService.setDocument('menus', menuData.id, menuData);
-        
-        // Actualizar estado
-        menuState.setValue('menuData', menuData);
-        
-        // Actualizar UI
-        renderMenuUI();
-        
-        // Mostrar mensaje de éxito
-        window.errorService.showSuccessMessage('Menú archivado correctamente');
-        
-    } catch (error) {
-        window.errorService.handleError(
-            error,
-            'Error al archivar el menú',
-            ERROR_TYPES.DATABASE,
-            ERROR_SEVERITY.ERROR
-        );
-    } finally {
-        window.errorService.toggleLoading(false);
-    }
-}
-
-/**
- * Cambiar a la semana anterior
- * Carga el menú de la semana anterior a la actual
- * 
- * @async
- * @returns {Promise<void>}
- * @throws {Error} Si hay problemas al cargar los datos
- */
-async function goToPreviousWeek() {
-    try {
-        // Obtener semana actual
-        const currentWeek = menuState.getValue('currentWeek');
-        
-        // Calcular semana anterior
-        const prevWeek = new Date(currentWeek);
-        prevWeek.setDate(prevWeek.getDate() - 7);
-        
-        // Actualizar estado
-        menuState.setValue('currentWeek', prevWeek);
-        
-        // Cancelar escuchas actuales
-        cancelRealTimeListeners();
-        
-        // Cargar datos de la nueva semana
-        await loadMenuData();
-        
-        // Configurar nueva escucha
-        setupRealTimeListener();
-        
-        // Actualizar UI
-        renderMenuUI();
-        
-    } catch (error) {
-        window.errorService.handleError(
-            error,
-            'Error al cambiar de semana',
-            ERROR_TYPES.UNKNOWN,
-            ERROR_SEVERITY.ERROR
-        );
-    }
-}
-
-/**
- * Cambiar a la semana siguiente
- * Carga el menú de la semana siguiente a la actual
- * 
- * @async
- * @returns {Promise<void>}
- * @throws {Error} Si hay problemas al cargar los datos
- */
-async function goToNextWeek() {
-    try {
-        // Obtener semana actual
-        const currentWeek = menuState.getValue('currentWeek');
-        
-        // Calcular semana siguiente
-        const nextWeek = new Date(currentWeek);
-        nextWeek.setDate(nextWeek.getDate() + 7);
-        
-        // Actualizar estado
-        menuState.setValue('currentWeek', nextWeek);
-        
-        // Cancelar escuchas actuales
-        cancelRealTimeListeners();
-        
-        // Cargar datos de la nueva semana
-        await loadMenuData();
-        
-        // Configurar nueva escucha
-        setupRealTimeListener();
-        
-        // Actualizar UI
-        renderMenuUI();
-        
-    } catch (error) {
-        window.errorService.handleError(
-            error,
-            'Error al cambiar de semana',
-            ERROR_TYPES.UNKNOWN,
-            ERROR_SEVERITY.ERROR
-        );
-    }
-}
-
-/**
- * Entrar en modo edición
- * Activa el modo de edición del menú
- */
-function editMenu() {
-    menuState.setValue('isEditing', true);
-    renderMenuUI();
-}
-
-/**
- * Cancelar edición
- * Sale del modo de edición descartando los cambios no guardados
- * 
- * @async
- * @returns {Promise<void>}
- */
-async function cancelEdit() {
-    try {
-        // Si hay cambios sin guardar, confirmar
-        if (menuState.getValue('isDirty')) {
-            const confirmed = confirm('Hay cambios sin guardar. ¿Desea descartarlos?');
-            if (!confirmed) {
+        try {
+            // Validate inputs
+            if (!mainDishInput.value.trim()) {
+                showMessage('Por favor ingrese el platillo principal.', 'error');
                 return;
             }
-        }
-        
-        // Recargar datos originales
-        await loadMenuData();
-        
-        // Actualizar UI
-        renderMenuUI();
-        
-    } catch (error) {
-        window.errorService.handleError(
-            error,
-            'Error al cancelar edición',
-            ERROR_TYPES.UNKNOWN,
-            ERROR_SEVERITY.ERROR
-        );
-    }
-}
-
-/**
- * Configurar eventos de la página
- * Establece los manejadores de eventos para los elementos de la interfaz
- */
-function setupEventListeners() {
-    // Botón de editar
-    const editButton = document.getElementById('edit-menu-btn');
-    if (editButton) {
-        editButton.addEventListener('click', editMenu);
-    }
-    
-    // Botón de guardar
-    const saveButton = document.getElementById('save-menu-btn');
-    if (saveButton) {
-        saveButton.addEventListener('click', saveMenu);
-    }
-    
-    // Botón de cancelar
-    const cancelButton = document.getElementById('cancel-menu-btn');
-    if (cancelButton) {
-        cancelButton.addEventListener('click', cancelEdit);
-    }
-    
-    // Botón de publicar
-    const publishButton = document.getElementById('publish-menu-btn');
-    if (publishButton) {
-        publishButton.addEventListener('click', publishMenu);
-    }
-    
-    // Botón de archivar
-    const archiveButton = document.getElementById('archive-menu-btn');
-    if (archiveButton) {
-        archiveButton.addEventListener('click', archiveMenu);
-    }
-    
-    // Botones de navegación de semana
-    const prevWeekBtn = document.getElementById('prev-week-btn');
-    if (prevWeekBtn) {
-        prevWeekBtn.addEventListener('click', goToPreviousWeek);
-    }
-    
-    const nextWeekBtn = document.getElementById('next-week-btn');
-    if (nextWeekBtn) {
-        nextWeekBtn.addEventListener('click', goToNextWeek);
-    }
-    
-    // Evento de descarga de la página
-    window.addEventListener('beforeunload', (e) => {
-        // Cancelar escuchas
-        cancelRealTimeListeners();
-        
-        // Advertir si hay cambios sin guardar
-        if (menuState.getValue('isDirty')) {
-            e.preventDefault();
-            e.returnValue = ''; // Mensaje estándar del navegador
-            return '';
+            
+            // Prepare menu data
+            const dayMenuData = {
+                mainDish: mainDishInput.value.trim(),
+                sideDish: sideDishInput.value.trim(),
+                dessert: dessertInput.value.trim(),
+                vegetarianOption: vegetarianOptionInput.value.trim()
+            };
+            
+            // Save to Firestore
+            await db.collection('weeklyMenus').doc(currentWeekId)
+                .collection('dailyMenus').doc(currentDay).update(dayMenuData);
+            
+            showMessage('Menú guardado correctamente.', 'success');
+            
+            // Update local data
+            if (menuData && menuData.dailyMenus) {
+                menuData.dailyMenus[currentDay] = dayMenuData;
+            }
+            
+            // Check if all days have a main dish
+            checkMenuCompleteness();
+        } catch (error) {
+            console.error('Error saving menu:', error);
+            showMessage('Error al guardar el menú. Intente nuevamente.', 'error');
         }
     });
-}
-
-/**
- * Obtener el lunes de la semana actual
- * Calcula la fecha del lunes de la semana que contiene la fecha proporcionada
- * 
- * @param {Date} date - Fecha de referencia
- * @returns {Date} Fecha del lunes
- */
-function getMonday(date) {
-    // Usar la utilidad compartida si está disponible
-    if (window.DateUtils && window.DateUtils.getMonday) {
-        return window.DateUtils.getMonday(date);
+    
+    // Create menu button
+    createMenuBtn.addEventListener('click', () => {
+        // Set default date to next Monday
+        const nextMonday = getNextMonday();
+        menuStartDateInput.value = formatDateForInput(nextMonday);
+        
+        // Show modal
+        createMenuModal.style.display = 'block';
+    });
+    
+    // Confirm create menu button
+    confirmCreateMenuBtn.addEventListener('click', async () => {
+        const startDate = menuStartDateInput.value;
+        
+        if (!startDate) {
+            alert('Por favor seleccione una fecha válida.');
+            return;
+        }
+        
+        // Validate if selected date is a Monday
+        const date = new Date(startDate);
+        if (date.getDay() !== 1) { // 1 = Monday
+            alert('Por favor seleccione un lunes como fecha inicial.');
+            return;
+        }
+        
+        try {
+            // Create new weekly menu
+            await createWeeklyMenu(startDate);
+            
+            // Close modal
+            createMenuModal.style.display = 'none';
+            
+            // Reload menu data
+            loadCurrentMenu();
+        } catch (error) {
+            console.error('Error creating menu:', error);
+            alert('Error al crear el menú. Intente nuevamente.');
+        }
+    });
+    
+    // Cancel create menu button
+    cancelCreateMenuBtn.addEventListener('click', () => {
+        createMenuModal.style.display = 'none';
+    });
+    
+    // Close modal button
+    closeModalBtn.addEventListener('click', () => {
+        createMenuModal.style.display = 'none';
+    });
+    
+    // Close modal when clicking outside
+    window.addEventListener('click', (e) => {
+        if (e.target === createMenuModal) {
+            createMenuModal.style.display = 'none';
+        }
+    });
+    
+    // Publish menu button
+    publishMenuBtn.addEventListener('click', async () => {
+        if (!currentWeekId) return;
+        
+        try {
+            // Update menu status to in-progress
+            await db.collection('weeklyMenus').doc(currentWeekId).update({
+                status: 'in-progress',
+                publishDate: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            
+            // Reload menu data
+            loadCurrentMenu();
+            
+            showMessage('Menú publicado correctamente. Los coordinadores ya pueden realizar confirmaciones.', 'success');
+        } catch (error) {
+            console.error('Error publishing menu:', error);
+            showMessage('Error al publicar el menú. Intente nuevamente.', 'error');
+        }
+    });
+    
+    // Load current menu data
+    async function loadCurrentMenu() {
+        try {
+            // Get current date
+            const today = new Date();
+            
+            // Query for the most recent menu
+            const menuSnapshot = await db.collection('weeklyMenus')
+                .orderBy('startDate', 'desc')
+                .limit(1)
+                .get();
+            
+            if (!menuSnapshot.empty) {
+                const menuDoc = menuSnapshot.docs[0];
+                currentWeekId = menuDoc.id;
+                menuData = menuDoc.data();
+                
+                // Load menu details
+                displayMenuDetails();
+                
+                // Load daily menus
+                const dailyMenusSnapshot = await db.collection('weeklyMenus')
+                    .doc(currentWeekId)
+                    .collection('dailyMenus')
+                    .get();
+                
+                menuData.dailyMenus = {};
+                
+                dailyMenusSnapshot.forEach(doc => {
+                    menuData.dailyMenus[doc.id] = doc.data();
+                });
+                
+                // Load first day menu
+                loadDayMenu();
+                
+                // Check menu completeness
+                checkMenuCompleteness();
+                
+                // Start countdown timer if in-progress
+                startCountdownTimer();
+            } else {
+                // No menu found, hide form
+                document.getElementById('menuForm').innerHTML = `
+                    <div class="empty-state">
+                        <p>No hay ningún menú creado para esta semana.</p>
+                        <p>Utilice el botón "Crear Menú" para crear uno nuevo.</p>
+                    </div>
+                `;
+                
+                weekDatesElement.textContent = 'Sin menú';
+                statusBadgeElement.textContent = 'No Creado';
+                statusBadgeElement.className = 'status-badge pending';
+                
+                // Reset stats
+                updateStats(0, 0);
+            }
+        } catch (error) {
+            console.error('Error loading menu:', error);
+            showMessage('Error al cargar los datos del menú.', 'error');
+        }
     }
     
-    // Implementación de respaldo
-    const day = date.getDay();
-    const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Ajustar para domingo
-    return new Date(date.setDate(diff));
-}
-
-/**
- * Formatear fecha como YYYY-MM-DD
- * 
- * @param {Date} date - Fecha a formatear
- * @returns {string} Fecha formateada
- */
-function formatDate(date) {
-    // Usar la utilidad compartida si está disponible
-    if (window.DateUtils && window.DateUtils.formatDate) {
-        return window.DateUtils.formatDate(date);
+    // Display menu details
+    function displayMenuDetails() {
+        if (!menuData) return;
+        
+        // Format dates
+        const startDate = menuData.startDate.toDate();
+        const endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + 4); // Add 4 days to get to Friday
+        
+        // Display date range
+        weekDatesElement.textContent = `${formatDateShort(startDate)} al ${formatDateShort(endDate)}`;
+        
+        // Display status
+        statusBadgeElement.textContent = getStatusText(menuData.status);
+        statusBadgeElement.className = `status-badge ${menuData.status}`;
+        
+        // Enable/disable publish button based on status
+        publishMenuBtn.disabled = menuData.status !== 'pending';
+        
+        // Update stats
+        updateStats(
+            menuData.totalEmployees || 0,
+            menuData.confirmedEmployees || 0
+        );
     }
     
-    // Implementación de respaldo
+    // Load day menu
+    function loadDayMenu() {
+        if (!menuData || !menuData.dailyMenus || !menuData.dailyMenus[currentDay]) {
+            // Clear form
+            clearMenuForm();
+            return;
+        }
+        
+        const dayMenu = menuData.dailyMenus[currentDay];
+        
+        // Fill form
+        mainDishInput.value = dayMenu.mainDish || '';
+        sideDishInput.value = dayMenu.sideDish || '';
+        dessertInput.value = dayMenu.dessert || '';
+        vegetarianOptionInput.value = dayMenu.vegetarianOption || '';
+        
+        // Disable form if menu is not in pending status
+        const isEditable = menuData.status === 'pending';
+        toggleFormEditable(isEditable);
+    }
+    
+    // Clear menu form
+    function clearMenuForm() {
+        mainDishInput.value = '';
+        sideDishInput.value = '';
+        dessertInput.value = '';
+        vegetarianOptionInput.value = '';
+    }
+    
+    // Toggle form editable state
+    function toggleFormEditable(isEditable) {
+        mainDishInput.disabled = !isEditable;
+        sideDishInput.disabled = !isEditable;
+        dessertInput.disabled = !isEditable;
+        vegetarianOptionInput.disabled = !isEditable;
+        saveMenuBtn.disabled = !isEditable;
+    }
+    
+    // Check if menu is complete to enable publish button
+    function checkMenuCompleteness() {
+        if (!menuData || !menuData.dailyMenus || menuData.status !== 'pending') return;
+        
+        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+        let isComplete = true;
+        
+        for (const day of days) {
+            const dayMenu = menuData.dailyMenus[day];
+            if (!dayMenu || !dayMenu.mainDish || dayMenu.mainDish.trim() === '') {
+                isComplete = false;
+                break;
+            }
+        }
+        
+        publishMenuBtn.disabled = !isComplete;
+        
+        if (!isComplete && publishMenuBtn.disabled) {
+            showMessage('Para publicar el menú, debe completar el platillo principal para todos los días.', 'info');
+        }
+    }
+    
+    // Update stats display
+    function updateStats(totalEmployees, confirmedEmployees) {
+        totalEmployeesElement.textContent = totalEmployees;
+        confirmedEmployeesElement.textContent = confirmedEmployees;
+        
+        // Calculate percentage
+        const percentage = totalEmployees > 0 
+            ? Math.round((confirmedEmployees / totalEmployees) * 100) 
+            : 0;
+        
+        confirmationPercentageElement.textContent = `${percentage}%`;
+    }
+    
+    // Start countdown timer for confirmation deadline
+    function startCountdownTimer() {
+        // Clear any existing interval
+        if (countdownInterval) {
+            clearInterval(countdownInterval);
+        }
+        
+        // If menu is not in-progress, don't start timer
+        if (!menuData || menuData.status !== 'in-progress') {
+            timeRemainingElement.textContent = '--:--:--';
+            return;
+        }
+        
+        // Get confirmation end time
+        const endTime = menuData.confirmEndDate.toDate();
+        
+        // Update immediately and then every second
+        updateCountdown();
+        countdownInterval = setInterval(updateCountdown, 1000);
+        
+        function updateCountdown() {
+            const now = new Date();
+            const timeDiff = endTime - now;
+            
+            if (timeDiff <= 0) {
+                // Time has expired
+                clearInterval(countdownInterval);
+                timeRemainingElement.textContent = 'Finalizado';
+                return;
+            }
+            
+            // Calculate hours, minutes, seconds
+            const hours = Math.floor(timeDiff / (1000 * 60 * 60));
+            const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000);
+            
+            // Format time
+            timeRemainingElement.textContent = `${padZero(hours)}:${padZero(minutes)}:${padZero(seconds)}`;
+        }
+    }
+    
+    // Display message in form
+    function showMessage(message, type = 'info') {
+        menuFormMessage.className = 'message-container';
+        menuFormMessage.classList.add(`message-${type}`);
+        menuFormMessage.textContent = message;
+        
+        // Clear message after 5 seconds
+        setTimeout(() => {
+            menuFormMessage.textContent = '';
+            menuFormMessage.className = 'message-container';
+        }, 5000);
+    }
+    
+    // Create a new weekly menu
+    async function createWeeklyMenu(startDateStr) {
+        const startDate = new Date(startDateStr);
+        const weekId = formatDateForId(startDate);
+        
+        // Check if menu already exists
+        const existingMenu = await db.collection('weeklyMenus').doc(weekId).get();
+        
+        if (existingMenu.exists) {
+            throw new Error('Ya existe un menú para esta semana.');
+        }
+        
+        // Get total employees count
+        const employeesSnapshot = await db.collection('employees')
+            .where('active', '==', true)
+            .get();
+        
+        const totalEmployees = employeesSnapshot.size;
+        
+        // Get app settings for confirmation window
+        const settingsSnapshot = await db.collection('settings').doc('appSettings').get();
+        let confirmStartTime, confirmEndTime;
+        
+        if (settingsSnapshot.exists) {
+            const settings = settingsSnapshot.data();
+            
+            // Calculate confirmation start and end times based on settings
+            confirmStartTime = new Date(startDate);
+            confirmStartTime.setDate(confirmStartTime.getDate() - 4); // Thursday before the week
+            confirmStartTime.setHours(16, 10, 0, 0); // 16:10
+            
+            confirmEndTime = new Date(startDate);
+            confirmEndTime.setDate(confirmEndTime.getDate() - 2); // Saturday before the week
+            confirmEndTime.setHours(10, 0, 0, 0); // 10:00
+        } else {
+            // Default times if settings don't exist
+            confirmStartTime = new Date(startDate);
+            confirmStartTime.setDate(confirmStartTime.getDate() - 4); // Thursday
+            confirmStartTime.setHours(16, 10, 0, 0); // 16:10
+            
+            confirmEndTime = new Date(startDate);
+            confirmEndTime.setDate(confirmEndTime.getDate() - 2); // Saturday
+            confirmEndTime.setHours(10, 0, 0, 0); // 10:00
+        }
+        
+        // Create weeklyMenu document
+        await db.collection('weeklyMenus').doc(weekId).set({
+            startDate: firebase.firestore.Timestamp.fromDate(startDate),
+            status: 'pending',
+            confirmStartDate: firebase.firestore.Timestamp.fromDate(confirmStartTime),
+            confirmEndDate: firebase.firestore.Timestamp.fromDate(confirmEndTime),
+            totalEmployees,
+            confirmedEmployees: 0,
+            createdBy: auth.currentUser.uid,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // Create dailyMenus subcollection
+        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+        const batch = db.batch();
+        
+        days.forEach((day, index) => {
+            const dayDate = new Date(startDate);
+            dayDate.setDate(dayDate.getDate() + index);
+            
+            const dayRef = db.collection('weeklyMenus').doc(weekId).collection('dailyMenus').doc(day);
+            batch.set(dayRef, {
+                date: firebase.firestore.Timestamp.fromDate(dayDate),
+                mainDish: '',
+                sideDish: '',
+                dessert: '',
+                vegetarianOption: ''
+            });
+        });
+        
+        await batch.commit();
+    }
+}
+
+// Helper Functions
+
+// Get next Monday
+function getNextMonday() {
+    const date = new Date();
+    const day = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    
+    // Calculate days to add to get to next Monday
+    const daysToAdd = (day === 0) ? 1 : 8 - day;
+    
+    date.setDate(date.getDate() + daysToAdd);
+    date.setHours(0, 0, 0, 0);
+    
+    return date;
+}
+
+// Format date for input field (YYYY-MM-DD)
+function formatDateForInput(date) {
     const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
+    const month = padZero(date.getMonth() + 1);
+    const day = padZero(date.getDate());
+    
     return `${year}-${month}-${day}`;
 }
 
-/**
- * Formatear fecha para mostrar (DD/MM/YYYY)
- * 
- * @param {Date} date - Fecha a formatear
- * @returns {string} Fecha formateada
- */
-function formatDateDisplay(date) {
-    // Usar la utilidad compartida si está disponible
-    if (window.DateUtils && window.DateUtils.formatDateDisplay) {
-        return window.DateUtils.formatDateDisplay(date);
-    }
-    
-    // Implementación de respaldo
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
+// Format date for Firestore document ID (YYYY-MM-DD)
+function formatDateForId(date) {
+    return formatDateForInput(date);
+}
+
+// Format date for display (DD/MM/YYYY)
+function formatDateShort(date) {
+    const day = padZero(date.getDate());
+    const month = padZero(date.getMonth() + 1);
     const year = date.getFullYear();
+    
     return `${day}/${month}/${year}`;
 }
 
-/**
- * Generar ID único
- * Crea un identificador único para nuevos elementos
- * 
- * @returns {string} ID generado
- */
-function generateId() {
-    return Math.random().toString(36).substr(2, 9);
+// Pad number with zero
+function padZero(num) {
+    return num.toString().padStart(2, '0');
 }
 
-/**
- * Obtener usuario actual desde localStorage
- * Recupera la información del usuario en sesión
- * 
- * @returns {Object|null} Usuario actual o null
- */
-function getCurrentUser() {
-    try {
-        const userJson = localStorage.getItem('currentUser');
-        if (!userJson) {
-            return null;
-        }
-        
-        return JSON.parse(userJson);
-    } catch (error) {
-        console.error('Error al obtener usuario actual:', error);
-        return null;
+// Get status text
+function getStatusText(status) {
+    switch (status) {
+        case 'pending':
+            return 'Pendiente';
+        case 'in-progress':
+            return 'En Progreso';
+        case 'completed':
+            return 'Completado';
+        default:
+            return 'Desconocido';
     }
 }
-
-// Inicializar cuando el DOM esté listo
-document.addEventListener('DOMContentLoaded', initMenuPage);

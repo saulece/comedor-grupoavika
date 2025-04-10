@@ -1,165 +1,190 @@
-# Comedor Grupo Avika
+# Sistema de Gestión de Comedor Empresarial
 
-Sistema de gestión de comedor empresarial para Grupo Avika.
+Sistema web para optimizar la planificación de comidas y reducir el desperdicio en el comedor empresarial de Grupo Avika.
 
 ## Descripción
 
-Aplicación web para la gestión del comedor de la empresa Grupo Avika. El sistema permite:
+Este sistema permite a los administradores crear menús semanales y a los coordinadores de cada sucursal confirmar la asistencia de sus empleados, permitiendo una mejor planificación de recursos y reducción de desperdicios.
 
-- **Administradores**:
-  - Publicación del menú semanal
-  - Visualización de confirmaciones de empleados
-  - Exportar reportes de confirmaciones
+## Características
 
-- **Coordinadores**:
-  - Visualización del menú semanal
-  - Gestión de empleados de su departamento
-  - Registro de confirmaciones diarias
+- **Dos roles de usuario**:
+  - **Administrador**: Crea y publica menús semanales, visualiza reportes
+  - **Coordinador**: Gestiona empleados, confirma asistencia diaria
 
-## Tecnologías
+- **Flujo de trabajo**:
+  - Creación del menú (Admin)
+  - Período de confirmaciones (Jueves 16:10 a Sábado 10:00)
+  - Consolidación de datos para cocina
+  - Seguimiento de asistencia real
 
-- HTML5, CSS3, JavaScript (ES6+)
-- Firebase (Autenticación, Firestore, Storage)
-- Diseño responsive
+- **Funcionalidades principales**:
+  - Gestión de menús semanales 
+  - Confirmación masiva de empleados
+  - Importación de empleados desde Excel
+  - Visualización de métricas y ahorro estimado
 
 ## Estructura del Proyecto
 
 ```
-comedor-grupoavika/
-│
-├── index.html                          # Página de inicio/login
-├── favicon.ico                         # Ícono de la aplicación
-│
-├── css/                                # Estilos CSS de la aplicación
-│   ├── styles.css                      # Estilos globales
-│   ├── login.css                       # Estilos para login
-│   ├── admin.css                       # Estilos para panel de administrador
-│   └── coordinator.css                 # Estilos para panel de coordinador
-│
-├── js/
-│   ├── components/                     # Componentes reutilizables de UI
-│   │   ├── admin/                      # Componentes específicos para administradores
-│   │   ├── coordinator/                # Componentes específicos para coordinadores
-│   │   └── common/                     # Componentes comunes reutilizables
-│   │
-│   ├── services/                       # Servicios centralizados
-│   │   ├── firebase/                   # Servicios relacionados con Firebase
-│   │   │   ├── config.js               # Configuración de Firebase
-│   │   │   ├── firebase-service.js     # Servicio general de Firebase
-│   │   │   ├── firestore.js            # Operaciones de Firestore
-│   │   │   └── firestoreService.js     # Servicio para gestión de Firestore
-│   │   │
-│   │   ├── error/                      # Servicios de gestión de errores
-│   │   │   ├── errorService.js         # Servicio centralizado de errores
-│   │   │   └── examples.js             # Ejemplos de uso del servicio de errores
-│   │   │
-│   │   └── state/                      # Servicios de gestión de estado
-│   │       └── stateManager.js         # Gestor centralizado de estado
-│   │
-│   ├── utils/                          # Utilidades y funciones auxiliares
-│   │   ├── date/                       # Utilidades para manejo de fechas
-│   │   ├── validation/                 # Funciones de validación
-│   │   ├── formatting/                 # Utilidades de formateo y Excel
-│   │   ├── common-utils.js             # Utilidades comunes
-│   │   ├── error-handler.js            # Manejador de errores
-│   │   └── logger.js                   # Utilidad de registro (logging)
-│   │
-│   └── views/                          # Lógica específica de cada vista
-│       ├── admin/                      # Vistas de administrador
-│       │   ├── menu.js                 # Gestión de menú
-│       │   ├── confirmations.js        # Ver confirmaciones
-│       │   └── users.js                # Gestión de usuarios
-│       │
-│       ├── coordinator/                # Vistas de coordinador
-│       │   ├── menu-view.js            # Ver menú
-│       │   ├── confirmaciones.js        # Registrar confirmaciones
-│       │   └── employees.js            # Gestión de empleados
-│       │
-│       └── auth/                       # Vistas de autenticación
-│           └── auth.js                 # Funciones de autenticación
-│
-├── pages/                              # Archivos HTML de la aplicación
-│   ├── admin/                          # Páginas de administrador
-│   └── coordinator/                    # Páginas de coordinador
-│
-├── assets/                             # Recursos estáticos
-│   └── img/                            # Imágenes
-│
-├── docs/                               # Documentación del proyecto
-│
-└── tests/                              # Pruebas automatizadas
+comedor-app/
+├── assets/           # Imágenes, iconos y plantillas
+├── css/              # Estilos CSS
+├── js/               # Scripts JavaScript
+│   ├── services/     # Servicios (Firebase, notificaciones)
+│   ├── models/       # Modelos de datos
+│   ├── utils/        # Utilidades (fechas, validación)
+│   └── views/        # Lógica específica de páginas
+└── pages/            # Páginas HTML
+    ├── admin/        # Interfaces de administrador
+    └── coordinator/  # Interfaces de coordinador
 ```
 
-## Instalación y Configuración
+## Tecnologías Utilizadas
 
-### Requisitos Previos
+- **Frontend**: HTML5, CSS3, JavaScript (Vanilla)
+- **Backend**: Firebase
+  - Firestore Database (NoSQL)
+  - Firebase Authentication
+- **Hosting**: Netlify/Firebase Hosting
+- **Librerías**: SheetJS para manejo de Excel
 
-- Cuenta de Firebase con un proyecto configurado
-- Navegador web moderno (Chrome, Firefox, Edge, Safari)
+## Requisitos de Instalación
 
-### Configuración de Firebase
+1. Node.js y npm instalados
+2. Cuenta en Firebase
+3. Configuración del proyecto Firebase
 
-1. Crear un proyecto en Firebase Console
-2. Habilitar Autenticación (correo/contraseña)
-3. Configurar Firestore Database
-4. Actualizar `js/services/firebase/config.js` con tus credenciales:
+## Configuración
+
+1. Clonar este repositorio
+2. Actualizar archivo `js/services/firebase/config.js` con tus credenciales de Firebase:
 
 ```javascript
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_AUTH_DOMAIN",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_STORAGE_BUCKET",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    apiKey: "TU_API_KEY",
+    authDomain: "tu-proyecto.firebaseapp.com",
+    projectId: "tu-proyecto",
+    storageBucket: "tu-proyecto.appspot.com",
+    messagingSenderId: "TU_SENDER_ID",
+    appId: "TU_APP_ID"
 };
 ```
 
-### Estructura de la Base de Datos
+3. Instalar Firebase CLI (opcional, para despliegue local):
+```bash
+npm install -g firebase-tools
+firebase login
+firebase init
+```
 
-Colecciones de Firestore:
+## Estructura de Datos en Firestore
 
-- **users**: Usuarios del sistema (administradores y coordinadores)
-- **menus**: Menús semanales
-- **confirmations**: Confirmaciones diarias de comedor
-- **employees**: Empleados organizados por departamento
+### Colecciones Principales
 
-## Uso
+- **users**: Información de usuarios (admins y coordinadores)
+- **branches**: Sucursales de la empresa
+- **employees**: Información de empleados por sucursal
+- **weeklyMenus**: Menús semanales con subcollección dailyMenus
+- **confirmations**: Confirmaciones de asistencia por sucursal y semana
+- **settings**: Configuración del sistema
 
-### Acceso al Sistema
+## Reglas de Seguridad
 
-1. Accede al sistema con tus credenciales de usuario
-2. Según tu rol (administrador o coordinador), serás redirigido al panel correspondiente
+Para implementar correctamente las reglas de seguridad en Firestore, sigue esta estructura:
 
-### Panel de Administrador
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Validar si el usuario está autenticado
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Validar rol de administrador
+    function isAdmin() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // Validar rol de coordinador
+    function isCoordinator() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'coordinator';
+    }
+    
+    // Verificar si el coordinador pertenece a la sucursal
+    function isCoordinatorOfBranch(branchId) {
+      return isCoordinator() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.branch == branchId;
+    }
+    
+    // Reglas para usuarios
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || request.auth.uid == userId;
+    }
+    
+    // Reglas para sucursales
+    match /branches/{branchId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+    
+    // Reglas para empleados
+    match /employees/{employeeId} {
+      allow read: if isAuthenticated();
+      allow create: if isCoordinatorOfBranch(resource.data.branch) || isAdmin();
+      allow update, delete: if isCoordinatorOfBranch(resource.data.branch) || isAdmin();
+    }
+    
+    // Reglas para menús semanales
+    match /weeklyMenus/{weekId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin();
+      
+      // Subcollección de menús diarios
+      match /dailyMenus/{dayId} {
+        allow read: if isAuthenticated();
+        allow write: if isAdmin();
+      }
+    }
+    
+    // Reglas para confirmaciones
+    match /confirmations/{confirmationId} {
+      allow read: if isAuthenticated();
+      allow create: if isCoordinator();
+      allow update: if isCoordinatorOfBranch(resource.data.branchId) || isAdmin();
+    }
+    
+    // Reglas para configuración
+    match /settings/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+  }
+}
+```
 
-- **Publicar Menú**: Crea y publica el menú semanal
-- **Confirmaciones**: Visualiza y exporta las confirmaciones registradas
+## Despliegue
 
-### Panel de Coordinador
+### Despliegue en Firebase Hosting
 
-- **Ver Menú**: Visualiza el menú semanal publicado
-- **Empleados**: Gestiona los empleados de tu departamento
-- **Confirmaciones**: Registra las confirmaciones diarias de comedor
+```bash
+firebase deploy
+```
 
-## Desarrollo y Contribución
+### Despliegue en Netlify
 
-### Guía de Estilo
+1. Conecta tu repositorio de GitHub a Netlify
+2. Configura las variables de entorno necesarias
+3. Configura el comando de build si es necesario
 
-- Se utiliza camelCase para nombres de variables y funciones
-- Se utiliza PascalCase para nombres de clases
-- Se utiliza kebab-case para nombres de archivos y carpetas
-- Se utilizan 4 espacios para la indentación
+## Autor
 
-### Extendiendo Funcionalidades
-
-Para agregar nuevas funcionalidades:
-
-1. Crear los archivos HTML/CSS/JS necesarios siguiendo la estructura existente
-2. Actualizar la navegación en los paneles correspondientes
-3. Agregar la lógica de negocio en los archivos JS
+Desarrollado para Grupo Avika - 2025
 
 ## Licencia
 
-Proyecto desarrollado para uso interno de Grupo Avika.
-Todos los derechos reservados 2025 Grupo Avika
+Este proyecto es propiedad de Grupo Avika y está protegido por derechos de autor.

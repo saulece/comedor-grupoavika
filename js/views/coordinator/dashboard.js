@@ -1,602 +1,513 @@
-// Coordinator Dashboard for Comedor Grupo Avika
+// Dashboard.js - Coordinator Dashboard
 
-// Inicialización de la página cuando el DOM esté listo
-document.addEventListener('DOMContentLoaded', async () => {
-    // Proteger esta ruta para el rol de coordinador
-    await protectRoute(USER_ROLES.COORDINATOR);
-    
-    // Inicializar la página si la autenticación es válida
-    initDashboard();
-});
-
-/**
- * Inicializar el dashboard del coordinador
- */
-async function initDashboard() {
-    try {
-        window.errorService.toggleLoading(true);
-        
-        // Verificar servicios necesarios
-        if (!window.firestoreService) {
-            throw new Error('Servicio de Firestore no disponible');
-        }
-        
-        // Obtener usuario actual
-        const currentUser = getCurrentUser();
-        
-        if (!currentUser || !currentUser.uid) {
-            throw new Error('No hay usuario en sesión');
-        }
-        
-        // Verificar rol de coordinador
-        if (currentUser.role !== USER_ROLES.COORDINATOR) {
-            throw new Error('Acceso no autorizado: se requiere rol de coordinador');
-        }
-        
-        // Cargar datos iniciales
-        await loadDashboardData();
-        
-        // Configurar escuchas en tiempo real
-        setupRealTimeListeners();
-        
-        // Configurar eventos
-        setupEventListeners();
-        
-    } catch (error) {
-        window.errorService.handleError(
-            error, 
-            'Error al inicializar el dashboard',
-            ERROR_TYPES.UNKNOWN,
-            ERROR_SEVERITY.ERROR
-        );
-    } finally {
-        window.errorService.toggleLoading(false);
-    }
-}
-
-/**
- * Cargar datos del dashboard
- */
-async function loadDashboardData() {
-    try {
-        const currentUser = getCurrentUser();
-        
-        // Cargar estadísticas de empleados
-        await loadEmployeeStats(currentUser.uid);
-        
-        // Cargar estadísticas de confirmaciones para la fecha actual
-        await loadConfirmationStats();
-        
-        // Actualizar UI con los datos cargados
-        updateDashboardUI();
-        
-    } catch (error) {
-        console.error('Error al cargar datos del dashboard:', error);
-        throw error;
-    }
-}
-
-/**
- * Cargar estadísticas de empleados para el coordinador
- * @param {string} coordinatorId - ID del coordinador
- */
-async function loadEmployeeStats(coordinatorId) {
-    try {
-        // Consultar empleados asignados a este coordinador con caché y selección de campos
-        const query = {
-            collection: 'employees',
-            where: [['coordinatorId', '==', coordinatorId]],
-            select: ['active'], // Solo necesitamos el campo active para las estadísticas
-            useCache: true,
-            cacheExpiration: 15 // 15 minutos
-        };
-        
-        const employeesResult = await window.firestoreService.getDocuments(query);
-        
-        if (!employeesResult || !employeesResult.data) {
-            throw new Error('Error al obtener estadísticas de empleados');
-        }
-        
-        // Calcular estadísticas
-        const employees = employeesResult.data;
-        const total = employees.length;
-        const active = employees.filter(emp => emp.active === true).length;
-        const inactive = total - active;
-        
-        // Actualizar estado
-        dashboardState.setValue('stats', {
-            ...dashboardState.getValue('stats'),
-            employees: { total, active, inactive }
-        });
-        
-    } catch (error) {
-        console.error('Error al cargar estadísticas de empleados:', error);
-        throw error;
-    }
-}
-
-/**
- * Cargar estadísticas de confirmaciones para la fecha actual
- */
-async function loadConfirmationStats() {
-    try {
-        const currentUser = getCurrentUser();
-        const currentDate = dashboardState.getValue('currentDate');
-        
-        // Formatear fecha para consulta (YYYY-MM-DD)
-        const dateStr = formatDate(currentDate);
-        
-        // Obtener departamentos asignados al coordinador con caché
-        const deptQuery = {
-            collection: 'departments',
-            where: [['coordinatorId', '==', currentUser.uid]],
-            select: ['name'], // Solo necesitamos el nombre
-            useCache: true,
-            cacheExpiration: 60 // 1 hora
-        };
-        
-        const deptsResult = await window.firestoreService.getDocuments(deptQuery);
-        
-        if (!deptsResult || !deptsResult.data) {
-            throw new Error('Error al obtener departamentos');
-        }
-        
-        dashboardState.setValue('departments', deptsResult.data);
-        
-        // Obtener IDs de departamentos
-        const departmentIds = deptsResult.data.map(dept => dept.id);
-        
-        // Si no hay departamentos, establecer estadísticas en cero
-        if (departmentIds.length === 0) {
-            dashboardState.setValue('stats', {
-                ...dashboardState.getValue('stats'),
-                confirmations: { total: 0, confirmed: 0, pending: 0 }
-            });
+document.addEventListener('DOMContentLoaded', () => {
+    // Check authentication and role
+    auth.onAuthStateChanged(async (user) => {
+        if (!user) {
+            // Redirect to login if not authenticated
+            window.location.href = '../../index.html';
             return;
         }
         
-        // Consultar confirmaciones para los departamentos del coordinador en la fecha actual
-        // Usamos una transacción para garantizar consistencia en los datos
-        const confirmationStats = await window.firestoreService.runTransaction(async (transaction) => {
-            let totalEmployees = 0;
-            let confirmedEmployees = 0;
-            
-            // Obtener total de empleados activos por departamento
-            for (const deptId of departmentIds) {
-                const empQuery = {
-                    collection: 'employees',
-                    where: [
-                        ['departmentId', '==', deptId],
-                        ['active', '==', true]
-                    ],
-                    select: ['id'] // Solo necesitamos contar
-                };
-                
-                const empResult = await transaction.get('employees', null, empQuery);
-                
-                if (empResult) {
-                    totalEmployees += empResult.length;
-                }
-                
-                // Obtener confirmaciones para este departamento y fecha
-                const confQuery = {
-                    collection: 'confirmations',
-                    where: [
-                        ['departmentId', '==', deptId],
-                        ['date', '==', dateStr]
-                    ]
-                };
-                
-                const confResult = await transaction.get('confirmations', null, confQuery);
-                
-                if (confResult && confResult.length > 0) {
-                    // Sumar empleados confirmados
-                    confResult.forEach(conf => {
-                        if (conf.confirmedEmployees && Array.isArray(conf.confirmedEmployees)) {
-                            confirmedEmployees += conf.confirmedEmployees.length;
-                        } else if (conf.confirmedCount) {
-                            confirmedEmployees += conf.confirmedCount;
-                        }
-                    });
-                }
-            }
-            
-            return {
-                total: totalEmployees,
-                confirmed: confirmedEmployees,
-                pending: totalEmployees - confirmedEmployees
-            };
-        });
-        
-        // Actualizar estado con las estadísticas de confirmaciones
-        dashboardState.setValue('stats', {
-            ...dashboardState.getValue('stats'),
-            confirmations: confirmationStats
-        });
-        
-    } catch (error) {
-        console.error('Error al cargar estadísticas de confirmaciones:', error);
-        throw error;
-    }
-}
-
-/**
- * Configurar escuchas en tiempo real
- */
-function setupRealTimeListeners() {
-    try {
-        const currentUser = getCurrentUser();
-        const currentDate = dashboardState.getValue('currentDate');
-        const dateStr = formatDate(currentDate);
-        
-        // Escucha para cambios en confirmaciones
-        const confirmationsUnsubscribe = window.firestoreService.listenForDocuments(
-            {
-                collection: 'confirmations',
-                where: [['date', '==', dateStr]],
-                select: ['departmentId', 'confirmedEmployees', 'confirmedCount']
-            },
-            (error, result) => {
-                if (error) {
-                    console.error('Error en escucha de confirmaciones:', error);
-                    return;
-                }
-                
-                // Actualizar estadísticas de confirmaciones
-                loadConfirmationStats()
-                    .then(() => updateDashboardUI())
-                    .catch(err => console.error('Error al actualizar estadísticas:', err));
-            }
-        );
-        
-        // Escucha para cambios en empleados
-        const employeesUnsubscribe = window.firestoreService.listenForDocuments(
-            {
-                collection: 'employees',
-                where: [['coordinatorId', '==', currentUser.uid]],
-                select: ['active']
-            },
-            (error, result) => {
-                if (error) {
-                    console.error('Error en escucha de empleados:', error);
-                    return;
-                }
-                
-                // Actualizar estadísticas de empleados
-                loadEmployeeStats(currentUser.uid)
-                    .then(() => updateDashboardUI())
-                    .catch(err => console.error('Error al actualizar estadísticas de empleados:', err));
-            }
-        );
-        
-        // Guardar funciones para cancelar escuchas
-        const unsubscribeListeners = dashboardState.getValue('unsubscribeListeners');
-        unsubscribeListeners.push(confirmationsUnsubscribe, employeesUnsubscribe);
-        dashboardState.setValue('unsubscribeListeners', unsubscribeListeners);
-        
-    } catch (error) {
-        console.error('Error al configurar escuchas en tiempo real:', error);
-    }
-}
-
-/**
- * Cancelar escuchas en tiempo real
- */
-function cancelRealTimeListeners() {
-    const unsubscribeListeners = dashboardState.getValue('unsubscribeListeners');
-    
-    // Ejecutar todas las funciones de cancelación
-    unsubscribeListeners.forEach(unsubscribe => {
-        if (typeof unsubscribe === 'function') {
-            unsubscribe();
+        // Check if user is coordinator
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        if (!userDoc.exists || userDoc.data().role !== 'coordinator') {
+            // Redirect non-coordinator users
+            window.location.href = '../../index.html';
+            return;
         }
+        
+        // Store user data
+        const userData = userDoc.data();
+        setCurrentUser(userData);
+        setUserRole(userData.role);
+        setUserBranch(userData.branch);
+        
+        // Display user info
+        document.getElementById('userName').textContent = userData.displayName || 'Coordinador';
+        
+        // Get branch details
+        const branchDoc = await db.collection('branches').doc(userData.branch).get();
+        if (branchDoc.exists) {
+            const branchData = branchDoc.data();
+            document.getElementById('branchName').textContent = branchData.name;
+        }
+        
+        // Initialize dashboard
+        initDashboard(userData.branch, user.uid);
     });
     
-    // Limpiar lista
-    dashboardState.setValue('unsubscribeListeners', []);
-}
+    // Logout functionality
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+        try {
+            await logout();
+            window.location.href = '../../index.html';
+        } catch (error) {
+            console.error('Error logging out:', error);
+            showError('Error al cerrar sesión. Intente nuevamente.');
+        }
+    });
+});
 
-/**
- * Actualizar la interfaz del dashboard con los datos cargados
- */
-function updateDashboardUI() {
-    const stats = dashboardState.getValue('stats');
+// Initialize dashboard
+function initDashboard(branchId, coordinatorId) {
+    // DOM elements
+    const confirmationStatus = document.getElementById('confirmationStatus');
+    const timeRemainingValue = document.getElementById('timeRemainingValue');
+    const weekDates = document.getElementById('weekDates');
+    const dayTabsContainer = document.getElementById('dayTabsContainer');
+    const menuPreview = document.getElementById('menuPreview');
+    const totalEmployees = document.getElementById('totalEmployees');
+    const activeEmployees = document.getElementById('activeEmployees');
+    const confirmedEmployees = document.getElementById('confirmedEmployees');
+    const activityList = document.getElementById('activityList');
+    const goToConfirmBtn = document.getElementById('goToConfirmBtn');
+    const viewFullMenuBtn = document.getElementById('viewFullMenuBtn');
+    const manageEmployeesBtn = document.getElementById('manageEmployeesBtn');
     
-    // Actualizar estadísticas de empleados
-    updateEmployeeStatsUI(stats.employees);
+    // State
+    let currentMenu = null;
+    let currentDay = 'monday';
+    let employeesData = [];
+    let countdownInterval = null;
     
-    // Actualizar estadísticas de confirmaciones
-    updateConfirmationStatsUI(stats.confirmations);
+    // Load dashboard data
+    loadDashboardData();
     
-    // Actualizar fecha actual
-    updateCurrentDateUI();
-}
-
-/**
- * Actualizar UI de estadísticas de empleados
- */
-function updateEmployeeStatsUI(employeeStats) {
-    // Total de empleados
-    const totalEmployeesElement = document.getElementById('total-employees');
-    if (totalEmployeesElement) {
-        totalEmployeesElement.textContent = employeeStats.total;
-    }
+    // Event listeners
     
-    // Empleados activos
-    const activeEmployeesElement = document.getElementById('active-employees');
-    if (activeEmployeesElement) {
-        activeEmployeesElement.textContent = employeeStats.active;
-    }
+    // Go to confirmations button
+    goToConfirmBtn.addEventListener('click', () => {
+        window.location.href = 'confirmations.html';
+    });
     
-    // Empleados inactivos
-    const inactiveEmployeesElement = document.getElementById('inactive-employees');
-    if (inactiveEmployeesElement) {
-        inactiveEmployeesElement.textContent = employeeStats.inactive;
-    }
+    // View full menu button
+    viewFullMenuBtn.addEventListener('click', () => {
+        window.location.href = 'menu.html';
+    });
     
-    // Actualizar gráficos si existen
-    updateEmployeeCharts(employeeStats);
-}
-
-/**
- * Actualizar UI de estadísticas de confirmaciones
- */
-function updateConfirmationStatsUI(confirmationStats) {
-    // Total de empleados para confirmar
-    const totalConfirmationsElement = document.getElementById('total-confirmations');
-    if (totalConfirmationsElement) {
-        totalConfirmationsElement.textContent = confirmationStats.total;
-    }
+    // Manage employees button
+    manageEmployeesBtn.addEventListener('click', () => {
+        window.location.href = 'employees.html';
+    });
     
-    // Empleados confirmados
-    const confirmedElement = document.getElementById('confirmed-count');
-    if (confirmedElement) {
-        confirmedElement.textContent = confirmationStats.confirmed;
-    }
-    
-    // Empleados pendientes
-    const pendingElement = document.getElementById('pending-count');
-    if (pendingElement) {
-        pendingElement.textContent = confirmationStats.pending;
-    }
-    
-    // Porcentaje de confirmación
-    const percentElement = document.getElementById('confirmation-percent');
-    if (percentElement) {
-        const percent = confirmationStats.total > 0 
-            ? Math.round((confirmationStats.confirmed / confirmationStats.total) * 100) 
-            : 0;
-        percentElement.textContent = `${percent}%`;
-        
-        // Actualizar barra de progreso si existe
-        const progressBar = document.getElementById('confirmation-progress');
-        if (progressBar) {
-            progressBar.style.width = `${percent}%`;
+    // Load dashboard data
+    async function loadDashboardData() {
+        try {
+            // Load current menu
+            currentMenu = await getCurrentWeeklyMenu();
             
-            // Cambiar color según porcentaje
-            if (percent < 30) {
-                progressBar.className = 'progress-bar bg-danger';
-            } else if (percent < 70) {
-                progressBar.className = 'progress-bar bg-warning';
-            } else {
-                progressBar.className = 'progress-bar bg-success';
-            }
-        }
-    }
-    
-    // Actualizar gráficos si existen
-    updateConfirmationCharts(confirmationStats);
-}
-
-/**
- * Actualizar gráficos de empleados si existen
- */
-function updateEmployeeCharts(employeeStats) {
-    // Verificar si existe Chart.js y el elemento canvas
-    if (window.Chart && document.getElementById('employee-chart')) {
-        // Destruir gráfico anterior si existe
-        if (window.employeeChart) {
-            window.employeeChart.destroy();
-        }
-        
-        // Crear nuevo gráfico
-        const ctx = document.getElementById('employee-chart').getContext('2d');
-        window.employeeChart = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: ['Activos', 'Inactivos'],
-                datasets: [{
-                    data: [employeeStats.active, employeeStats.inactive],
-                    backgroundColor: ['#28a745', '#dc3545'],
-                    borderWidth: 0
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                cutoutPercentage: 70,
-                legend: {
-                    position: 'bottom'
-                }
-            }
-        });
-    }
-}
-
-/**
- * Actualizar gráficos de confirmaciones si existen
- */
-function updateConfirmationCharts(confirmationStats) {
-    // Verificar si existe Chart.js y el elemento canvas
-    if (window.Chart && document.getElementById('confirmation-chart')) {
-        // Destruir gráfico anterior si existe
-        if (window.confirmationChart) {
-            window.confirmationChart.destroy();
-        }
-        
-        // Crear nuevo gráfico
-        const ctx = document.getElementById('confirmation-chart').getContext('2d');
-        window.confirmationChart = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: ['Confirmados', 'Pendientes'],
-                datasets: [{
-                    data: [confirmationStats.confirmed, confirmationStats.pending],
-                    backgroundColor: ['#28a745', '#ffc107'],
-                    borderWidth: 0
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                cutoutPercentage: 70,
-                legend: {
-                    position: 'bottom'
-                }
-            }
-        });
-    }
-}
-
-/**
- * Actualizar fecha actual en la UI
- */
-function updateCurrentDateUI() {
-    const currentDate = dashboardState.getValue('currentDate');
-    const dateElement = document.getElementById('current-date');
-    
-    if (dateElement) {
-        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-        dateElement.textContent = currentDate.toLocaleDateString('es-ES', options);
-    }
-}
-
-/**
- * Configurar eventos de la página
- */
-function setupEventListeners() {
-    // Botón para cambiar fecha
-    const dateSelector = document.getElementById('date-selector');
-    if (dateSelector) {
-        dateSelector.addEventListener('change', async (e) => {
-            const dateStr = e.target.value;
+            // Load employees data
+            const employeesResult = await getEmployeesByBranch(branchId);
+            employeesData = employeesResult;
             
-            // Validar formato de fecha (DD/MM/YYYY)
-            if (!isValidDateString(dateStr)) {
-                window.errorService.handleValidationError(
-                    'Formato de fecha inválido. Use DD/MM/YYYY',
-                    { date: 'Formato inválido' }
-                );
+            // Display menu preview
+            displayMenuPreview();
+            
+            // Display confirmation status
+            displayConfirmationStatus();
+            
+            // Display employee stats
+            displayEmployeeStats();
+            
+            // Load recent activity
+            loadRecentActivity();
+            
+            // Store in state manager
+            setCurrentMenu(currentMenu);
+            setCurrentEmployees(employeesData.filter(e => e.active));
+        } catch (error) {
+            console.error('Error loading dashboard data:', error);
+            showError('Error al cargar datos del dashboard. Intente nuevamente.');
+        }
+    }
+    
+    // Display menu preview
+    function displayMenuPreview() {
+        if (!currentMenu) {
+            weekDates.textContent = 'No disponible';
+            menuPreview.innerHTML = `
+                <div class="empty-message">
+                    No hay menú disponible actualmente.
+                </div>
+            `;
+            dayTabsContainer.innerHTML = '';
+            return;
+        }
+        
+        // Display week dates
+        const startDate = currentMenu.startDate.toDate();
+        const endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + 4); // Add 4 days to get to Friday
+        
+        weekDates.textContent = `${formatDateDMY(startDate)} al ${formatDateDMY(endDate)}`;
+        
+        // Create day tabs
+        let tabsHtml = '';
+        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+        const dayNames = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+        
+        days.forEach((day, index) => {
+            tabsHtml += `
+                <div class="day-tab ${day === currentDay ? 'active' : ''}" data-day="${day}">
+                    ${dayNames[index]}
+                </div>
+            `;
+        });
+        
+        dayTabsContainer.innerHTML = tabsHtml;
+        
+        // Add event listeners to tabs
+        const dayTabs = document.querySelectorAll('.day-tab');
+        dayTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Deactivate all tabs
+                dayTabs.forEach(t => t.classList.remove('active'));
+                
+                // Activate clicked tab
+                tab.classList.add('active');
+                
+                // Update current day and display menu
+                currentDay = tab.dataset.day;
+                displayDayMenu();
+            });
+        });
+        
+        // Display current day menu
+        displayDayMenu();
+    }
+    
+    // Display current day menu
+    function displayDayMenu() {
+        if (!currentMenu || !currentMenu.dailyMenus || !currentMenu.dailyMenus[currentDay]) {
+            menuPreview.innerHTML = `
+                <div class="empty-message">
+                    No hay detalles disponibles para este día.
+                </div>
+            `;
+            return;
+        }
+        
+        const dayMenu = currentMenu.dailyMenus[currentDay];
+        const dayDate = dayMenu.date.toDate();
+        
+        // Format day and date
+        const dayName = getDayName(dayDate.getDay());
+        const formattedDate = formatDateDMY(dayDate);
+        
+        // Build menu details HTML
+        let html = `
+            <div class="menu-day-header">
+                <h3>${dayName} - ${formattedDate}</h3>
+            </div>
+        `;
+        
+        // Check if day menu has data
+        if (dayMenu.mainDish || dayMenu.sideDish || dayMenu.dessert || dayMenu.vegetarianOption) {
+            html += `
+                <div class="menu-items">
+                    <div class="menu-item">
+                        <h4>Platillo Principal</h4>
+                        <p>${dayMenu.mainDish || 'No especificado'}</p>
+                    </div>
+                    
+                    <div class="menu-item">
+                        <h4>Guarnición</h4>
+                        <p>${dayMenu.sideDish || 'No especificado'}</p>
+                    </div>
+                    
+                    <div class="menu-item">
+                        <h4>Postre</h4>
+                        <p>${dayMenu.dessert || 'No especificado'}</p>
+                    </div>
+                    
+                    <div class="menu-item">
+                        <h4>Opción Vegetariana</h4>
+                        <p>${dayMenu.vegetarianOption || 'No disponible'}</p>
+                    </div>
+                </div>
+            `;
+        } else {
+            html += `
+                <div class="empty-message">
+                    El menú para este día aún no ha sido completado.
+                </div>
+            `;
+        }
+        
+        menuPreview.innerHTML = html;
+    }
+    
+    // Display confirmation status
+    async function displayConfirmationStatus() {
+        if (!currentMenu) {
+            confirmationStatus.innerHTML = `
+                <p>No hay menú disponible para confirmaciones.</p>
+            `;
+            timeRemainingValue.textContent = '--:--:--';
+            return;
+        }
+        
+        // Get confirmation status
+        const now = new Date();
+        const confirmStart = currentMenu.confirmStartDate.toDate();
+        const confirmEnd = currentMenu.confirmEndDate.toDate();
+        
+        // Get confirmation for current branch
+        const confirmation = await getConfirmationsByBranch(currentMenu.id, branchId);
+        
+        // Build status HTML
+        let html = '';
+        
+        if (now < confirmStart) {
+            // Confirmation period not started yet
+            html = `
+                <p>
+                    El período de confirmaciones aún no ha comenzado.
+                    <br>
+                    Inicia el ${formatDateTime(confirmStart)}.
+                </p>
+            `;
+            
+            timeRemainingValue.textContent = 'No iniciado';
+            goToConfirmBtn.style.display = 'none';
+        } else if (now > confirmEnd) {
+            // Confirmation period ended
+            html = confirmation ? `
+                <p>
+                    Confirmaciones completadas.
+                    <br>
+                    Se confirmaron ${confirmation.employees ? confirmation.employees.length : 0} empleados.
+                </p>
+            ` : `
+                <p>
+                    El período de confirmaciones ha finalizado.
+                    <br>
+                    No se registraron confirmaciones.
+                </p>
+            `;
+            
+            timeRemainingValue.textContent = 'Finalizado';
+            goToConfirmBtn.style.display = 'none';
+        } else {
+            // Confirmation period active
+            html = confirmation ? `
+                <p>
+                    Confirmaciones en progreso.
+                    <br>
+                    ${confirmation.employees ? confirmation.employees.length : 0} empleados confirmados hasta ahora.
+                </p>
+            ` : `
+                <p>
+                    El período de confirmaciones está abierto.
+                    <br>
+                    Aún no ha registrado confirmaciones.
+                </p>
+            `;
+            
+            // Show confirmation button
+            goToConfirmBtn.style.display = 'inline-flex';
+            
+            // Start countdown timer
+            startCountdownTimer();
+        }
+        
+        confirmationStatus.innerHTML = html;
+    }
+    
+    // Start countdown timer for confirmation deadline
+    function startCountdownTimer() {
+        // Clear existing interval
+        if (countdownInterval) {
+            clearInterval(countdownInterval);
+        }
+        
+        // If menu is not available, don't start timer
+        if (!currentMenu) {
+            timeRemainingValue.textContent = '--:--:--';
+            return;
+        }
+        
+        // Get confirmation end time
+        const endTime = currentMenu.confirmEndDate.toDate();
+        
+        // Update immediately and then every second
+        updateCountdown();
+        countdownInterval = setInterval(updateCountdown, 1000);
+        
+        function updateCountdown() {
+            const now = new Date();
+            const timeDiff = endTime - now;
+            
+            if (timeDiff <= 0) {
+                // Time has expired
+                clearInterval(countdownInterval);
+                timeRemainingValue.textContent = 'Finalizado';
+                goToConfirmBtn.style.display = 'none';
                 return;
             }
             
-            // Convertir a objeto Date
-            const [day, month, year] = dateStr.split('/').map(Number);
-            dashboardState.setValue('currentDate', new Date(year, month - 1, day));
+            // Calculate hours, minutes, seconds
+            const hours = Math.floor(timeDiff / (1000 * 60 * 60));
+            const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000);
             
-            // Cancelar escuchas anteriores
-            cancelRealTimeListeners();
-            
-            // Recargar datos con la nueva fecha
-            await loadConfirmationStats();
-            
-            // Actualizar UI
-            updateDashboardUI();
-            
-            // Configurar nuevas escuchas
-            setupRealTimeListeners();
-        });
-    }
-    
-    // Botón para ir a confirmaciones
-    const confirmationsBtn = document.getElementById('go-to-confirmations');
-    if (confirmationsBtn) {
-        confirmationsBtn.addEventListener('click', () => {
-            window.location.href = './confirmations.html';
-        });
-    }
-    
-    // Evento de descarga de la página
-    window.addEventListener('beforeunload', () => {
-        // Cancelar escuchas al salir de la página
-        cancelRealTimeListeners();
-    });
-}
-
-/**
- * Formatear fecha para consultas (YYYY-MM-DD)
- */
-function formatDate(date) {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-}
-
-/**
- * Validar formato de fecha (DD/MM/YYYY)
- */
-function isValidDateString(dateStr) {
-    // Verificar formato básico
-    if (!/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) {
-        return false;
-    }
-    
-    // Verificar valores válidos
-    const [day, month, year] = dateStr.split('/').map(Number);
-    
-    if (month < 1 || month > 12) {
-        return false;
-    }
-    
-    const maxDays = new Date(year, month, 0).getDate();
-    if (day < 1 || day > maxDays) {
-        return false;
-    }
-    
-    return true;
-}
-
-/**
- * Obtener usuario actual desde localStorage
- */
-function getCurrentUser() {
-    try {
-        const userJson = localStorage.getItem('currentUser');
-        if (!userJson) {
-            return null;
+            // Format time
+            timeRemainingValue.textContent = `${padZero(hours)}:${padZero(minutes)}:${padZero(seconds)}`;
         }
+    }
+    
+    // Display employee stats
+    async function displayEmployeeStats() {
+        // Count employees
+        const totalCount = employeesData.length;
+        const activeCount = employeesData.filter(employee => employee.active).length;
         
-        return JSON.parse(userJson);
-    } catch (error) {
-        console.error('Error al obtener usuario actual:', error);
-        return null;
+        // Display counts
+        totalEmployees.textContent = totalCount;
+        activeEmployees.textContent = activeCount;
+        
+        // Get confirmations for current menu
+        if (currentMenu) {
+            const confirmation = await getConfirmationsByBranch(currentMenu.id, branchId);
+            const confirmedCount = confirmation ? (confirmation.employees ? confirmation.employees.length : 0) : 0;
+            
+            confirmedEmployees.textContent = confirmedCount;
+        } else {
+            confirmedEmployees.textContent = '0';
+        }
+    }
+    
+    // Load recent activity
+    async function loadRecentActivity() {
+        try {
+            activityList.innerHTML = `
+                <div class="loading-message">Cargando actividades...</div>
+            `;
+            
+            // Get recent confirmations
+            const confirmationsQuery = await db.collection('confirmations')
+                .where('branchId', '==', branchId)
+                .orderBy('timestamp', 'desc')
+                .limit(3)
+                .get();
+            
+            // Get employee actions (added/updated)
+            const employeeActionsQuery = await db.collection('employees')
+                .where('branch', '==', branchId)
+                .orderBy('createdAt', 'desc')
+                .limit(3)
+                .get();
+            
+            // Combine activities
+            const activities = [];
+            
+            // Add confirmations
+            confirmationsQuery.forEach(doc => {
+                const data = doc.data();
+                activities.push({
+                    type: 'confirmation',
+                    date: data.timestamp.toDate(),
+                    data: {
+                        weekId: data.weekId,
+                        employeeCount: data.employees ? data.employees.length : 0
+                    }
+                });
+            });
+            
+            // Add employee actions
+            employeeActionsQuery.forEach(doc => {
+                const data = doc.data();
+                activities.push({
+                    type: 'employee_added',
+                    date: data.createdAt.toDate(),
+                    data: {
+                        name: data.name,
+                        position: data.position
+                    }
+                });
+            });
+            
+            // Sort by date
+            activities.sort((a, b) => b.date - a.date);
+            
+            // Limit to 5 most recent
+            const recentActivities = activities.slice(0, 5);
+            
+            if (recentActivities.length === 0) {
+                activityList.innerHTML = `
+                    <div class="empty-message">
+                        No hay actividad reciente.
+                    </div>
+                `;
+                return;
+            }
+            
+            // Display activities
+            let html = '';
+            
+            recentActivities.forEach(activity => {
+                const relativeDate = formatRelativeDate(activity.date);
+                const activityTime = formatTime(activity.date);
+                
+                switch (activity.type) {
+                    case 'confirmation':
+                        html += `
+                            <div class="activity-item">
+                                <div class="activity-icon">
+                                    <i class="material-icons">fact_check</i>
+                                </div>
+                                <div class="activity-content">
+                                    <div class="activity-title">
+                                        Confirmación de ${activity.data.employeeCount} empleados
+                                    </div>
+                                    <div class="activity-time">${relativeDate} a las ${activityTime}</div>
+                                </div>
+                            </div>
+                        `;
+                        break;
+                        
+                    case 'employee_added':
+                        html += `
+                            <div class="activity-item">
+                                <div class="activity-icon">
+                                    <i class="material-icons">person_add</i>
+                                </div>
+                                <div class="activity-content">
+                                    <div class="activity-title">
+                                        Empleado agregado: ${activity.data.name}
+                                    </div>
+                                    <div class="activity-time">${relativeDate} a las ${activityTime}</div>
+                                </div>
+                            </div>
+                        `;
+                        break;
+                }
+            });
+            
+            activityList.innerHTML = html;
+        } catch (error) {
+            console.error('Error loading activities:', error);
+            activityList.innerHTML = `
+                <div class="error-message">
+                    Error al cargar las actividades recientes.
+                </div>
+            `;
+        }
+    }
+    
+    // Pad number with leading zero
+    function padZero(num) {
+        return num.toString().padStart(2, '0');
     }
 }
 
-// Estado local para este módulo
-const dashboardState = window.StateManager.createModuleState('dashboard', {
-    currentUser: null,
-    currentDate: new Date(),
-    stats: {
-        employees: {
-            total: 0,
-            active: 0,
-            inactive: 0
-        },
-        confirmations: {
-            total: 0,
-            confirmed: 0,
-            pending: 0
-        }
-    },
-    departments: [],
-    unsubscribeListeners: [] // Para almacenar funciones de cancelación de escuchas
-});
+// Helper function to show success notification
+function showSuccess(message) {
+    showNotification(message, { type: 'success' });
+}
 
-// Constantes
-const USER_ROLES = {
-    ADMIN: 'admin',
-    COORDINATOR: 'coordinator',
-    EMPLOYEE: 'employee'
-};
+// Helper function to show error notification
+function showError(message) {
+    showNotification(message, { type: 'error' });
+}

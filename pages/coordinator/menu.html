@@ -3,148 +3,170 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Menú Semanal - Coordinador</title>
+    <title>Menú Semanal - Sistema de Comedor</title>
     <link rel="stylesheet" href="../../css/styles.css">
     <link rel="stylesheet" href="../../css/coordinator.css">
-    <link rel="icon" type="image/x-icon" href="../../favicon.ico">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <link rel="stylesheet" href="../../css/fixes.css">
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <!-- Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 </head>
 <body>
-    <div class="coordinator-container">
+    <div class="app-container">
         <!-- Sidebar -->
-        <div class="sidebar">
+        <aside class="sidebar">
             <div class="sidebar-header">
-                <img src="../../assets/img/logo-small.png" alt="Grupo Avika Logo">
-                <h3>Grupo Avika</h3>
+                <img src="../../assets/img/logo.png" alt="Grupo Avika" class="sidebar-logo">
+                <h2>Coordinador</h2>
             </div>
-            <div class="sidebar-menu">
+            
+            <nav class="sidebar-nav">
                 <ul>
                     <li>
                         <a href="dashboard.html">
-                            <i class="fas fa-tachometer-alt"></i> Dashboard
+                            <i class="material-icons">dashboard</i>
+                            <span>Dashboard</span>
                         </a>
                     </li>
-                    <li>
-                        <a href="menu.html" class="active">
-                            <i class="fas fa-utensils"></i> Menú
+                    <li class="active">
+                        <a href="menu.html">
+                            <i class="material-icons">restaurant_menu</i>
+                            <span>Menú Semanal</span>
                         </a>
                     </li>
                     <li>
                         <a href="confirmations.html">
-                            <i class="fas fa-clipboard-check"></i> Confirmaciones
+                            <i class="material-icons">fact_check</i>
+                            <span>Confirmaciones</span>
                         </a>
                     </li>
                     <li>
                         <a href="employees.html">
-                            <i class="fas fa-users"></i> Empleados
-                        </a>
-                    </li>
-                    <li>
-                        <a href="#" id="logout-btn">
-                            <i class="fas fa-sign-out-alt"></i> Cerrar sesión
+                            <i class="material-icons">people</i>
+                            <span>Empleados</span>
                         </a>
                     </li>
                 </ul>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <button id="logoutBtn" class="btn btn-outline">
+                    <i class="material-icons">exit_to_app</i>
+                    <span>Cerrar Sesión</span>
+                </button>
             </div>
-        </div>
-
+        </aside>
+        
         <!-- Main Content -->
-        <div class="main-content">
-            <div class="content-header">
-                <h2>Menú Semanal</h2>
+        <main class="main-content">
+            <header class="content-header">
+                <h1>Menú Semanal</h1>
                 <div class="user-info">
-                    <span id="user-name">Coordinador</span>
+                    <span id="branchName">Sucursal</span>
+                    <span id="userName">Coordinador</span>
+                    <i class="material-icons">account_circle</i>
+                </div>
+            </header>
+            
+            <div class="content-body">
+                <!-- Menu Container -->
+                <div class="menu-container">
+                    <!-- Menu Header -->
+                    <div class="section">
+                        <div class="section-header">
+                            <h2>Menú del <span id="weekDates">Cargando...</span></h2>
+                            <div class="menu-status">
+                                <span id="menuStatusBadge" class="status-badge">Cargando...</span>
+                                <a href="confirmations.html" id="goToConfirmBtn" class="btn btn-primary">
+                                    <i class="material-icons">fact_check</i>
+                                    Ir a Confirmaciones
+                                </a>
+                            </div>
+                        </div>
+                        
+                        <!-- Day Tabs -->
+                        <div class="day-tabs">
+                            <div class="day-tab active" data-day="monday">Lunes</div>
+                            <div class="day-tab" data-day="tuesday">Martes</div>
+                            <div class="day-tab" data-day="wednesday">Miércoles</div>
+                            <div class="day-tab" data-day="thursday">Jueves</div>
+                            <div class="day-tab" data-day="friday">Viernes</div>
+                        </div>
+                        
+                        <!-- Menu Details -->
+                        <div class="day-content" id="menuDetails">
+                            <!-- Menu details will be loaded dynamically -->
+                            <div class="loading-message">Cargando menú...</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Branch Confirmations -->
+                    <div class="section">
+                        <h2>Confirmaciones de su Sucursal</h2>
+                        
+                        <div id="branchConfirmations">
+                            <!-- Confirmation data will be loaded dynamically -->
+                            <div class="loading-message">Cargando confirmaciones...</div>
+                        </div>
+                    </div>
+                    
+                    <!-- All Branches Confirmations -->
+                    <div class="section">
+                        <h2>Resumen de Confirmaciones</h2>
+                        
+                        <div class="branches-summary">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Sucursal</th>
+                                        <th>Empleados</th>
+                                        <th>Confirmados</th>
+                                        <th>Porcentaje</th>
+                                        <th>Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="branchesSummaryBody">
+                                    <!-- Summary will be loaded dynamically -->
+                                    <tr>
+                                        <td colspan="5" class="text-center">Cargando resumen...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
-
-            <!-- Week Selector -->
-            <div class="week-selector">
-                <button id="prev-week-btn" class="btn btn-icon">
-                    <i class="fas fa-chevron-left"></i>
-                </button>
-                <div class="week-display">
-                    <span id="current-week-display">Semana del DD/MM/YYYY al DD/MM/YYYY</span>
-                </div>
-                <button id="next-week-btn" class="btn btn-icon">
-                    <i class="fas fa-chevron-right"></i>
-                </button>
-            </div>
-
-            <!-- Menu Tabs -->
-            <div class="menu-tabs">
-                <button class="menu-tab active" data-day="lunes">Lunes</button>
-                <button class="menu-tab" data-day="martes">Martes</button>
-                <button class="menu-tab" data-day="miercoles">Miércoles</button>
-                <button class="menu-tab" data-day="jueves">Jueves</button>
-                <button class="menu-tab" data-day="viernes">Viernes</button>
-                <button class="menu-tab" data-day="sabado">Sábado</button>
-                <button class="menu-tab" data-day="domingo">Domingo</button>
-            </div>
-
-            <!-- Weekly Menu -->
-            <div id="weekly-menu" class="card">
-                <div id="lunes-menu" class="daily-menu active">
-                    <!-- Menu items for Monday will be loaded here -->
-                </div>
-                <div id="martes-menu" class="daily-menu">
-                    <!-- Menu items for Tuesday will be loaded here -->
-                </div>
-                <div id="miercoles-menu" class="daily-menu">
-                    <!-- Menu items for Wednesday will be loaded here -->
-                </div>
-                <div id="jueves-menu" class="daily-menu">
-                    <!-- Menu items for Thursday will be loaded here -->
-                </div>
-                <div id="viernes-menu" class="daily-menu">
-                    <!-- Menu items for Friday will be loaded here -->
-                </div>
-                <div id="sabado-menu" class="daily-menu">
-                    <!-- Menu items for Saturday will be loaded here -->
-                </div>
-                <div id="domingo-menu" class="daily-menu">
-                    <!-- Menu items for Sunday will be loaded here -->
-                </div>
-            </div>
-
-            <!-- No Menu Message -->
-            <div id="no-menu-message" class="card" style="display: none;">
-                <div class="card-body empty-state">
-                    <i class="fas fa-utensils empty-icon"></i>
-                    <p>No hay menú publicado para esta semana.</p>
+        </main>
+        
+        <!-- No Menu Available Modal -->
+        <div id="noMenuModal" class="modal">
+            <div class="modal-content">
+                <h2>No hay menú disponible</h2>
+                
+                <p>Actualmente no hay un menú semanal disponible.</p>
+                <p>Por favor, espere a que el administrador publique el menú.</p>
+                
+                <div class="form-actions">
+                    <button id="refreshMenuBtn" class="btn btn-primary">Actualizar</button>
                 </div>
             </div>
         </div>
     </div>
-
-    <!-- Loading Indicator -->
-    <div id="loading-indicator" style="display: none;">
-        <div class="spinner"></div>
-    </div>
-
-    <!-- Alert Messages -->
-    <div id="error-alert" class="alert-message error-message" style="display: none;"></div>
-
-    <!-- Firebase Scripts -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-storage.js"></script>
-
-    <!-- Utility Scripts -->
-    <script src="../../js/utils/logger.js"></script>
+    
+    <!-- Firebase App (the core Firebase SDK) -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <!-- Firebase Auth -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <!-- Firebase Firestore -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    
+    <!-- App Scripts -->
+    <script src="../../js/services/firebase/config.js"></script>
+    <script src="../../js/services/firebase/auth-service.js"></script>
+    <script src="../../js/services/firebase/firestore-service.js"></script>
+    <script src="../../js/services/state/state-manager.js"></script>
+    <script src="../../js/services/notification/notification-service.js"></script>
     <script src="../../js/utils/date-utils.js"></script>
-    <script src="../../js/utils/error-handler.js"></script>
-    <script src="../../js/utils/formatting/excel-handler.js"></script>
-    <script src="../../js/utils/menu-utils.js"></script>
-    <script src="../../js/utils/ui-message-utils.js"></script>
-
-    <!-- Firebase Configuration -->
-    <script src="../../js/services/firebase/firebase-config.js"></script>
-    <script src="../../js/services/firebase/firebase-service.js"></script>
-
-    <!-- Custom Scripts -->
-    <script src="../../js/auth.js"></script>
     <script src="../../js/views/coordinator/menu-view.js"></script>
 </body>
 </html>

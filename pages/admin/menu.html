@@ -3,264 +3,194 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestión de Menú - Administrador</title>
+    <title>Gestión de Menú - Sistema de Comedor</title>
     <link rel="stylesheet" href="../../css/styles.css">
     <link rel="stylesheet" href="../../css/admin.css">
-    <link rel="stylesheet" href="../../css/custom.css">
-    <link rel="icon" type="image/x-icon" href="../../favicon.ico">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <link rel="stylesheet" href="../../css/fixes.css">
+    <link rel="stylesheet" href="../../css/components/forms.css">
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <!-- Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 </head>
 <body>
-    <div class="admin-container">
+    <div class="app-container">
         <!-- Sidebar -->
-        <div class="sidebar">
+        <aside class="sidebar">
             <div class="sidebar-header">
-                <img src="../../assets/img/logo-small.png" alt="Grupo Avika Logo">
-                <h3>Grupo Avika</h3>
+                <img src="../../assets/img/logo.png" alt="Grupo Avika" class="sidebar-logo">
+                <h2>Panel Admin</h2>
             </div>
-            <div class="sidebar-menu">
+            
+            <nav class="sidebar-nav">
                 <ul>
                     <li>
                         <a href="dashboard.html">
-                            <i class="fas fa-tachometer-alt"></i> Dashboard
+                            <i class="material-icons">dashboard</i>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
+                    <li class="active">
+                        <a href="menu.html">
+                            <i class="material-icons">restaurant_menu</i>
+                            <span>Gestión de Menú</span>
                         </a>
                     </li>
                     <li>
-                        <a href="menu.html" class="active">
-                            <i class="fas fa-utensils"></i> Menú
-                        </a>
-                    </li>
-                    <li>
-                        <a href="confirmations.html">
-                            <i class="fas fa-clipboard-check"></i> Confirmaciones
-                        </a>
-                    </li>
-                    <li>
-                        <a href="users.html">
-                            <i class="fas fa-users-cog"></i> Usuarios
-                        </a>
-                    </li>
-                    <li>
-                        <a href="#" id="logout-btn">
-                            <i class="fas fa-sign-out-alt"></i> Cerrar sesión
+                        <a href="reports.html">
+                            <i class="material-icons">bar_chart</i>
+                            <span>Reportes</span>
                         </a>
                     </li>
                 </ul>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <button id="logoutBtn" class="btn btn-outline">
+                    <i class="material-icons">exit_to_app</i>
+                    <span>Cerrar Sesión</span>
+                </button>
             </div>
-        </div>
-
+        </aside>
+        
         <!-- Main Content -->
-        <div class="main-content">
-            <div class="content-header">
-                <h2>Gestión de Menú</h2>
+        <main class="main-content">
+            <header class="content-header">
+                <h1>Gestión de Menú</h1>
                 <div class="user-info">
-                    <span id="user-name">Administrador</span>
+                    <span id="userName">Administrador</span>
+                    <i class="material-icons">account_circle</i>
                 </div>
-            </div>
-
-            <!-- Menu Controls -->
-            <div class="card menu-controls-card">
-                <div class="card-header">
-                    <h3>Control del Menú</h3>
-                </div>
-                <div class="card-body">
-                    <div class="menu-navigation">
-                        <div class="week-selector">
-                            <button id="previous-week" class="btn btn-icon">
-                                <i class="fas fa-chevron-left"></i>
-                            </button>
-                            <div class="week-display">
-                                <span id="week-range">Semana del DD/MM/YYYY</span>
-                                <span id="menu-status" class="badge badge-warning">Borrador</span>
-                            </div>
-                            <button id="next-week" class="btn btn-icon">
-                                <i class="fas fa-chevron-right"></i>
-                            </button>
-                        </div>
+            </header>
+            
+            <div class="content-body">
+                <!-- Menu Status -->
+                <div class="menu-status-container">
+                    <div class="menu-status">
+                        <h2>Menú Semanal: <span id="weekDates">Cargando...</span></h2>
+                        <div class="status-badge" id="statusBadge">Pendiente</div>
                     </div>
                     
                     <div class="menu-actions">
-                        <button id="new-menu-btn" class="btn btn-primary">
-                            <i class="fas fa-plus"></i> Nuevo Menú
+                        <button id="createMenuBtn" class="btn btn-primary">
+                            <i class="material-icons">add</i>
+                            Crear Menú
                         </button>
-                        <button id="import-excel-btn" class="btn btn-secondary">
-                            <i class="fas fa-file-excel"></i> Importar Excel
-                        </button>
-                        <button id="publish-menu-btn" class="btn btn-success">
-                            <i class="fas fa-upload"></i> Publicar Menú
+                        
+                        <button id="publishMenuBtn" class="btn btn-secondary" disabled>
+                            <i class="material-icons">publish</i>
+                            Publicar Menú
                         </button>
                     </div>
                 </div>
-            </div>
-
-            <!-- Days Tabs -->
-            <div class="day-selector">
-                <div class="days-tabs">
-                    <button class="day-tab active" data-day="lunes">Lunes</button>
-                    <button class="day-tab" data-day="martes">Martes</button>
-                    <button class="day-tab" data-day="miercoles">Miércoles</button>
-                    <button class="day-tab" data-day="jueves">Jueves</button>
-                    <button class="day-tab" data-day="viernes">Viernes</button>
-                    <button class="day-tab" data-day="sabado">Sábado</button>
-                    <button class="day-tab" data-day="domingo">Domingo</button>
+                
+                <!-- Day Tabs -->
+                <div class="section">
+                    <div class="day-tabs">
+                        <div class="day-tab active" data-day="monday">Lunes</div>
+                        <div class="day-tab" data-day="tuesday">Martes</div>
+                        <div class="day-tab" data-day="wednesday">Miércoles</div>
+                        <div class="day-tab" data-day="thursday">Jueves</div>
+                        <div class="day-tab" data-day="friday">Viernes</div>
+                    </div>
+                    
+                    <!-- Menu Form -->
+                    <div class="day-content" id="menuForm">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="mainDish">Platillo Principal</label>
+                                <input type="text" id="mainDish" name="mainDish" placeholder="Ej. Milanesa de pollo">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="sideDish">Guarnición</label>
+                                <input type="text" id="sideDish" name="sideDish" placeholder="Ej. Arroz blanco">
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="dessert">Postre</label>
+                                <input type="text" id="dessert" name="dessert" placeholder="Ej. Gelatina">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="vegetarianOption">Opción Vegetariana</label>
+                                <input type="text" id="vegetarianOption" name="vegetarianOption" placeholder="Ej. Lasaña de verduras">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <button id="saveMenuBtn" class="btn btn-primary">Guardar Menú</button>
+                        </div>
+                        
+                        <div id="menuFormMessage" class="message-container"></div>
+                    </div>
                 </div>
-            </div>
-
-            <!-- Menu Editor -->
-            <div class="card menu-editor-card">
-                <div class="card-header">
-                    <h3 id="day-title">Menú del Lunes</h3>
-                    <button id="add-item-btn" class="btn btn-primary">
-                        <i class="fas fa-plus"></i> Agregar Plato
-                    </button>
-                </div>
-                <div class="card-body">
-                    <!-- Menu Items Container -->
-                    <div id="menu-items-container">
-                        <div id="empty-state" class="empty-state">
-                            <p>No hay elementos en el menú para este día</p>
-                            <button class="btn btn-primary add-menu-item">Agregar Plato</button>
+                
+                <!-- Confirmation Stats -->
+                <div class="section">
+                    <h2>Estadísticas de Confirmación</h2>
+                    
+                    <div class="confirmation-stats">
+                        <div class="stat-item">
+                            <div class="stat-label">Empleados Totales:</div>
+                            <div class="stat-value" id="totalEmployees">0</div>
+                        </div>
+                        
+                        <div class="stat-item">
+                            <div class="stat-label">Confirmaciones:</div>
+                            <div class="stat-value" id="confirmedEmployees">0</div>
+                        </div>
+                        
+                        <div class="stat-item">
+                            <div class="stat-label">Porcentaje:</div>
+                            <div class="stat-value" id="confirmationPercentage">0%</div>
+                        </div>
+                        
+                        <div class="stat-item">
+                            <div class="stat-label">Tiempo Restante:</div>
+                            <div class="stat-value" id="timeRemaining">--:--:--</div>
                         </div>
                     </div>
-
-                    <!-- Save Button -->
-                    <div class="form-actions">
-                        <button id="save-menu-btn" class="btn btn-primary">
-                            <i class="fas fa-save"></i> Guardar Cambios
-                        </button>
-                    </div>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <!-- Menu Item Form Modal -->
-    <div id="menu-item-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Agregar Plato</h3>
-                <button class="close-modal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <form id="menu-item-form">
-                    <input type="hidden" id="edit-item-id">
-                    
-                    <div class="form-group">
-                        <label for="item-name">Nombre del plato</label>
-                        <input type="text" id="item-name" class="form-control" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="item-description">Descripción</label>
-                        <textarea id="item-description" class="form-control" rows="3"></textarea>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="item-type">Tipo</label>
-                        <select id="item-type" class="form-control">
-                            <option value="main">Plato principal</option>
-                            <option value="side">Guarnición</option>
-                            <option value="dessert">Postre</option>
-                            <option value="drink">Bebida</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-buttons">
-                        <button type="button" class="btn btn-secondary cancel-modal">Cancelar</button>
-                        <button type="submit" class="btn btn-primary">Guardar</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- New Menu Modal -->
-    <div id="new-menu-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Crear Nuevo Menú</h3>
-                <button class="close-modal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <p>Selecciona la semana para el nuevo menú:</p>
-                <form id="new-menu-form">
-                    <div class="form-group">
-                        <label for="new-menu-week">Semana del menú</label>
-                        <input type="date" id="new-menu-week" class="form-control" required>
-                    </div>
-                    
-                    <div class="form-buttons">
-                        <button type="button" class="btn btn-secondary cancel-modal">Cancelar</button>
-                        <button type="submit" class="btn btn-primary">Crear Menú</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Publish Menu Modal -->
-    <div id="publish-menu-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Publicar Menú</h3>
-                <button class="close-modal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <p>¿Estás seguro de que deseas publicar este menú? Una vez publicado, los coordinadores podrán verlo.</p>
-                <div id="publish-menu-validation-errors" class="validation-errors" style="display: none;"></div>
+        </main>
+        
+        <!-- Create Menu Modal -->
+        <div id="createMenuModal" class="modal">
+            <div class="modal-content">
+                <span class="close-modal">&times;</span>
+                <h2>Crear Nuevo Menú Semanal</h2>
                 
-                <div class="form-buttons">
-                    <button type="button" class="btn btn-secondary cancel-modal">Cancelar</button>
-                    <button type="button" class="btn btn-success" id="confirm-publish-menu-btn">Publicar</button>
+                <div class="form-group">
+                    <label for="menuStartDate">Fecha Inicial (Lunes)</label>
+                    <input type="date" id="menuStartDate" name="menuStartDate">
+                </div>
+                
+                <p class="info-text">
+                    El menú se creará para la semana que comienza en la fecha seleccionada.
+                    Asegúrese de seleccionar un lunes.
+                </p>
+                
+                <div class="form-actions">
+                    <button id="cancelCreateMenu" class="btn btn-outline">Cancelar</button>
+                    <button id="confirmCreateMenu" class="btn btn-primary">Crear Menú</button>
                 </div>
             </div>
         </div>
     </div>
-
-    <!-- Import Excel Modal -->
-    <div id="import-excel-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Importar Menú desde Excel</h3>
-                <button class="close-modal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <form id="import-excel-form">
-                    <div class="form-group">
-                        <label for="excel-file">Selecciona un archivo Excel</label>
-                        <input type="file" id="excel-file" class="form-control" accept=".xlsx, .xls">
-                    </div>
-                    
-                    <div class="form-buttons">
-                        <button type="button" class="btn btn-secondary cancel-modal">Cancelar</button>
-                        <button type="submit" class="btn btn-primary">Importar</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Loading Indicator -->
-    <div id="loading-indicator" style="display: none;">
-        <div class="spinner"></div>
-    </div>
-
-    <!-- Alert Messages -->
-    <div id="error-alert" class="alert-message error-message" style="display: none;"></div>
-    <div id="success-alert" class="alert-message success-message" style="display: none;"></div>
-
-    <!-- Firebase Scripts -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     
-    <!-- Custom Scripts -->
-    <script src="../../js/firebase-config.js"></script>
-    <script src="../../js/auth.js"></script>
-    <!-- Nuevos mu00f3dulos de servicios y manejo de errores -->
-    <script src="../../js/utils/error-handler.js"></script>
-    <script src="../../js/services/firestore.js"></script>
-    <script src="../../js/admin/menu.js"></script>
+    <!-- Firebase App (the core Firebase SDK) -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <!-- Firebase Auth -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <!-- Firebase Firestore -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    
+    <!-- App Scripts -->
+    <script src="../../js/services/firebase/config.js"></script>
+    <script src="../../js/services/firebase/auth-service.js"></script>
+    <script src="../../js/utils/date-utils.js"></script>
+    <script src="../../js/views/admin/menu.js"></script>
 </body>
 </html>

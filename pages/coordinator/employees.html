@@ -3,331 +3,249 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestión de Empleados - Coordinador</title>
+    <title>Gestión de Empleados - Sistema de Comedor</title>
     <link rel="stylesheet" href="../../css/styles.css">
     <link rel="stylesheet" href="../../css/coordinator.css">
-    <link rel="icon" type="image/x-icon" href="../../favicon.ico">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <link rel="stylesheet" href="../../css/fixes.css">
+    <link rel="stylesheet" href="../../css/components/forms.css">
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <!-- Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <!-- SheetJS (Excel library) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
-    <div class="coordinator-container">
+    <div class="app-container">
         <!-- Sidebar -->
-        <div class="sidebar">
+        <aside class="sidebar">
             <div class="sidebar-header">
-                <img src="../../assets/img/logo-small.png" alt="Grupo Avika Logo">
-                <h3>Grupo Avika</h3>
+                <img src="../../assets/img/logo.png" alt="Grupo Avika" class="sidebar-logo">
+                <h2>Coordinador</h2>
             </div>
-            <div class="sidebar-menu">
+            
+            <nav class="sidebar-nav">
                 <ul>
                     <li>
                         <a href="dashboard.html">
-                            <i class="fas fa-tachometer-alt"></i> Dashboard
+                            <i class="material-icons">dashboard</i>
+                            <span>Dashboard</span>
                         </a>
                     </li>
                     <li>
                         <a href="menu.html">
-                            <i class="fas fa-utensils"></i> Menú
+                            <i class="material-icons">restaurant_menu</i>
+                            <span>Menú Semanal</span>
                         </a>
                     </li>
                     <li>
                         <a href="confirmations.html">
-                            <i class="fas fa-clipboard-check"></i> Confirmaciones
+                            <i class="material-icons">fact_check</i>
+                            <span>Confirmaciones</span>
                         </a>
                     </li>
-                    <li>
-                        <a href="employees.html" class="active">
-                            <i class="fas fa-users"></i> Empleados
-                        </a>
-                    </li>
-                    <li>
-                        <a href="#" id="logout-btn">
-                            <i class="fas fa-sign-out-alt"></i> Cerrar sesión
+                    <li class="active">
+                        <a href="employees.html">
+                            <i class="material-icons">people</i>
+                            <span>Empleados</span>
                         </a>
                     </li>
                 </ul>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <button id="logoutBtn" class="btn btn-outline">
+                    <i class="material-icons">exit_to_app</i>
+                    <span>Cerrar Sesión</span>
+                </button>
             </div>
-        </div>
-
+        </aside>
+        
         <!-- Main Content -->
-        <div class="main-content">
-            <div class="content-header">
-                <h2>Gestión de Empleados</h2>
+        <main class="main-content">
+            <header class="content-header">
+                <h1>Gestión de Empleados</h1>
                 <div class="user-info">
-                    <span id="user-name">Coordinador</span>
+                    <span id="branchName">Sucursal</span>
+                    <span id="userName">Coordinador</span>
+                    <i class="material-icons">account_circle</i>
                 </div>
-            </div>
-
-            <!-- Employee Controls -->
-            <div class="employee-controls">
-                <div class="search-bar">
-                    <div class="input-with-icon">
-                        <i class="fas fa-search"></i>
-                        <input type="text" id="employee-search" class="form-control" placeholder="Buscar empleado...">
+            </header>
+            
+            <div class="content-body">
+                <!-- Employee Management -->
+                <div class="employee-management">
+                    <div class="section-header">
+                        <h2>Empleados de <span id="branchNameTitle">Su Sucursal</span></h2>
+                        <div class="employee-actions">
+                            <button id="addEmployeeBtn" class="btn btn-primary">
+                                <i class="material-icons">person_add</i>
+                                Agregar Empleado
+                            </button>
+                            <button id="importEmployeesBtn" class="btn btn-secondary">
+                                <i class="material-icons">upload_file</i>
+                                Importar Excel
+                            </button>
+                            <button id="downloadTemplateBtn" class="btn btn-outline">
+                                <i class="material-icons">download</i>
+                                Descargar Plantilla
+                            </button>
+                        </div>
                     </div>
-                </div>
-                <div class="control-actions">
-                    <button id="add-employee-btn" class="btn btn-primary">
-                        <i class="fas fa-user-plus"></i> Agregar Empleado
-                    </button>
-                    <button id="select-all-btn" class="btn btn-secondary">
-                        <i class="fas fa-check-square"></i> Seleccionar Todos
-                    </button>
-                    <button id="clear-selection-btn" class="btn btn-secondary">
-                        <i class="fas fa-times"></i> Limpiar Selección
-                    </button>
-                    <button id="import-employees-btn" class="btn btn-secondary">
-                        <i class="fas fa-file-import"></i> Importar Excel
-                    </button>
-                    <button id="export-employees-btn" class="btn btn-secondary">
-                        <i class="fas fa-file-export"></i> Exportar
-                    </button>
-                </div>
-            </div>
-
-            <!-- Employee Summary -->
-            <div class="summary-bar">
-                <div class="summary-item">
-                    <i class="fas fa-users"></i>
-                    <span>Total: <strong id="employee-count">0</strong> empleados</span>
-                </div>
-            </div>
-
-            <!-- Employee List -->
-            <div class="card">
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="data-table" id="employees-table">
+                    
+                    <!-- Employee List -->
+                    <div class="section">
+                        <div class="employee-list-header">
+                            <div class="employee-search">
+                                <input type="text" id="searchEmployee" placeholder="Buscar empleado..." class="search-input">
+                            </div>
+                            <div class="employee-filters">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="showInactiveEmployees">
+                                    Mostrar inactivos
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <table class="employee-table">
                             <thead>
                                 <tr>
-                                    <th class="select-column">
-                                        <label class="checkbox-container">
-                                            <input type="checkbox" id="select-all-employees">
-                                            <span class="checkmark"></span>
-                                        </label>
-                                    </th>
-                                    <th>#</th>
                                     <th>Nombre</th>
-                                    <th>Posición</th>
-                                    <th>Email</th>
+                                    <th>Puesto</th>
+                                    <th>Restricciones Alimentarias</th>
                                     <th>Estado</th>
                                     <th>Acciones</th>
                                 </tr>
                             </thead>
-                            <tbody id="employees-table-body">
+                            <tbody id="employeeTableBody">
+                                <!-- Employee rows will be loaded dynamically -->
                                 <tr>
-                                    <td colspan="7" class="text-center">Cargando empleados...</td>
+                                    <td colspan="5" class="text-center">Cargando empleados...</td>
                                 </tr>
                             </tbody>
                         </table>
-                    </div>
-                    
-                    <div class="table-pagination" id="employees-pagination">
-                        <div class="pagination-info">
-                            Mostrando <span id="page-info">0-0 de 0</span> resultados
-                        </div>
-                        <div class="pagination-controls">
-                            <button id="prev-page" class="btn btn-icon pagination-btn" disabled>
-                                <i class="fas fa-chevron-left"></i>
-                            </button>
-                            <span id="page-number">Página 1</span>
-                            <button id="next-page" class="btn btn-icon pagination-btn" disabled>
-                                <i class="fas fa-chevron-right"></i>
-                            </button>
+                        
+                        <div id="employeesPagination" class="pagination">
+                            <!-- Pagination will be generated dynamically -->
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <!-- Add/Edit Employee Modal -->
-    <div id="employee-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="employee-modal-title">Agregar Empleado</h3>
-                <button class="close-modal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <form id="employee-form">
-                    <input type="hidden" id="employee-id" name="id">
+        </main>
+        
+        <!-- Add/Edit Employee Modal -->
+        <div id="employeeModal" class="modal">
+            <div class="modal-content">
+                <span class="close-modal">&times;</span>
+                <h2 id="modalTitle">Agregar Empleado</h2>
+                
+                <form id="employeeForm">
+                    <input type="hidden" id="employeeId">
                     
                     <div class="form-group">
-                        <label for="employee-name">Nombre Completo</label>
-                        <input type="text" id="employee-name" name="name" class="form-control" required>
+                        <label for="employeeName">Nombre Completo</label>
+                        <input type="text" id="employeeName" name="employeeName" required>
                     </div>
                     
                     <div class="form-group">
-                        <label for="employee-email">Email</label>
-                        <input type="email" id="employee-email" name="email" class="form-control" required>
+                        <label for="employeePosition">Puesto</label>
+                        <input type="text" id="employeePosition" name="employeePosition">
                     </div>
                     
                     <div class="form-group">
-                        <label for="employee-position">Posición</label>
-                        <input type="text" id="employee-position" name="position" class="form-control" required>
+                        <label for="employeeRestrictions">Restricciones Alimentarias</label>
+                        <input type="text" id="employeeRestrictions" name="employeeRestrictions" placeholder="Ej. Vegetariano, alergia a lácteos">
                     </div>
                     
                     <div class="form-group">
-                        <label for="employee-status">Estado</label>
-                        <select id="employee-status" name="status" class="form-control" required>
-                            <option value="active">Activo</option>
-                            <option value="inactive">Inactivo</option>
-                        </select>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="employeeActive" name="employeeActive" checked>
+                            Empleado activo
+                        </label>
                     </div>
                     
-                    <div class="form-group form-buttons">
-                        <button type="button" class="btn btn-secondary cancel-modal">Cancelar</button>
-                        <button type="submit" class="btn btn-primary" id="save-employee-btn">Guardar</button>
+                    <div class="form-actions">
+                        <button type="button" id="cancelEmployeeBtn" class="btn btn-outline">Cancelar</button>
+                        <button type="submit" id="saveEmployeeBtn" class="btn btn-primary">Guardar</button>
                     </div>
                 </form>
             </div>
         </div>
-    </div>
-
-    <!-- Delete Employee Modal -->
-    <div id="delete-employee-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Eliminar Empleado</h3>
-                <button class="close-modal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <p>¿Estás seguro de que deseas eliminar a <strong id="delete-employee-name"></strong>?</p>
-                <p class="warning-text">Esta acción no se puede deshacer.</p>
+        
+        <!-- Import Modal -->
+        <div id="importModal" class="modal">
+            <div class="modal-content">
+                <span class="close-modal">&times;</span>
+                <h2>Importar Empleados</h2>
                 
-                <div class="form-group form-buttons">
-                    <button type="button" class="btn btn-secondary cancel-modal">Cancelar</button>
-                    <button type="button" class="btn btn-danger" id="confirm-delete-employee-btn">Eliminar</button>
+                <div class="import-container">
+                    <p>Seleccione un archivo Excel (.xlsx) con la lista de empleados.</p>
+                    <p>El archivo debe contener las columnas: Nombre, Puesto, Restricciones Alimentarias, Activo.</p>
+                    <input type="file" id="excelFile" accept=".xlsx" class="file-input">
+                    <button id="uploadExcelBtn" class="btn btn-primary">
+                        <i class="material-icons">upload</i>
+                        Cargar Archivo
+                    </button>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Import Employees Modal -->
-    <div id="import-employees-modal" class="modal">
-        <div class="modal-content modal-lg">
-            <div class="modal-header">
-                <h3>Importar Empleados desde Excel</h3>
-                <button class="close-modal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="import-instructions">
-                    <h4><i class="fas fa-info-circle"></i> Instrucciones para importar empleados</h4>
-                    <ol>
-                        <li>Descarga la plantilla Excel haciendo clic en el botón "Descargar Plantilla".</li>
-                        <li>Completa la información de los empleados en la plantilla con solo 3 columnas: Nombre, Puesto y Estado.</li>
-                        <li>No modifiques los encabezados de las columnas ni elimines ninguna columna.</li>
-                        <li>Guarda el archivo Excel una vez completado.</li>
-                        <li>Haz clic en "Seleccionar archivo" y elige el archivo Excel que acabas de completar.</li>
-                        <li>Haz clic en "Importar" para cargar los empleados al sistema.</li>
-                    </ol>
-                    <div class="alert alert-info">
-                        <p><strong>Nota:</strong> Solo se requieren los campos Nombre y Estado. El campo Puesto es opcional.</p>
-                    </div>
-                </div>
-
-                <div class="template-example">
-                    <h4><i class="fas fa-table"></i> Estructura de la plantilla</h4>
-                    <div class="table-responsive">
-                        <table class="data-table example-table">
+                
+                <div id="previewContainer" style="display:none">
+                    <h3>Vista Previa</h3>
+                    <p>Se importarán <span id="previewCount">0</span> empleados. Revise los datos antes de confirmar.</p>
+                    
+                    <div class="preview-table-container">
+                        <table class="employee-table" id="previewTable">
                             <thead>
                                 <tr>
-                                    <th>Nombre Completo*</th>
+                                    <th>Nombre</th>
                                     <th>Puesto</th>
-                                    <th>Estado*</th>
+                                    <th>Restricciones</th>
+                                    <th>Activo</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                <tr>
-                                    <td>Juan Pérez López</td>
-                                    <td>Operador</td>
-                                    <td>active</td>
-                                </tr>
-                                <tr>
-                                    <td>María González Ruiz</td>
-                                    <td>Supervisor</td>
-                                    <td>active</td>
-                                </tr>
+                            <tbody id="previewTableBody">
+                                <!-- Preview rows will be loaded dynamically -->
                             </tbody>
                         </table>
                     </div>
-                    <p class="small-text">* Campos obligatorios. Para el campo Estado, use "active" para activo o "inactive" para inactivo.</p>
+                    
+                    <div class="form-actions">
+                        <button type="button" id="cancelImportBtn" class="btn btn-outline">Cancelar</button>
+                        <button type="button" id="confirmImportBtn" class="btn btn-primary">Confirmar Importación</button>
+                    </div>
                 </div>
-
-                <form id="import-form">
-                    <div class="form-group">
-                        <label for="import-file"><i class="fas fa-file-excel"></i> Selecciona un archivo Excel (.xlsx, .xls)</label>
-                        <input type="file" id="import-file" name="import-file" class="form-control" accept=".xlsx, .xls">
-                    </div>
-                    
-                    <div class="template-download">
-                        <p>Descarga la plantilla para importar empleados:</p>
-                        <button type="button" id="download-template-btn" class="btn btn-secondary">
-                            <i class="fas fa-download"></i> Descargar Plantilla
-                        </button>
-                    </div>
-                    
-                    <div class="form-group form-buttons">
-                        <button type="button" class="btn btn-secondary cancel-modal">Cancelar</button>
-                        <button type="submit" class="btn btn-primary" id="confirm-import-btn">Importar</button>
-                    </div>
-                </form>
+            </div>
+        </div>
+        
+        <!-- Delete Confirmation Modal -->
+        <div id="deleteModal" class="modal">
+            <div class="modal-content">
+                <span class="close-modal">&times;</span>
+                <h2>Confirmar Eliminación</h2>
+                
+                <p>¿Está seguro que desea eliminar al empleado <strong id="deleteEmployeeName"></strong>?</p>
+                <p>Esta acción no se puede deshacer.</p>
+                
+                <div class="form-actions">
+                    <button type="button" id="cancelDeleteBtn" class="btn btn-outline">Cancelar</button>
+                    <button type="button" id="confirmDeleteBtn" class="btn btn-primary delete-btn">Eliminar</button>
+                </div>
             </div>
         </div>
     </div>
-
-    <!-- Loading Indicator -->
-    <div id="loading-indicator" style="display: none;">
-        <div class="spinner"></div>
-    </div>
-
-    <!-- Alert Messages -->
-    <div id="error-alert" class="alert-message error-message" style="display: none;"></div>
-    <div id="success-alert" class="alert-message success-message" style="display: none;"></div>
-
-    <!-- External Libraries - Cargar primero las bibliotecas externas -->
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     
-    <!-- Firebase Scripts -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <!-- Firebase App (the core Firebase SDK) -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <!-- Firebase Auth -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <!-- Firebase Firestore -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
     
-    <!-- Firebase Config - Debe cargarse después de Firebase pero antes de los módulos de utilidad -->
-    <script src="../../js/services/firebase/firebase-config.js"></script>
-    
-    <!-- Utility Scripts - Módulos de utilidad en orden de dependencia -->
-    <script src="../../js/utils/logger.js"></script>
-    <script src="../../js/utils/date-utils.js"></script>
-    <script src="../../js/utils/error-handler.js"></script>
-    <script src="../../js/utils/formatting/excel-handler.js"></script>
-    <script src="../../js/utils/employee-utils.js"></script>
-    <script src="../../js/utils/ui-message-utils.js"></script>
-    <script src="../../js/utils/validation/validators.js"></script>
-    
-    <!-- Servicios y autenticación -->
-    <script src="../../js/services/firebase/firebase-service.js"></script>
-    <script src="../../js/auth.js"></script>
-    
-    <!-- Script principal de la página -->
+    <!-- App Scripts -->
+    <script src="../../js/services/firebase/config.js"></script>
+    <script src="../../js/services/firebase/auth-service.js"></script>
+    <script src="../../js/services/firebase/firestore-service.js"></script>
+    <script src="../../js/services/state/state-manager.js"></script>
+    <script src="../../js/services/notification/notification-service.js"></script>
+    <script src="../../js/utils/excel-utils.js"></script>
     <script src="../../js/views/coordinator/employees.js"></script>
-    
-    <!-- Script para verificar la carga de XLSX -->
-    <script>
-        window.addEventListener('DOMContentLoaded', function() {
-            setTimeout(function() {
-                if (typeof XLSX === 'undefined') {
-                    console.error('Error: La biblioteca XLSX no se ha cargado correctamente');
-                    if (window.errorHandler) {
-                        window.errorHandler.showUIError('Error al cargar la biblioteca para procesar archivos Excel. Por favor, recarga la página.');
-                    } else {
-                        alert('Error al cargar la biblioteca para procesar archivos Excel. Por favor, recarga la página.');
-                    }
-                } else {
-                    console.info('Biblioteca XLSX cargada correctamente:', XLSX.version);
-                }
-            }, 1000);
-        });
-    </script>
 </body>
 </html>

@@ -1,516 +1,467 @@
-// Coordinator Menu View for Comedor Grupo Avika
+// Menu View - Coordinator Menu View
 
-// Ensure coordinator only access
 document.addEventListener('DOMContentLoaded', () => {
-    // Verificar permisos de acceso
-    if (!window.checkAuth) {
-        console.error('La función de autenticación no está disponible');
-        alert('Error: La función de autenticación no está disponible. Por favor recargue la página.');
-        return;
-    }
-    
-    // Normalizar rol para compatibilidad
-    const requiredRole = window.USER_ROLES ? window.USER_ROLES.COORDINATOR : 'coordinator';
-    
-    if (!checkAuth(requiredRole)) {
-        return;
-    }
-    
-    // Set user name
-    let userName = 'Coordinador';
-    try {
-        const userJson = sessionStorage.getItem('user');
-        if (userJson) {
-            const userObj = JSON.parse(userJson);
-            userName = userObj.displayName || userName;
-        }
-    } catch (error) {
-        // Usar el sistema de logging si está disponible
-        if (window.logger && window.logger.error) {
-            window.logger.error('Error al procesar datos del usuario:', error);
-        } else {
-            console.error('Error al procesar datos del usuario:', error);
-        }
-    }
-    
-    const userNameElement = document.getElementById('user-name');
-    if (userNameElement) {
-        userNameElement.textContent = userName;
-    }
-    
-    // Setup logout button
-    const logoutBtn = document.getElementById('logout-btn');
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            if (window.logout) {
-                window.logout();
-            } else {
-                // Fallback si la función de logout no está disponible
-                sessionStorage.clear();
-                window.location.href = '../index.html';
-            }
-        });
-    }
-    
-    // Initialize week selector
-    initializeWeekSelector();
-    
-    // Load current week menu
-    loadMenuForWeek();
-});
-
-// Referencia al servicio centralizado de Firebase
-const firebaseService = window.firebaseService;
-
-// Current week settings
-// Usar la utilidad de fecha del módulo dateUtils si está disponible
-let currentWeek = (window.dateUtils && window.dateUtils.getMonday) ?
-    window.dateUtils.getMonday(new Date()) : getMonday(new Date());
-
-// Usar los formatos de días del módulo de utilidades si está disponible
-const DAYS = (window.dateUtils && window.dateUtils.DATE_FORMATS) ?
-    window.dateUtils.DATE_FORMATS.COORDINATOR : 
-    ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
-
-const DAYS_DISPLAY = (window.dateUtils && window.dateUtils.DATE_FORMATS) ?
-    window.dateUtils.DATE_FORMATS.ADMIN : 
-    ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-
-// Format day name nicely with proper accents and capitalization
-function formatDayDisplay(day) {
-    const index = DAYS.indexOf(day.toLowerCase());
-    return index >= 0 ? DAYS_DISPLAY[index] : day;
-}
-
-// Initialize week selector
-function initializeWeekSelector() {
-    const prevWeekBtn = document.getElementById('prev-week-btn');
-    const nextWeekBtn = document.getElementById('next-week-btn');
-    
-    if (prevWeekBtn) {
-        prevWeekBtn.addEventListener('click', () => {
-            // Go to previous week
-            currentWeek.setDate(currentWeek.getDate() - 7);
-            updateWeekDisplay();
-            loadMenuForWeek();
-        });
-    }
-    
-    if (nextWeekBtn) {
-        nextWeekBtn.addEventListener('click', () => {
-            // Go to next week
-            currentWeek.setDate(currentWeek.getDate() + 7);
-            updateWeekDisplay();
-            loadMenuForWeek();
-        });
-    }
-    
-    updateWeekDisplay();
-}
-
-// Update week display
-function updateWeekDisplay() {
-    const weekDisplay = document.getElementById('current-week-display');
-    if (!weekDisplay) return;
-    
-    // Get the week start and end dates
-    const weekStart = new Date(currentWeek);
-    const weekEnd = new Date(currentWeek);
-    weekEnd.setDate(weekEnd.getDate() + 6); // Show Monday-Sunday (toda la semana)
-    
-    // Format dates using dateUtils if available
-    let formattedStart, formattedEnd;
-    
-    if (window.dateUtils && window.dateUtils.formatDateDisplay) {
-        formattedStart = window.dateUtils.formatDateDisplay(weekStart);
-        formattedEnd = window.dateUtils.formatDateDisplay(weekEnd);
-    } else {
-        formattedStart = formatDateDisplay(weekStart);
-        formattedEnd = formatDateDisplay(weekEnd);
-    }
-    
-    // Update display
-    weekDisplay.textContent = `${formattedStart} - ${formattedEnd}`;
-}
-
-// Load menu for selected week
-function loadMenuForWeek() {
-    // Show loading state
-    if (window.errorHandler && window.errorHandler.toggleLoadingIndicator) {
-        window.errorHandler.toggleLoadingIndicator(true);
-    } else {
-        showLoadingState(true);
-    }
-    
-    // Format date for Firestore query
-    const weekStartStr = window.dateUtils && window.dateUtils.formatDate ? 
-        window.dateUtils.formatDate(currentWeek) : 
-        formatDate(currentWeek);
-    
-    // Log usando el sistema de logging si está disponible
-    if (window.logger && window.logger.info) {
-        window.logger.info('Cargando menú para la semana que comienza el:', weekStartStr);
-    } else {
-        console.log('Cargando menú para la semana que comienza el:', weekStartStr);
-    }
-    
-    // Verificar que el servicio de Firebase esté disponible
-    if (!firebaseService) {
-        handleMenuLoadError(new Error('Servicio de Firebase no disponible'));
-        return;
-    }
-    
-    // Usar el servicio centralizado de Firebase
-    const menusCollection = firebaseService.getCollection('menus');
-    menusCollection.doc(weekStartStr)
-        .get()
-        .then(processMenuDocument)
-        .catch(handleMenuLoadError);
-}
-
-/**
- * Process menu document
- * @param {FirebaseFirestore.DocumentSnapshot} doc - Menu document
- */
-function processMenuDocument(doc) {
-    if (doc.exists) {
-        const menuData = doc.data();
-        
-        // Log usando el sistema de logging si está disponible
-        if (window.logger && window.logger.debug) {
-            window.logger.debug('Menú encontrado para la semana:', menuData);
-        } else {
-            console.log('Menú encontrado para la semana:', menuData);
-        }
-        
-        // Verificar si el menú está publicado
-        if (menuData.status !== 'published') {
-            // El menú existe pero no está publicado
-            showNoMenuMessage();
-            
-            if (window.errorHandler && window.errorHandler.toggleLoadingIndicator) {
-                window.errorHandler.toggleLoadingIndicator(false);
-            } else {
-                showLoadingState(false);
-            }
+    // Check authentication and role
+    auth.onAuthStateChanged(async (user) => {
+        if (!user) {
+            // Redirect to login if not authenticated
+            window.location.href = '../../index.html';
             return;
         }
         
-        // Verificar si hay elementos en el menú para al menos un día
-        let hasMenuItems = false;
-        
-        // Normalizar los datos del menú para asegurar compatibilidad entre formatos
-        let normalizedMenuData;
-        if (window.firestoreServices && window.firestoreServices.menu.normalizeMenuData) {
-            normalizedMenuData = window.firestoreServices.menu.normalizeMenuData(menuData);
-        } else {
-            // Implementación de respaldo
-            normalizedMenuData = normalizeMenuData(menuData);
+        // Check if user is coordinator
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        if (!userDoc.exists || userDoc.data().role !== 'coordinator') {
+            // Redirect non-coordinator users
+            window.location.href = '../../index.html';
+            return;
         }
         
-        // Verificar si hay elementos en el menú después de la normalización
-        hasMenuItems = DAYS.some(day => {
-            return normalizedMenuData[day] && 
-                normalizedMenuData[day].items && 
-                normalizedMenuData[day].items.length > 0;
+        // Store user data
+        const userData = userDoc.data();
+        setCurrentUser(userData);
+        setUserRole(userData.role);
+        setUserBranch(userData.branch);
+        
+        // Display user info
+        document.getElementById('userName').textContent = userData.displayName || 'Coordinador';
+        
+        // Get branch details
+        const branchDoc = await db.collection('branches').doc(userData.branch).get();
+        if (branchDoc.exists) {
+            const branchData = branchDoc.data();
+            document.getElementById('branchName').textContent = branchData.name;
+        }
+        
+        // Initialize menu view
+        initMenuView(userData.branch);
+    });
+    
+    // Logout functionality
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+        try {
+            await logout();
+            window.location.href = '../../index.html';
+        } catch (error) {
+            console.error('Error logging out:', error);
+            showError('Error al cerrar sesión. Intente nuevamente.');
+        }
+    });
+});
+
+// Initialize menu view
+function initMenuView(branchId) {
+    // DOM elements
+    const weekDatesElement = document.getElementById('weekDates');
+    const menuStatusBadge = document.getElementById('menuStatusBadge');
+    const menuDetails = document.getElementById('menuDetails');
+    const branchConfirmations = document.getElementById('branchConfirmations');
+    const branchesSummaryBody = document.getElementById('branchesSummaryBody');
+    const dayTabs = document.querySelectorAll('.day-tab');
+    const goToConfirmBtn = document.getElementById('goToConfirmBtn');
+    
+    // Modals
+    const noMenuModal = document.getElementById('noMenuModal');
+    const refreshMenuBtn = document.getElementById('refreshMenuBtn');
+    
+    // State
+    let currentMenu = null;
+    let currentDay = 'monday';
+    let branchesData = [];
+    
+    // Load menu data
+    loadMenuData();
+    
+    // Event listeners
+    
+    // Day tabs
+    dayTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            // Deactivate all tabs
+            dayTabs.forEach(t => t.classList.remove('active'));
+            
+            // Activate clicked tab
+            tab.classList.add('active');
+            
+            // Update current day and display menu details
+            currentDay = tab.dataset.day;
+            displayMenuDetails();
         });
+    });
+    
+    // Refresh menu button
+    refreshMenuBtn.addEventListener('click', () => {
+        noMenuModal.style.display = 'none';
+        loadMenuData();
+    });
+    
+    // Load menu data
+    async function loadMenuData() {
+        try {
+            // Show loading state
+            weekDatesElement.textContent = 'Cargando...';
+            menuStatusBadge.textContent = 'Cargando...';
+            menuStatusBadge.className = 'status-badge';
+            
+            // Get current menu
+            currentMenu = await getCurrentWeeklyMenu();
+            
+            if (!currentMenu) {
+                // No menu available
+                weekDatesElement.textContent = 'No disponible';
+                menuStatusBadge.textContent = 'No Publicado';
+                menuStatusBadge.className = 'status-badge pending';
+                
+                menuDetails.innerHTML = `
+                    <div class="empty-message">
+                        No hay menú disponible actualmente.
+                    </div>
+                `;
+                
+                branchConfirmations.innerHTML = `
+                    <div class="empty-message">
+                        No hay confirmaciones disponibles.
+                    </div>
+                `;
+                
+                branchesSummaryBody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="text-center">No hay datos disponibles</td>
+                    </tr>
+                `;
+                
+                // Show no menu modal
+                noMenuModal.style.display = 'block';
+                
+                // Hide confirm button
+                goToConfirmBtn.style.display = 'none';
+                
+                return;
+            }
+            
+            // Store in state manager
+            setCurrentMenu(currentMenu);
+            
+            // Display menu info
+            displayMenuInfo();
+            
+            // Display menu details for current day
+            displayMenuDetails();
+            
+            // Load branch confirmations
+            loadBranchConfirmations();
+            
+            // Load all branches summary
+            loadBranchesSummary();
+            
+            // Show confirm button if in confirmation period
+            const now = new Date();
+            const confirmStart = currentMenu.confirmStartDate.toDate();
+            const confirmEnd = currentMenu.confirmEndDate.toDate();
+            
+            if (now >= confirmStart && now <= confirmEnd) {
+                goToConfirmBtn.style.display = 'inline-flex';
+            } else {
+                goToConfirmBtn.style.display = 'none';
+            }
+        } catch (error) {
+            console.error('Error loading menu data:', error);
+            showError('Error al cargar los datos del menú. Intente nuevamente.');
+        }
+    }
+    
+    // Display menu info
+    function displayMenuInfo() {
+        if (!currentMenu) return;
         
-        // Log usando el sistema de logging si está disponible
-        if (window.logger && window.logger.debug) {
-            window.logger.debug('¿Hay elementos en el menú?', hasMenuItems);
-        } else {
-            console.log('¿Hay elementos en el menú?', hasMenuItems);
+        // Display week dates
+        const startDate = currentMenu.startDate.toDate();
+        const endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + 4); // Add 4 days to get to Friday
+        
+        weekDatesElement.textContent = `${formatDateDMY(startDate)} al ${formatDateDMY(endDate)}`;
+        
+        // Display menu status
+        menuStatusBadge.textContent = getStatusText(currentMenu.status);
+        menuStatusBadge.className = `status-badge ${currentMenu.status}`;
+    }
+    
+    // Display menu details for current day
+    function displayMenuDetails() {
+        if (!currentMenu || !currentMenu.dailyMenus || !currentMenu.dailyMenus[currentDay]) {
+            menuDetails.innerHTML = `
+                <div class="empty-message">
+                    No hay detalles disponibles para este día.
+                </div>
+            `;
+            return;
         }
         
-        if (hasMenuItems) {
-            // Display menu for each day
-            DAYS.forEach(day => {
-                // Get menu container for this day
-                const dayContainer = document.getElementById(`${day}-menu`);
-                if (dayContainer) {
-                    // Verificar si tenemos datos para este día
-                    let dayData = normalizedMenuData[day];
+        const dayMenu = currentMenu.dailyMenus[currentDay];
+        const dayDate = dayMenu.date.toDate();
+        
+        // Format day and date
+        const dayName = getDayName(dayDate.getDay());
+        const formattedDate = formatDateDMY(dayDate);
+        
+        // Build menu details HTML
+        let html = `
+            <div class="menu-day-header">
+                <h3>${dayName} - ${formattedDate}</h3>
+            </div>
+            
+            <div class="menu-items">
+        `;
+        
+        // Check if day menu has data
+        if (dayMenu.mainDish || dayMenu.sideDish || dayMenu.dessert || dayMenu.vegetarianOption) {
+            html += `
+                <div class="menu-item">
+                    <h4>Platillo Principal</h4>
+                    <p>${dayMenu.mainDish || 'No especificado'}</p>
+                </div>
+                
+                <div class="menu-item">
+                    <h4>Guarnición</h4>
+                    <p>${dayMenu.sideDish || 'No especificado'}</p>
+                </div>
+                
+                <div class="menu-item">
+                    <h4>Postre</h4>
+                    <p>${dayMenu.dessert || 'No especificado'}</p>
+                </div>
+                
+                <div class="menu-item">
+                    <h4>Opción Vegetariana</h4>
+                    <p>${dayMenu.vegetarianOption || 'No disponible'}</p>
+                </div>
+            `;
+        } else {
+            html += `
+                <div class="empty-message">
+                    El menú para este día aún no ha sido completado.
+                </div>
+            `;
+        }
+        
+        html += `</div>`;
+        
+        menuDetails.innerHTML = html;
+    }
+    
+    // Load branch confirmations
+    async function loadBranchConfirmations() {
+        try {
+            if (!currentMenu) return;
+            
+            branchConfirmations.innerHTML = `
+                <div class="loading-message">Cargando confirmaciones...</div>
+            `;
+            
+            // Get branch confirmations
+            const confirmation = await getConfirmationsByBranch(currentMenu.id, branchId);
+            
+            if (!confirmation || !confirmation.employees || confirmation.employees.length === 0) {
+                branchConfirmations.innerHTML = `
+                    <div class="empty-message">
+                        No hay confirmaciones registradas para su sucursal.
+                        <a href="confirmations.html">Ir a confirmar asistencia</a>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Count confirmations by day
+            const daysCounts = {
+                monday: 0,
+                tuesday: 0,
+                wednesday: 0,
+                thursday: 0,
+                friday: 0
+            };
+            
+            confirmation.employees.forEach(employee => {
+                employee.days.forEach(day => {
+                    daysCounts[day]++;
+                });
+            });
+            
+            // Build confirmations HTML
+            let html = `
+                <div class="confirmation-summary">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Día</th>
+                                <th>Empleados Confirmados</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            // Add rows for each day
+            Object.keys(daysCounts).forEach((day, index) => {
+                const dayName = getDayName(index + 1); // Monday is 1
+                html += `
+                    <tr>
+                        <td>${dayName}</td>
+                        <td>${daysCounts[day]}</td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="confirmation-employees">
+                    <h3>Empleados Confirmados (${confirmation.employees.length})</h3>
+                    <ul class="employee-list">
+            `;
+            
+            // Add employees
+            confirmation.employees.sort((a, b) => a.name.localeCompare(b.name));
+            
+            confirmation.employees.forEach(employee => {
+                html += `
+                    <li class="employee-list-item">
+                        <span class="employee-name">${employee.name}</span>
+                        <span class="employee-days">
+                `;
+                
+                // Show days as badges
+                const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+                days.forEach((day, index) => {
+                    const shortDayName = getShortDayName(index + 1); // Monday is 1
+                    const isConfirmed = employee.days.includes(day);
                     
-                    // Display menu items for this day
-                    displayDayMenu(day, dayData, day === 'lunes');
+                    html += `
+                        <span class="day-badge ${isConfirmed ? 'confirmed' : ''}" title="${shortDayName}">
+                            ${shortDayName[0]}
+                        </span>
+                    `;
+                });
+                
+                html += `
+                        </span>
+                    </li>
+                `;
+            });
+            
+            html += `
+                    </ul>
+                </div>
+            `;
+            
+            branchConfirmations.innerHTML = html;
+        } catch (error) {
+            console.error('Error loading branch confirmations:', error);
+            branchConfirmations.innerHTML = `
+                <div class="error-message">
+                    Error al cargar las confirmaciones.
+                </div>
+            `;
+        }
+    }
+    
+    // Load all branches summary
+    async function loadBranchesSummary() {
+        try {
+            if (!currentMenu) return;
+            
+            branchesSummaryBody.innerHTML = `
+                <tr>
+                    <td colspan="5" class="text-center">Cargando resumen...</td>
+                </tr>
+            `;
+            
+            // Get all branches
+            const branchesSnapshot = await db.collection('branches').get();
+            branchesData = [];
+            
+            branchesSnapshot.forEach(doc => {
+                branchesData.push({
+                    id: doc.id,
+                    ...doc.data(),
+                    confirmations: 0,
+                    confirmed: false
+                });
+            });
+            
+            // Get all confirmations for this menu
+            const confirmationsSnapshot = await db.collection('confirmations')
+                .where('weekId', '==', currentMenu.id)
+                .get();
+            
+            // Update branch confirmations data
+            confirmationsSnapshot.forEach(doc => {
+                const confirmationData = doc.data();
+                const branchIndex = branchesData.findIndex(b => b.id === confirmationData.branchId);
+                
+                if (branchIndex !== -1) {
+                    branchesData[branchIndex].confirmations = confirmationData.employees ? confirmationData.employees.length : 0;
+                    branchesData[branchIndex].confirmed = true;
                 }
             });
             
-            // Make sure the active tab is shown
-            const activeTab = document.querySelector('.menu-tab.active');
-            if (activeTab) {
-                switchMenuTab(activeTab.getAttribute('data-day'));
-            }
+            // Build summary table
+            let html = '';
             
-            // Show menu container
-            const menuContainer = document.getElementById('weekly-menu');
-            if (menuContainer) {
-                menuContainer.style.display = 'block';
-            }
+            branchesData.forEach(branch => {
+                const percentage = branch.employeeCount ? Math.round((branch.confirmations / branch.employeeCount) * 100) : 0;
+                
+                html += `
+                    <tr>
+                        <td>${branch.name}</td>
+                        <td>${branch.employeeCount || 0}</td>
+                        <td>${branch.confirmations}</td>
+                        <td>${percentage}%</td>
+                        <td>
+                            <span class="status-badge ${branch.confirmed ? 'success' : 'warning'}">
+                                ${branch.confirmed ? 'Confirmado' : 'Pendiente'}
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            });
             
-            // Hide "no menu" message
-            const noMenuMessage = document.getElementById('no-menu-message');
-            if (noMenuMessage) {
-                noMenuMessage.style.display = 'none';
-            }
-        } else {
-            // No menu items found for this week
-            showNoMenuMessage();
-        }
-    } else {
-        // No hay menú para esta semana
-        showNoMenuMessage();
-    }
-    
-    // Hide loading state
-    if (window.errorHandler && window.errorHandler.toggleLoadingIndicator) {
-        window.errorHandler.toggleLoadingIndicator(false);
-    } else {
-        showLoadingState(false);
-    }
-}
-
-/**
- * Handle error when loading menu
- * @param {Error} error - Error object
- */
-function handleMenuLoadError(error) {
-    console.error("Error loading menu:", error);
-    
-    // Usar error handler si está disponible
-    if (window.errorHandler) {
-        const errorMsg = window.errorHandler.handleFirestoreError(
-            error, 
-            "Error al cargar el menú. Por favor intente de nuevo."
-        );
-        window.errorHandler.showUIError(errorMsg);
-        window.errorHandler.toggleLoadingIndicator(false);
-    } else {
-        showErrorMessage("Error al cargar el menú. Por favor intente de nuevo.");
-        showLoadingState(false);
-    }
-}
-
-// Display menu for a specific day
-function displayDayMenu(day, dayData, isActive) {
-    // Get tab and content elements
-    const tab = document.querySelector(`.menu-tab[data-day="${day}"]`);
-    const content = document.getElementById(`${day}-menu`);
-    
-    if (!tab || !content) return;
-    
-    // Update tab active state
-    if (isActive) {
-        tab.classList.add('active');
-        content.classList.add('active');
-    } else {
-        tab.classList.remove('active');
-        content.classList.remove('active');
-    }
-    
-    // Clear previous content
-    content.innerHTML = '';
-    
-    // Check if day data exists
-    if (dayData && dayData.items && dayData.items.length > 0) {
-        // Create day header
-        const dayHeader = document.createElement('div');
-        dayHeader.className = 'day-header';
-        dayHeader.innerHTML = `<h3>${formatDayDisplay(day)}</h3>`;
-        content.appendChild(dayHeader);
-        
-        // Create menu items
-        dayData.items.forEach(item => {
-            const mealCard = document.createElement('div');
-            mealCard.classList.add('meal-card');
-            
-            mealCard.innerHTML = `
-                <div class="meal-name">${item.name}</div>
-                ${item.description ? `<div class="meal-description">${item.description}</div>` : ''}
+            branchesSummaryBody.innerHTML = html || `
+                <tr>
+                    <td colspan="5" class="text-center">No hay datos disponibles</td>
+                </tr>
             `;
-            
-            content.appendChild(mealCard);
-        });
-    } else {
-        // No menu for this day
-        const emptyMessage = document.createElement('div');
-        emptyMessage.classList.add('empty-menu-message');
-        emptyMessage.textContent = 'No hay menú disponible para este día.';
-        
-        content.appendChild(emptyMessage);
-    }
-}
-
-// Switch between menu tabs
-function switchMenuTab(day) {
-    // Update tab active states
-    document.querySelectorAll('.menu-tab').forEach(tab => {
-        tab.classList.remove('active');
-    });
-    document.querySelector(`.menu-tab[data-day="${day}"]`).classList.add('active');
-    
-    // Update content active states
-    document.querySelectorAll('.daily-menu').forEach(content => {
-        content.classList.remove('active');
-    });
-    document.getElementById(`${day}-menu`).classList.add('active');
-}
-
-// Show message when no menu is available
-function showNoMenuMessage() {
-    // Hide menu container
-    const menuContainer = document.getElementById('weekly-menu');
-    if (menuContainer) {
-        menuContainer.style.display = 'none';
-    }
-    
-    // Show "no menu" message
-    const noMenuMessage = document.getElementById('no-menu-message');
-    if (noMenuMessage) {
-        noMenuMessage.style.display = 'block';
-        
-        // Format date for display
-        let formattedDate;
-        if (window.dateUtils && window.dateUtils.formatDateDisplay) {
-            formattedDate = window.dateUtils.formatDateDisplay(currentWeek);
-        } else {
-            formattedDate = formatDateDisplay(currentWeek);
+        } catch (error) {
+            console.error('Error loading branches summary:', error);
+            branchesSummaryBody.innerHTML = `
+                <tr>
+                    <td colspan="5" class="text-center">Error al cargar el resumen</td>
+                </tr>
+            `;
         }
-        
-        noMenuMessage.innerHTML = `
-            <div class="card-body empty-state">
-                <i class="fas fa-utensils empty-icon"></i>
-                <p>No hay menú publicado para la semana del ${formattedDate}.</p>
-                <p>Por favor, contacte al administrador para más información.</p>
-            </div>
-        `;
-    }
-}
-
-// Normalize menu data to ensure compatibility between formats
-/**
- * @deprecated Use commonUtils.TextUtils.normalizeMenuData instead
- */
-function normalizeMenuData(menuData) {
-    // Usar la función centralizada en commonUtils
-    if (window.commonUtils && window.commonUtils.TextUtils && window.commonUtils.TextUtils.normalizeMenuData) {
-        return window.commonUtils.TextUtils.normalizeMenuData(menuData);
     }
     
-    // Fallback a la implementación original
-    if (!menuData) return {};
-    
-    const normalizedData = {...menuData};
-    
-    // Para cada día, asegurarnos de que exista la estructura adecuada
-    DAYS.forEach(day => {
-        if (!normalizedData[day]) {
-            normalizedData[day] = { items: [] };
-        } else if (!normalizedData[day].items) {
-            normalizedData[day].items = [];
+    // Get status text
+    function getStatusText(status) {
+        switch (status) {
+            case 'pending':
+                return 'Pendiente';
+            case 'in-progress':
+                return 'En Progreso';
+            case 'completed':
+                return 'Completado';
+            default:
+                return 'Desconocido';
         }
-        
-        // También verificar la versión con mayúsculas/acentos
-        const adminDay = formatDayDisplay(day);
-        if (normalizedData[adminDay] && normalizedData[adminDay].items && 
-            normalizedData[adminDay].items.length > 0 && 
-            (!normalizedData[day].items || normalizedData[day].items.length === 0)) {
-            // Copiar los elementos
-            normalizedData[day].items = normalizedData[adminDay].items;
-        }
-    });
-    
-    return normalizedData;
+    }
 }
 
-// Get Monday of the current week - Respaldo si no está disponible en dateUtils
-function getMonday(date) {
-    date = new Date(date);
-    const day = date.getDay();
-    const diff = date.getDate() - day + (day === 0 ? -6 : 1);
-    return new Date(date.setDate(diff));
+// Helper function to show success notification
+function showSuccess(message) {
+    showNotification(message, { type: 'success' });
 }
 
-// Usar DateUtils para formatear fechas
-function formatDate(date) {
-    // Usar la utilidad compartida si está disponible
-    if (window.DateUtils && window.DateUtils.formatDate) {
-        return window.DateUtils.formatDate(date);
-    }
-    
-    // Implementación de respaldo
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-}
-
-// Usar DateUtils para formatear fechas para mostrar
-function formatDateDisplay(date) {
-    // Usar la utilidad compartida si está disponible
-    if (window.DateUtils && window.DateUtils.formatDateDisplay) {
-        return window.DateUtils.formatDateDisplay(date);
-    }
-    
-    // Implementación de respaldo
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
-}
-
-// Usar UIMessageUtils para mostrar estado de carga
-function showLoadingState(isLoading) {
-    // Usar la utilidad compartida si está disponible
-    if (window.UIMessageUtils && window.UIMessageUtils.toggleLoading) {
-        window.UIMessageUtils.toggleLoading(isLoading);
-        return;
-    }
-    
-    // Implementación de respaldo
-    const loadingIndicator = document.getElementById('loading-indicator');
-    if (loadingIndicator) {
-        loadingIndicator.style.display = isLoading ? 'block' : 'none';
-    }
-    
-    // Disable buttons while loading
-    document.querySelectorAll('button').forEach(button => {
-        button.disabled = isLoading;
-    });
-}
-
-// Usar UIMessageUtils para mostrar errores
-function showErrorMessage(message) {
-    // Usar la utilidad compartida si está disponible
-    if (window.UIMessageUtils && window.UIMessageUtils.showError) {
-        window.UIMessageUtils.showError(message);
-        return;
-    }
-    
-    // Intentar usar el error handler global si está disponible
-    if (window.errorHandler && window.errorHandler.showUIError) {
-        window.errorHandler.showUIError(message);
-        return;
-    }
-    
-    // Implementación de respaldo
-    const errorAlert = document.getElementById('error-alert');
-    if (errorAlert) {
-        errorAlert.textContent = message;
-        errorAlert.style.display = 'block';
-        
-        // Hide after 5 seconds
-        setTimeout(() => {
-            errorAlert.style.display = 'none';
-        }, 5000);
-    } else {
-        // Usar el sistema de logging
-        if (window.logger && window.logger.error) {
-            window.logger.error(message);
-        } else {
-            console.error(message);
-        }
-        alert("Error: " + message);
-    }
+// Helper function to show error notification
+function showError(message) {
+    showNotification(message, { type: 'error' });
 }

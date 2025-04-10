@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Coordinador - Sistema de Comedor</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+    <link rel="stylesheet" href="../../css/coordinator.css">
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <!-- Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <img src="../../assets/img/logo.png" alt="Grupo Avika" class="sidebar-logo">
+                <h2>Coordinador</h2>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <ul>
+                    <li class="active">
+                        <a href="dashboard.html">
+                            <i class="material-icons">dashboard</i>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="menu.html">
+                            <i class="material-icons">restaurant_menu</i>
+                            <span>Menú Semanal</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="confirmations.html">
+                            <i class="material-icons">fact_check</i>
+                            <span>Confirmaciones</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="employees.html">
+                            <i class="material-icons">people</i>
+                            <span>Empleados</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <button id="logoutBtn" class="btn btn-outline">
+                    <i class="material-icons">exit_to_app</i>
+                    <span>Cerrar Sesión</span>
+                </button>
+            </div>
+        </aside>
+        
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="content-header">
+                <h1>Dashboard</h1>
+                <div class="user-info">
+                    <span id="branchName">Sucursal</span>
+                    <span id="userName">Coordinador</span>
+                    <i class="material-icons">account_circle</i>
+                </div>
+            </header>
+            
+            <div class="content-body">
+                <!-- Confirmation Status -->
+                <div class="confirmation-status">
+                    <div class="status-card" id="pendingCard">
+                        <div class="card-icon">
+                            <i class="material-icons">schedule</i>
+                        </div>
+                        <div class="card-content">
+                            <h3>Estado de Confirmaciones</h3>
+                            <p id="confirmationStatus">Cargando...</p>
+                        </div>
+                    </div>
+                    
+                    <div class="time-remaining-container">
+                        <div class="time-remaining" id="timeRemaining">
+                            <span id="timeRemainingValue">--:--:--</span>
+                            <span class="time-label">Tiempo Restante</span>
+                        </div>
+                        <button id="goToConfirmBtn" class="btn btn-primary">
+                            Ir a Confirmaciones
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Weekly Menu Preview -->
+                <div class="section">
+                    <div class="section-header">
+                        <h2>Menú Semanal: <span id="weekDates">Cargando...</span></h2>
+                        <button id="viewFullMenuBtn" class="btn btn-outline">
+                            Ver Menú Completo
+                        </button>
+                    </div>
+                    
+                    <div class="day-tabs" id="dayTabsContainer">
+                        <!-- Day tabs will be generated dynamically -->
+                    </div>
+                    
+                    <div class="menu-preview" id="menuPreview">
+                        <!-- Menu preview will be loaded dynamically -->
+                        <div class="loading-message">Cargando menú...</div>
+                    </div>
+                </div>
+                
+                <!-- Employees Overview -->
+                <div class="section">
+                    <div class="section-header">
+                        <h2>Empleados de su Sucursal</h2>
+                        <button id="manageEmployeesBtn" class="btn btn-outline">
+                            Gestionar Empleados
+                        </button>
+                    </div>
+                    
+                    <div class="employee-stats">
+                        <div class="stat-card">
+                            <div class="stat-value" id="totalEmployees">0</div>
+                            <div class="stat-label">Total de Empleados</div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-value" id="activeEmployees">0</div>
+                            <div class="stat-label">Empleados Activos</div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-value" id="confirmedEmployees">0</div>
+                            <div class="stat-label">Confirmados Esta Semana</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Recent Activity -->
+                <div class="section">
+                    <h2>Actividad Reciente</h2>
+                    
+                    <div class="activity-list" id="activityList">
+                        <!-- Activities will be loaded dynamically -->
+                        <div class="loading-message">Cargando actividades...</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <!-- Firebase App (the core Firebase SDK) -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <!-- Firebase Auth -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <!-- Firebase Firestore -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    
+    <!-- App Scripts -->
+    <script src="../../js/services/firebase/config.js"></script>
+    <script src="../../js/services/firebase/auth-service.js"></script>
+    <script src="../../js/utils/date-utils.js"></script>
+    <script src="../../js/views/coordinator/dashboard.js"></script>
+</body>
+</html>

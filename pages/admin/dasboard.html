@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Administrador - Sistema de Comedor</title>
+    <link rel="stylesheet" href="../../css/styles.css">
+    <link rel="stylesheet" href="../../css/admin.css">
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <!-- Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <img src="../../assets/img/logo.png" alt="Grupo Avika" class="sidebar-logo">
+                <h2>Panel Admin</h2>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <ul>
+                    <li class="active">
+                        <a href="dashboard.html">
+                            <i class="material-icons">dashboard</i>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="menu.html">
+                            <i class="material-icons">restaurant_menu</i>
+                            <span>Gestión de Menú</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="reports.html">
+                            <i class="material-icons">bar_chart</i>
+                            <span>Reportes</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <button id="logoutBtn" class="btn btn-outline">
+                    <i class="material-icons">exit_to_app</i>
+                    <span>Cerrar Sesión</span>
+                </button>
+            </div>
+        </aside>
+        
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="content-header">
+                <h1>Dashboard</h1>
+                <div class="user-info">
+                    <span id="userName">Administrador</span>
+                    <i class="material-icons">account_circle</i>
+                </div>
+            </header>
+            
+            <div class="content-body">
+                <!-- Status Cards -->
+                <div class="status-cards">
+                    <div class="card">
+                        <div class="card-icon">
+                            <i class="material-icons">today</i>
+                        </div>
+                        <div class="card-content">
+                            <h3>Estado del Menú</h3>
+                            <p id="menuStatus">Cargando...</p>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-icon">
+                            <i class="material-icons">people</i>
+                        </div>
+                        <div class="card-content">
+                            <h3>Confirmaciones</h3>
+                            <p id="confirmationCount">Cargando...</p>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-icon">
+                            <i class="material-icons">savings</i>
+                        </div>
+                        <div class="card-content">
+                            <h3>Ahorro Estimado</h3>
+                            <p id="estimatedSavings">Cargando...</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Weekly Menu Summary -->
+                <div class="section">
+                    <div class="section-header">
+                        <h2>Resumen de Menú Semanal</h2>
+                        <button id="createMenuBtn" class="btn btn-primary">
+                            <i class="material-icons">add</i>
+                            Crear Menú
+                        </button>
+                    </div>
+                    
+                    <div class="menu-summary">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Día</th>
+                                    <th>Platillo Principal</th>
+                                    <th>Guarnición</th>
+                                    <th>Postre</th>
+                                    <th>Confirmaciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="menuSummaryBody">
+                                <!-- Data will be loaded dynamically -->
+                                <tr>
+                                    <td colspan="5" class="text-center">Cargando datos...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Confirmations by Branch -->
+                <div class="section">
+                    <h2>Confirmaciones por Sucursal</h2>
+                    
+                    <div class="confirmations-by-branch">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Sucursal</th>
+                                    <th>Lunes</th>
+                                    <th>Martes</th>
+                                    <th>Miércoles</th>
+                                    <th>Jueves</th>
+                                    <th>Viernes</th>
+                                    <th>Total</th>
+                                </tr>
+                            </thead>
+                            <tbody id="branchConfirmationsBody">
+                                <!-- Data will be loaded dynamically -->
+                                <tr>
+                                    <td colspan="7" class="text-center">Cargando datos...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Pending Confirmations Alert -->
+                <div id="pendingConfirmationsAlert" class="alert" style="display: none;">
+                    <i class="material-icons">warning</i>
+                    <div class="alert-content">
+                        <h3>Confirmaciones Pendientes</h3>
+                        <p>Las siguientes sucursales aún no han confirmado asistencia:</p>
+                        <ul id="pendingBranchesList">
+                            <!-- Data will be loaded dynamically -->
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <!-- Firebase App (the core Firebase SDK) -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <!-- Firebase Auth -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <!-- Firebase Firestore -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    
+    <!-- App Scripts -->
+    <script src="../../js/services/firebase/config.js"></script>
+    <script src="../../js/services/firebase/auth-service.js"></script>
+    <script src="../../js/services/state/state-manager.js"></script>
+    <script src="../../js/utils/date-utils.js"></script>
+    <script src="../../js/views/admin/dashboard.js"></script>
+</body>
+</html>
