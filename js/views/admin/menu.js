@@ -2,7 +2,7 @@
 
 document.addEventListener('DOMContentLoaded', () => {
     // Check authentication and role
-    auth.onAuthStateChanged(async (user) => {
+    firebase.auth().onAuthStateChanged(async (user) => {
         if (!user) {
             // Redirect to login if not authenticated
             window.location.href = '../../index.html';
@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         // Display user name
-        const userDoc = await db.collection('users').doc(user.uid).get();
+        const userDoc = await firebase.firestore().collection('users').doc(user.uid).get();
         if (userDoc.exists) {
             document.getElementById('userName').textContent = userDoc.data().displayName || 'Administrador';
         }
@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Logout functionality
     document.getElementById('logoutBtn').addEventListener('click', async () => {
         try {
-            await logout();
+            await firebase.auth().signOut();
             window.location.href = '../../index.html';
         } catch (error) {
             console.error('Error logging out:', error);
@@ -113,7 +113,7 @@ function initMenuManagement() {
             };
             
             // Save to Firestore
-            await db.collection('weeklyMenus').doc(currentWeekId)
+            await firebase.firestore().collection('weeklyMenus').doc(currentWeekId)
                 .collection('dailyMenus').doc(currentDay).update(dayMenuData);
             
             showMessage('Menú guardado correctamente.', 'success');
@@ -183,8 +183,8 @@ function initMenuManagement() {
     });
     
     // Close modal when clicking outside
-    window.addEventListener('click', (e) => {
-        if (e.target === createMenuModal) {
+    window.addEventListener('click', (event) => {
+        if (event.target === createMenuModal) {
             createMenuModal.style.display = 'none';
         }
     });
@@ -194,16 +194,16 @@ function initMenuManagement() {
         if (!currentWeekId) return;
         
         try {
-            // Update menu status to in-progress
-            await db.collection('weeklyMenus').doc(currentWeekId).update({
+            // Update menu status
+            await firebase.firestore().collection('weeklyMenus').doc(currentWeekId).update({
                 status: 'in-progress',
-                publishDate: firebase.firestore.FieldValue.serverTimestamp()
+                publishedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
             
             // Reload menu data
             loadCurrentMenu();
             
-            showMessage('Menú publicado correctamente. Los coordinadores ya pueden realizar confirmaciones.', 'success');
+            showMessage('Menú publicado correctamente. Los empleados ya pueden confirmar su asistencia.', 'success');
         } catch (error) {
             console.error('Error publishing menu:', error);
             showMessage('Error al publicar el menú. Intente nuevamente.', 'error');
@@ -217,7 +217,7 @@ function initMenuManagement() {
             const today = new Date();
             
             // Query for the most recent menu
-            const menuSnapshot = await db.collection('weeklyMenus')
+            const menuSnapshot = await firebase.firestore().collection('weeklyMenus')
                 .orderBy('startDate', 'desc')
                 .limit(1)
                 .get();
@@ -231,7 +231,7 @@ function initMenuManagement() {
                 displayMenuDetails();
                 
                 // Load daily menus
-                const dailyMenusSnapshot = await db.collection('weeklyMenus')
+                const dailyMenusSnapshot = await firebase.firestore().collection('weeklyMenus')
                     .doc(currentWeekId)
                     .collection('dailyMenus')
                     .get();
@@ -431,21 +431,21 @@ function initMenuManagement() {
         const weekId = formatDateForId(startDate);
         
         // Check if menu already exists
-        const existingMenu = await db.collection('weeklyMenus').doc(weekId).get();
+        const existingMenu = await firebase.firestore().collection('weeklyMenus').doc(weekId).get();
         
         if (existingMenu.exists) {
             throw new Error('Ya existe un menú para esta semana.');
         }
         
         // Get total employees count
-        const employeesSnapshot = await db.collection('employees')
+        const employeesSnapshot = await firebase.firestore().collection('employees')
             .where('active', '==', true)
             .get();
         
         const totalEmployees = employeesSnapshot.size;
         
         // Get app settings for confirmation window
-        const settingsSnapshot = await db.collection('settings').doc('appSettings').get();
+        const settingsSnapshot = await firebase.firestore().collection('settings').doc('appSettings').get();
         let confirmStartTime, confirmEndTime;
         
         if (settingsSnapshot.exists) {
@@ -471,26 +471,26 @@ function initMenuManagement() {
         }
         
         // Create weeklyMenu document
-        await db.collection('weeklyMenus').doc(weekId).set({
+        await firebase.firestore().collection('weeklyMenus').doc(weekId).set({
             startDate: firebase.firestore.Timestamp.fromDate(startDate),
             status: 'pending',
             confirmStartDate: firebase.firestore.Timestamp.fromDate(confirmStartTime),
             confirmEndDate: firebase.firestore.Timestamp.fromDate(confirmEndTime),
             totalEmployees,
             confirmedEmployees: 0,
-            createdBy: auth.currentUser.uid,
+            createdBy: firebase.auth().currentUser.uid,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         
         // Create dailyMenus subcollection
         const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-        const batch = db.batch();
+        const batch = firebase.firestore().batch();
         
         days.forEach((day, index) => {
             const dayDate = new Date(startDate);
             dayDate.setDate(dayDate.getDate() + index);
             
-            const dayRef = db.collection('weeklyMenus').doc(weekId).collection('dailyMenus').doc(day);
+            const dayRef = firebase.firestore().collection('weeklyMenus').doc(weekId).collection('dailyMenus').doc(day);
             batch.set(dayRef, {
                 date: firebase.firestore.Timestamp.fromDate(dayDate),
                 mainDish: '',
