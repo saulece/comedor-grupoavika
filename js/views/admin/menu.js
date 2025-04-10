@@ -340,7 +340,7 @@ function initMenuManagement() {
     function checkMenuCompleteness() {
         if (!menuData || !menuData.dailyMenus || menuData.status !== 'pending') return;
         
-        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
         let isComplete = true;
         
         for (const day of days) {
@@ -483,7 +483,7 @@ function initMenuManagement() {
         });
         
         // Create dailyMenus subcollection
-        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
         const batch = db.batch();
         
         days.forEach((day, index) => {

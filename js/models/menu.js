@@ -76,7 +76,7 @@ class MenuModel {
     isComplete() {
         if (!this.dailyMenus) return false;
         
-        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
         
         for (const day of days) {
             const dayMenu = this.dailyMenus[day];

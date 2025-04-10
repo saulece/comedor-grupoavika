@@ -82,7 +82,7 @@ class ConfirmationModel {
      * @returns {Object} Counts by day
      */
     getConfirmationsByDay() {
-        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
         const counts = {};
         
         days.forEach(day => {
@@ -101,7 +101,7 @@ class ConfirmationModel {
         if (!this.employees || this.employees.length === 0) return 0;
         
         // Get total possible meal slots (employees * 5 days)
-        const totalMealSlots = this.employees.length * 5;
+        const totalMealSlots = this.employees.length * 7;
         
         // Get actual confirmations
         const confirmedMeals = this.getTotalConfirmations();
@@ -175,7 +175,7 @@ class ConfirmationModel {
             const attendanceRecord = attendance.find(record => record.employeeId === employee.id);
             
             if (attendanceRecord) {
-                const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+                const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
                 
                 days.forEach(day => {
                     const wasConfirmed = employee.days.includes(day);

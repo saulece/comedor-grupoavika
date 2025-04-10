@@ -15,6 +15,12 @@ function isSheetJSAvailable() {
  */
 function parseExcelFile(file) {
     return new Promise((resolve, reject) => {
+        // Validate input
+        if (!file || !(file instanceof File)) {
+            reject(new Error('Archivo inválido. Por favor, seleccione un archivo Excel válido.'));
+            return;
+        }
+        
         // Check if SheetJS is available before proceeding
         if (!isSheetJSAvailable()) {
             reject(new Error('La librería SheetJS (XLSX) no está disponible. Por favor, recargue la página o contacte al administrador.'));
@@ -26,14 +32,13 @@ function parseExcelFile(file) {
         reader.onload = function(e) {
             try {
                 const data = e.target.result;
+                const workbook = XLSX.read(data, { type: 'array' });
                 
-                // Double-check XLSX is available before using it
-                if (!isSheetJSAvailable()) {
-                    reject(new Error('La librería SheetJS (XLSX) no está disponible. Por favor, recargue la página o contacte al administrador.'));
+                // Validate workbook has sheets
+                if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+                    reject(new Error('El archivo Excel no contiene hojas de cálculo.'));
                     return;
                 }
-                
-                const workbook = XLSX.read(data, { type: 'array' });
                 
                 // Get first sheet
                 const firstSheetName = workbook.SheetNames[0];
@@ -49,7 +54,9 @@ function parseExcelFile(file) {
                 }
                 
                 // Get headers from first row
-                const headers = rows[0].map(header => String(header || '').trim());
+                const headers = rows[0].map(header => 
+                    header !== null && header !== undefined ? String(header).trim() : ''
+                );
                 
                 // Validate required headers
                 const requiredHeaders = ['Nombre', 'Puesto', 'Restricciones Alimentarias', 'Activo'];
@@ -69,38 +76,52 @@ function parseExcelFile(file) {
                 const activeIndex = headers.findIndex(h => h.toLowerCase() === 'activo');
                 
                 // Process data rows
-                const data = [];
+                const parsedData = [];
                 
-                try {
-                    for (let i = 1; i < rows.length; i++) {
-                        const row = rows[i];
-                        
-                        // Skip empty rows
-                        if (!row || !row[nameIndex]) continue;
-                        
-                        data.push({
-                            name: String(row[nameIndex] || '').trim(),
-                            position: row[positionIndex] ? String(row[positionIndex] || '').trim() : '',
-                            dietaryRestrictions: row[restrictionsIndex] ? String(row[restrictionsIndex] || '').trim() : '',
-                            active: parseActiveStatus(row[activeIndex])
-                        });
+                for (let i = 1; i < rows.length; i++) {
+                    const row = rows[i];
+                    
+                    // Skip empty rows
+                    if (!row || row.length === 0 || nameIndex < 0 || !row[nameIndex]) {
+                        continue;
                     }
-                } catch (processingError) {
-                    reject(new Error('Error al procesar los datos del archivo: ' + processingError.message));
-                    return;
+                    
+                    // Get values safely
+                    const name = nameIndex >= 0 && row[nameIndex] !== undefined ? String(row[nameIndex]).trim() : '';
+                    const position = positionIndex >= 0 && row[positionIndex] !== undefined ? String(row[positionIndex]).trim() : '';
+                    const restrictions = restrictionsIndex >= 0 && row[restrictionsIndex] !== undefined ? String(row[restrictionsIndex]).trim() : '';
+                    const active = activeIndex >= 0 ? parseActiveStatus(row[activeIndex]) : true;
+                    
+                    // Skip rows without a name
+                    if (!name) continue;
+                    
+                    parsedData.push({
+                        name,
+                        position,
+                        dietaryRestrictions: restrictions,
+                        active
+                    });
                 }
                 
-                resolve(data);
+                resolve(parsedData);
             } catch (error) {
-                reject(new Error('Error al procesar el archivo Excel: ' + error.message));
+                console.error('Error al procesar el archivo Excel:', error);
+                reject(new Error('Error al procesar el archivo Excel: ' + (error.message || 'Error desconocido')));
             }
         };
         
-        reader.onerror = function() {
-            reject(new Error('Error al leer el archivo'));
+        reader.onerror = function(event) {
+            console.error('Error al leer el archivo:', event);
+            reject(new Error('Error al leer el archivo. Verifique que el archivo no esté dañado.'));
         };
         
-        reader.readAsArrayBuffer(file);
+        // Read the file as an array buffer
+        try {
+            reader.readAsArrayBuffer(file);
+        } catch (error) {
+            console.error('Error al iniciar la lectura del archivo:', error);
+            reject(new Error('Error al iniciar la lectura del archivo: ' + (error.message || 'Error desconocido')));
+        }
     });
 }
 
@@ -110,17 +131,28 @@ function parseExcelFile(file) {
  * @returns {boolean} Active status
  */
 function parseActiveStatus(value) {
-    if (value === undefined || value === null) return true;
-    
-    if (typeof value === 'boolean') return value;
-    
-    if (typeof value === 'number') return value !== 0;
-    
-    if (typeof value === 'string') {
-        const lowerValue = value.toLowerCase().trim();
-        return !['no', 'false', '0', 'n', 'inactivo'].includes(lowerValue);
+    // Handle undefined or null
+    if (value === undefined || value === null) {
+        return true;
     }
     
+    // Handle boolean values directly
+    if (typeof value === 'boolean') {
+        return value;
+    }
+    
+    // Handle numeric values (0 = false, any other number = true)
+    if (typeof value === 'number') {
+        return value !== 0;
+    }
+    
+    // Handle string values
+    if (typeof value === 'string') {
+        const lowerValue = value.toLowerCase().trim();
+        return !['no', 'false', '0', 'n', 'inactivo', 'falso'].includes(lowerValue);
+    }
+    
+    // Default to true for any other type
     return true;
 }
 
@@ -168,7 +200,7 @@ function generateEmployeeTemplate() {
         return new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     } catch (error) {
         console.error('Error generando plantilla Excel:', error);
-        throw error;
+        throw new Error('Error al generar la plantilla Excel: ' + (error.message || 'Error desconocido'));
     }
 }
 
@@ -178,6 +210,15 @@ function generateEmployeeTemplate() {
  * @param {string} fileName - File name
  */
 function downloadFile(blob, fileName) {
+    if (!blob || !(blob instanceof Blob)) {
+        console.error('Error: Se requiere un objeto Blob válido');
+        throw new Error('Error: Se requiere un objeto Blob válido');
+    }
+    
+    if (!fileName || typeof fileName !== 'string') {
+        fileName = 'archivo_descargado.xlsx';
+    }
+    
     try {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -185,13 +226,15 @@ function downloadFile(blob, fileName) {
         a.download = fileName;
         document.body.appendChild(a);
         a.click();
+        
+        // Limpiar después de la descarga
         setTimeout(() => {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }, 100);
     } catch (error) {
         console.error('Error descargando archivo:', error);
-        throw error;
+        throw new Error('Error al descargar el archivo: ' + (error.message || 'Error desconocido'));
     }
 }
 
@@ -199,17 +242,21 @@ function downloadFile(blob, fileName) {
  * Download employee template
  */
 function downloadEmployeeTemplate() {
-    // Check if SheetJS is available before proceeding
-    if (!isSheetJSAvailable()) {
-        alert('La librería SheetJS (XLSX) no está disponible. Por favor, recargue la página o contacte al administrador.');
-        return;
-    }
-    
     try {
+        // Check if SheetJS is available before proceeding
+        if (!isSheetJSAvailable()) {
+            throw new Error('La librería SheetJS (XLSX) no está disponible. Por favor, recargue la página o contacte al administrador.');
+        }
+        
         const templateBlob = generateEmployeeTemplate();
         downloadFile(templateBlob, 'plantilla_empleados.xlsx');
     } catch (error) {
         console.error('Error descargando plantilla:', error);
-        alert('Error al generar la plantilla: ' + error.message);
+        // Usar un sistema de notificación si está disponible, de lo contrario usar alert
+        if (typeof showNotification === 'function') {
+            showNotification('error', 'Error al generar la plantilla: ' + error.message);
+        } else {
+            alert('Error al generar la plantilla: ' + error.message);
+        }
     }
 }
