@@ -1,11 +1,13 @@
 // Firebase configuration
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "your-project-id.firebaseapp.com",
-    projectId: "your-project-id",
-    storageBucket: "your-project-id.appspot.com",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    apiKey: "AIzaSyCIyAwAEqFEw_bcqmun5BlNjVPiRy2-bMs",
+    authDomain: "comedor-grupoavika.firebaseapp.com",
+    databaseURL: "https://comedor-grupoavika-default-rtdb.firebaseio.com",
+    projectId: "comedor-grupoavika",
+    storageBucket: "comedor-grupoavika.firebasestorage.app",
+    messagingSenderId: "277401445097",
+    appId: "1:277401445097:web:f1da7e5c8b3f3ab3570678",
+    measurementId: "G-P3ZDJJQVW9"
 };
 
 // Initialize Firebase
@@ -15,6 +17,7 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-// Firestore settings - removed obsolete timestampsInSnapshots setting
+// Optional: Initialize Analytics
+const analytics = firebase.analytics ? firebase.analytics() : null;
 
 console.log("Firebase initialized");
