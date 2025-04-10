@@ -15,7 +15,6 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-// Firestore settings
-db.settings({ timestampsInSnapshots: true });
+// Firestore settings - removed obsolete timestampsInSnapshots setting
 
 console.log("Firebase initialized");

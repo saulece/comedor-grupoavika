@@ -346,7 +346,7 @@ function initConfirmations(branchId, coordinatorId) {
         let html = '';
         
         days.forEach((day, index) => {
-            const dayName = getDayName(index + 1); // Monday is 1
+            const dayName = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'][index];
             const confirmedCount = counts[day];
             const percentage = totalEmployees > 0 ? Math.round((confirmedCount / totalEmployees) * 100) : 0;
             
@@ -466,6 +466,20 @@ function initConfirmations(branchId, coordinatorId) {
     // Pad number with leading zero
     function padZero(num) {
         return num.toString().padStart(2, '0');
+    }
+    
+    // Get status text based on confirmation status
+    function getStatusText(status) {
+        switch(status) {
+            case 'confirmed':
+                return 'Confirmado';
+            case 'pending':
+                return 'Pendiente';
+            case 'declined':
+                return 'Rechazado';
+            default:
+                return 'Desconocido';
+        }
     }
 }
 

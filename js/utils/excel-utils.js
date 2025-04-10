@@ -1,17 +1,38 @@
 // Excel Utilities - Functions for handling Excel files
 
 /**
+ * Check if SheetJS (XLSX) is available
+ * @returns {boolean} True if XLSX is available
+ */
+function isSheetJSAvailable() {
+    return typeof XLSX !== 'undefined';
+}
+
+/**
  * Parse Excel file and return data as array of objects
  * @param {File} file - Excel file
  * @returns {Promise<Array>} Array of objects with parsed data
  */
 function parseExcelFile(file) {
     return new Promise((resolve, reject) => {
+        // Check if SheetJS is available before proceeding
+        if (!isSheetJSAvailable()) {
+            reject(new Error('La librería SheetJS (XLSX) no está disponible. Por favor, recargue la página o contacte al administrador.'));
+            return;
+        }
+        
         const reader = new FileReader();
         
         reader.onload = function(e) {
             try {
                 const data = e.target.result;
+                
+                // Double-check XLSX is available before using it
+                if (!isSheetJSAvailable()) {
+                    reject(new Error('La librería SheetJS (XLSX) no está disponible. Por favor, recargue la página o contacte al administrador.'));
+                    return;
+                }
+                
                 const workbook = XLSX.read(data, { type: 'array' });
                 
                 // Get first sheet
@@ -50,18 +71,23 @@ function parseExcelFile(file) {
                 // Process data rows
                 const data = [];
                 
-                for (let i = 1; i < rows.length; i++) {
-                    const row = rows[i];
-                    
-                    // Skip empty rows
-                    if (!row || !row[nameIndex]) continue;
-                    
-                    data.push({
-                        name: String(row[nameIndex] || '').trim(),
-                        position: row[positionIndex] ? String(row[positionIndex] || '').trim() : '',
-                        dietaryRestrictions: row[restrictionsIndex] ? String(row[restrictionsIndex] || '').trim() : '',
-                        active: parseActiveStatus(row[activeIndex])
-                    });
+                try {
+                    for (let i = 1; i < rows.length; i++) {
+                        const row = rows[i];
+                        
+                        // Skip empty rows
+                        if (!row || !row[nameIndex]) continue;
+                        
+                        data.push({
+                            name: String(row[nameIndex] || '').trim(),
+                            position: row[positionIndex] ? String(row[positionIndex] || '').trim() : '',
+                            dietaryRestrictions: row[restrictionsIndex] ? String(row[restrictionsIndex] || '').trim() : '',
+                            active: parseActiveStatus(row[activeIndex])
+                        });
+                    }
+                } catch (processingError) {
+                    reject(new Error('Error al procesar los datos del archivo: ' + processingError.message));
+                    return;
                 }
                 
                 resolve(data);
@@ -103,6 +129,11 @@ function parseActiveStatus(value) {
  * @returns {Blob} Excel file as blob
  */
 function generateEmployeeTemplate() {
+    // Check if SheetJS is available before proceeding
+    if (!isSheetJSAvailable()) {
+        throw new Error('La librería SheetJS (XLSX) no está disponible. Por favor, recargue la página o contacte al administrador.');
+    }
+    
     try {
         // Create workbook and worksheet
         const wb = XLSX.utils.book_new();
@@ -168,11 +199,17 @@ function downloadFile(blob, fileName) {
  * Download employee template
  */
 function downloadEmployeeTemplate() {
+    // Check if SheetJS is available before proceeding
+    if (!isSheetJSAvailable()) {
+        alert('La librería SheetJS (XLSX) no está disponible. Por favor, recargue la página o contacte al administrador.');
+        return;
+    }
+    
     try {
         const templateBlob = generateEmployeeTemplate();
         downloadFile(templateBlob, 'plantilla_empleados.xlsx');
     } catch (error) {
         console.error('Error descargando plantilla:', error);
-        alert('Error al generar la plantilla. Por favor intente nuevamente.');
+        alert('Error al generar la plantilla: ' + error.message);
     }
 }
