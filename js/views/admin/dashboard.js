@@ -443,3 +443,86 @@ function setupEventListeners() {
         });
     }
 }
+
+/**
+ * Obtiene el menú semanal actual
+ * @returns {Promise<Object>} Datos del menú semanal
+ */
+async function getCurrentWeeklyMenu() {
+    try {
+        // Obtener fecha actual
+        const now = new Date();
+        
+        // Consultar menú activo (simplificado para evitar necesidad de índice compuesto)
+        const menuSnapshot = await firebase.firestore().collection('weeklyMenus')
+            .where('startDate', '<=', now)
+            .get();
+        
+        if (menuSnapshot.empty) {
+            console.log('No hay menú activo para la semana actual');
+            return null;
+        }
+        
+        // Filtrar menús cuya fecha de fin sea mayor o igual a hoy
+        // y ordenar por fecha de inicio (más reciente primero)
+        const validMenus = menuSnapshot.docs
+            .filter(doc => {
+                const data = doc.data();
+                const endDate = data.endDate.toDate ? data.endDate.toDate() : data.endDate;
+                return endDate >= now;
+            })
+            .sort((a, b) => {
+                const dateA = a.data().startDate.toDate ? a.data().startDate.toDate() : a.data().startDate;
+                const dateB = b.data().startDate.toDate ? b.data().startDate.toDate() : b.data().startDate;
+                return dateB - dateA; // Orden descendente
+            });
+        
+        if (validMenus.length === 0) {
+            console.log('No hay menú activo para la semana actual');
+            return null;
+        }
+        
+        // Obtener datos del menú más reciente
+        const menuDoc = validMenus[0];
+        const menuData = menuDoc.data();
+        menuData.id = menuDoc.id;
+        
+        // Obtener subcolección de menús diarios
+        const dailyMenusSnapshot = await firebase.firestore().collection('weeklyMenus')
+            .doc(menuDoc.id)
+            .collection('dailyMenus')
+            .get();
+        
+        // Organizar menús diarios por día
+        menuData.dailyMenus = {};
+        dailyMenusSnapshot.forEach(doc => {
+            const dailyMenu = doc.data();
+            menuData.dailyMenus[dailyMenu.day] = dailyMenu;
+        });
+        
+        return menuData;
+    } catch (error) {
+        console.error('Error al obtener menú semanal:', error);
+        throw error;
+    }
+}
+
+/**
+ * Obtiene la configuración de la aplicación
+ * @returns {Promise<Object>} Configuración de la aplicación
+ */
+async function getAppSettings() {
+    try {
+        const settingsDoc = await firebase.firestore().collection('settings').doc('appSettings').get();
+        
+        if (!settingsDoc.exists) {
+            console.log('No se encontró la configuración de la aplicación');
+            return { mealCost: 50 }; // Valor predeterminado
+        }
+        
+        return settingsDoc.data();
+    } catch (error) {
+        console.error('Error al obtener configuración:', error);
+        throw error;
+    }
+}
