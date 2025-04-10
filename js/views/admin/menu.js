@@ -143,23 +143,30 @@ function initMenuManagement() {
     
     // Confirm create menu button
     confirmCreateMenuBtn.addEventListener('click', async () => {
-        const startDate = menuStartDateInput.value;
+        console.log('Botón Crear Menú clickeado');
+        const startDateStr = menuStartDateInput.value;
+        console.log('Fecha seleccionada:', startDateStr);
         
-        if (!startDate) {
+        if (!startDateStr) {
             alert('Por favor seleccione una fecha válida.');
             return;
         }
         
         // Validate if selected date is a Monday
-        const date = new Date(startDate);
+        const date = new Date(startDateStr);
+        console.log('Fecha parseada:', date);
+        console.log('Día de la semana:', date.getDay()); // 0=Domingo, 1=Lunes, etc.
+        
         if (date.getDay() !== 1) { // 1 = Monday
             alert('Por favor seleccione un lunes como fecha inicial.');
             return;
         }
         
         try {
+            console.log('Intentando crear menú semanal...');
             // Create new weekly menu
-            await createWeeklyMenu(startDate);
+            await createWeeklyMenu(startDateStr);
+            console.log('Menú creado exitosamente');
             
             // Close modal
             createMenuModal.style.display = 'none';
@@ -167,8 +174,8 @@ function initMenuManagement() {
             // Reload menu data
             loadCurrentMenu();
         } catch (error) {
-            console.error('Error creating menu:', error);
-            alert('Error al crear el menú. Intente nuevamente.');
+            console.error('Error detallado al crear el menú:', error);
+            alert(`Error al crear el menú: ${error.message}`);
         }
     });
     
@@ -427,80 +434,118 @@ function initMenuManagement() {
     
     // Create a new weekly menu
     async function createWeeklyMenu(startDateStr) {
+        console.log('Iniciando createWeeklyMenu con fecha:', startDateStr);
+        
+        // Parse date string to Date object
         const startDate = new Date(startDateStr);
+        console.log('Fecha parseada en createWeeklyMenu:', startDate);
+        
+        // Format date for ID
         const weekId = formatDateForId(startDate);
+        console.log('ID de semana generado:', weekId);
         
         // Check if menu already exists
-        const existingMenu = await firebase.firestore().collection('weeklyMenus').doc(weekId).get();
-        
-        if (existingMenu.exists) {
-            throw new Error('Ya existe un menú para esta semana.');
-        }
-        
-        // Get total employees count
-        const employeesSnapshot = await firebase.firestore().collection('employees')
-            .where('active', '==', true)
-            .get();
-        
-        const totalEmployees = employeesSnapshot.size;
-        
-        // Get app settings for confirmation window
-        const settingsSnapshot = await firebase.firestore().collection('settings').doc('appSettings').get();
-        let confirmStartTime, confirmEndTime;
-        
-        if (settingsSnapshot.exists) {
-            const settings = settingsSnapshot.data();
+        try {
+            const existingMenu = await firebase.firestore().collection('weeklyMenus').doc(weekId).get();
+            console.log('¿Existe menú?', existingMenu.exists);
             
-            // Calculate confirmation start and end times based on settings
-            confirmStartTime = new Date(startDate);
-            confirmStartTime.setDate(confirmStartTime.getDate() - 4); // Thursday before the week
-            confirmStartTime.setHours(16, 10, 0, 0); // 16:10
+            if (existingMenu.exists) {
+                throw new Error('Ya existe un menú para esta semana.');
+            }
             
-            confirmEndTime = new Date(startDate);
-            confirmEndTime.setDate(confirmEndTime.getDate() - 2); // Saturday before the week
-            confirmEndTime.setHours(10, 0, 0, 0); // 10:00
-        } else {
-            // Default times if settings don't exist
-            confirmStartTime = new Date(startDate);
-            confirmStartTime.setDate(confirmStartTime.getDate() - 4); // Thursday
-            confirmStartTime.setHours(16, 10, 0, 0); // 16:10
+            // Get total employees count
+            console.log('Obteniendo conteo de empleados...');
+            const employeesSnapshot = await firebase.firestore().collection('employees')
+                .where('active', '==', true)
+                .get();
             
-            confirmEndTime = new Date(startDate);
-            confirmEndTime.setDate(confirmEndTime.getDate() - 2); // Saturday
-            confirmEndTime.setHours(10, 0, 0, 0); // 10:00
-        }
-        
-        // Create weeklyMenu document
-        await firebase.firestore().collection('weeklyMenus').doc(weekId).set({
-            startDate: firebase.firestore.Timestamp.fromDate(startDate),
-            status: 'pending',
-            confirmStartDate: firebase.firestore.Timestamp.fromDate(confirmStartTime),
-            confirmEndDate: firebase.firestore.Timestamp.fromDate(confirmEndTime),
-            totalEmployees,
-            confirmedEmployees: 0,
-            createdBy: firebase.auth().currentUser.uid,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        
-        // Create dailyMenus subcollection
-        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-        const batch = firebase.firestore().batch();
-        
-        days.forEach((day, index) => {
-            const dayDate = new Date(startDate);
-            dayDate.setDate(dayDate.getDate() + index);
+            const totalEmployees = employeesSnapshot.size;
+            console.log('Total de empleados activos:', totalEmployees);
             
-            const dayRef = firebase.firestore().collection('weeklyMenus').doc(weekId).collection('dailyMenus').doc(day);
-            batch.set(dayRef, {
-                date: firebase.firestore.Timestamp.fromDate(dayDate),
-                mainDish: '',
-                sideDish: '',
-                dessert: '',
-                vegetarianOption: ''
+            // Get app settings for confirmation window
+            console.log('Obteniendo configuraciones de la aplicación...');
+            const settingsSnapshot = await firebase.firestore().collection('settings').doc('appSettings').get();
+            let confirmStartTime, confirmEndTime;
+            
+            if (settingsSnapshot.exists) {
+                const settings = settingsSnapshot.data();
+                console.log('Configuraciones obtenidas:', settings);
+                
+                // Default to 48 hours before if not set
+                const confirmHoursBefore = settings.confirmHoursBefore || 48;
+                console.log('Horas antes para confirmar:', confirmHoursBefore);
+                
+                // Calculate confirmation window start and end times
+                confirmStartTime = new Date(startDate);
+                confirmStartTime.setHours(confirmStartTime.getHours() - confirmHoursBefore);
+                
+                confirmEndTime = new Date(startDate);
+                confirmEndTime.setHours(8, 0, 0, 0); // 8:00 AM on Monday
+            } else {
+                console.log('No se encontraron configuraciones, usando valores predeterminados');
+                // Default confirmation window (48 hours before)
+                confirmStartTime = new Date(startDate);
+                confirmStartTime.setHours(confirmStartTime.getHours() - 48);
+                
+                confirmEndTime = new Date(startDate);
+                confirmEndTime.setHours(8, 0, 0, 0); // 8:00 AM on Monday
+            }
+            
+            console.log('Ventana de confirmación:', {
+                inicio: confirmStartTime,
+                fin: confirmEndTime
             });
-        });
-        
-        await batch.commit();
+            
+            // Create weeklyMenu document
+            console.log('Creando documento de menú semanal...');
+            const currentUser = firebase.auth().currentUser;
+            console.log('Usuario actual:', currentUser ? currentUser.uid : 'No autenticado');
+            
+            if (!currentUser) {
+                throw new Error('No hay usuario autenticado. Por favor, inicie sesión nuevamente.');
+            }
+            
+            await firebase.firestore().collection('weeklyMenus').doc(weekId).set({
+                startDate: firebase.firestore.Timestamp.fromDate(startDate),
+                status: 'pending',
+                confirmStartDate: firebase.firestore.Timestamp.fromDate(confirmStartTime),
+                confirmEndDate: firebase.firestore.Timestamp.fromDate(confirmEndTime),
+                totalEmployees,
+                confirmedEmployees: 0,
+                createdBy: currentUser.uid,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            
+            // Create daily menu documents
+            console.log('Creando documentos de menú diario...');
+            const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+            const batch = firebase.firestore().batch();
+            
+            days.forEach((day, index) => {
+                const dayDate = new Date(startDate);
+                dayDate.setDate(dayDate.getDate() + index);
+                
+                const dayRef = firebase.firestore().collection('weeklyMenus').doc(weekId).collection('dailyMenus').doc(day);
+                batch.set(dayRef, {
+                    date: firebase.firestore.Timestamp.fromDate(dayDate),
+                    mainDish: '',
+                    sideDish: '',
+                    soup: '',
+                    salad: '',
+                    dessert: '',
+                    vegetarianOption: ''
+                });
+            });
+            
+            console.log('Ejecutando batch para crear menús diarios...');
+            await batch.commit();
+            console.log('Menú semanal creado exitosamente');
+            
+            return weekId;
+        } catch (error) {
+            console.error('Error en createWeeklyMenu:', error);
+            throw error;
+        }
     }
 }
 
