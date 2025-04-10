@@ -426,29 +426,49 @@ function normalizeMenuData(menuData) {
 
 // Get Monday of the current week - Respaldo si no está disponible en dateUtils
 function getMonday(date) {
+    date = new Date(date);
     const day = date.getDay();
-    const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Sunday
+    const diff = date.getDate() - day + (day === 0 ? -6 : 1);
     return new Date(date.setDate(diff));
 }
 
-// Format date as YYYY-MM-DD - Respaldo si no está disponible en dateUtils
+// Usar DateUtils para formatear fechas
 function formatDate(date) {
+    // Usar la utilidad compartida si está disponible
+    if (window.DateUtils && window.DateUtils.formatDate) {
+        return window.DateUtils.formatDate(date);
+    }
+    
+    // Implementación de respaldo
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
 }
 
-// Format date for display (DD/MM/YYYY) - Respaldo si no está disponible en dateUtils
+// Usar DateUtils para formatear fechas para mostrar
 function formatDateDisplay(date) {
+    // Usar la utilidad compartida si está disponible
+    if (window.DateUtils && window.DateUtils.formatDateDisplay) {
+        return window.DateUtils.formatDateDisplay(date);
+    }
+    
+    // Implementación de respaldo
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = date.getFullYear();
     return `${day}/${month}/${year}`;
 }
 
-// Función de respaldo para mostrar estado de carga
+// Usar UIMessageUtils para mostrar estado de carga
 function showLoadingState(isLoading) {
+    // Usar la utilidad compartida si está disponible
+    if (window.UIMessageUtils && window.UIMessageUtils.toggleLoading) {
+        window.UIMessageUtils.toggleLoading(isLoading);
+        return;
+    }
+    
+    // Implementación de respaldo
     const loadingIndicator = document.getElementById('loading-indicator');
     if (loadingIndicator) {
         loadingIndicator.style.display = isLoading ? 'block' : 'none';
@@ -460,8 +480,14 @@ function showLoadingState(isLoading) {
     });
 }
 
-// Función de respaldo para mostrar errores
+// Usar UIMessageUtils para mostrar errores
 function showErrorMessage(message) {
+    // Usar la utilidad compartida si está disponible
+    if (window.UIMessageUtils && window.UIMessageUtils.showError) {
+        window.UIMessageUtils.showError(message);
+        return;
+    }
+    
     // Intentar usar el error handler global si está disponible
     if (window.errorHandler && window.errorHandler.showUIError) {
         window.errorHandler.showUIError(message);

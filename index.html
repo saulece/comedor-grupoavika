@@ -11,8 +11,6 @@
     <!-- CSS específico para login -->
     <link rel="stylesheet" href="css/login.css">
     <link rel="stylesheet" href="css/fixes.css">
-    <!-- CSS para validación de formularios -->
-    <link rel="stylesheet" href="css/form-validation.css">
 </head>
 <body>
     <div class="container">
@@ -57,10 +55,19 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-analytics.js"></script>
     
-    <!-- Application Scripts -->
+    <!-- Utility Scripts -->
     <script src="js/utils/common-utils.js"></script>
-    <script src="js/utils/form-validation.js"></script>
-    <script src="js/services/firebase-service.js"></script>
+    <script src="js/utils/date-utils.js"></script>
+    <script src="js/utils/ui-message-utils.js"></script>
+    <script src="js/utils/validation/validators.js"></script>
+    <script src="js/utils/menu-utils.js"></script>
+    <script src="js/utils/employee-utils.js"></script>
+    
+    <!-- Firebase Configuration -->
+    <script src="js/services/firebase/firebase-config.js"></script>
+    <script src="js/services/firebase/firebase-service.js"></script>
+    
+    <!-- Application Scripts -->
     <script src="js/auth.js"></script>
     <script>
         // Configurar el formulario de inicio de sesión después de que el DOM esté listo

@@ -95,9 +95,46 @@ async function initMenuPage() {
 async function loadMenuData() {
     try {
         const currentWeek = menuState.getValue('currentWeek');
-        const weekStr = formatDate(currentWeek);
         
-        // Intentar obtener menú de la semana actual con caché
+        // Usar la utilidad compartida para formatear la fecha
+        const weekStr = window.DateUtils && window.DateUtils.formatDate 
+            ? window.DateUtils.formatDate(currentWeek) 
+            : formatDate(currentWeek);
+        
+        // Usar el servicio de menús si está disponible
+        if (window.firestoreServices && window.firestoreServices.menu && window.firestoreServices.menu.getMenuByWeek) {
+            try {
+                const menuDoc = await window.firestoreServices.menu.getMenuByWeek(weekStr);
+                
+                if (menuDoc) {
+                    // Normalizar datos del menú si está disponible la utilidad
+                    const normalizedMenu = window.MenuUtils && window.MenuUtils.normalizeMenuData
+                        ? window.MenuUtils.normalizeMenuData(menuDoc)
+                        : menuDoc;
+                        
+                    // Menú encontrado, guardar en estado
+                    menuState.setValue('menuData', normalizedMenu);
+                    menuState.setValue('isEditing', false);
+                    menuState.setValue('isDirty', false);
+                } else {
+                    // Menú no encontrado, crear uno nuevo
+                    const newMenu = window.MenuUtils && window.MenuUtils.createEmptyMenu
+                        ? window.MenuUtils.createEmptyMenu(weekStr)
+                        : createEmptyMenu(weekStr);
+                        
+                    menuState.setValue('menuData', newMenu);
+                    menuState.setValue('isEditing', true);
+                    menuState.setValue('isDirty', true);
+                }
+                
+                return menuState.getValue('menuData');
+            } catch (error) {
+                console.error('Error al cargar el menú usando el servicio centralizado:', error);
+                // Continuar con la implementación de respaldo
+            }
+        }
+        
+        // Implementación de respaldo - Intentar obtener menú de la semana actual con caché
         const menuDoc = await window.firestoreService.getDocument(
             'menus', 
             weekStr, 
@@ -847,19 +884,30 @@ function setupEventListeners() {
  * @returns {Date} Fecha del lunes
  */
 function getMonday(date) {
+    // Usar la utilidad compartida si está disponible
+    if (window.DateUtils && window.DateUtils.getMonday) {
+        return window.DateUtils.getMonday(date);
+    }
+    
+    // Implementación de respaldo
     const day = date.getDay();
     const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Ajustar para domingo
     return new Date(date.setDate(diff));
 }
 
 /**
- * Formatear fecha para almacenamiento (YYYY-MM-DD)
- * Convierte un objeto Date a formato de cadena para almacenamiento
+ * Formatear fecha como YYYY-MM-DD
  * 
  * @param {Date} date - Fecha a formatear
  * @returns {string} Fecha formateada
  */
 function formatDate(date) {
+    // Usar la utilidad compartida si está disponible
+    if (window.DateUtils && window.DateUtils.formatDate) {
+        return window.DateUtils.formatDate(date);
+    }
+    
+    // Implementación de respaldo
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
@@ -868,12 +916,17 @@ function formatDate(date) {
 
 /**
  * Formatear fecha para mostrar (DD/MM/YYYY)
- * Convierte un objeto Date a formato de cadena para mostrar al usuario
  * 
  * @param {Date} date - Fecha a formatear
  * @returns {string} Fecha formateada
  */
 function formatDateDisplay(date) {
+    // Usar la utilidad compartida si está disponible
+    if (window.DateUtils && window.DateUtils.formatDateDisplay) {
+        return window.DateUtils.formatDateDisplay(date);
+    }
+    
+    // Implementación de respaldo
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = date.getFullYear();

@@ -29,7 +29,7 @@ function isNotEmpty(value) {
  */
 function isNumber(value) {
     if (value === null || value === undefined || value === '') return false;
-    return !isNaN(Number(value));
+    return !isNaN(parseFloat(value)) && isFinite(value);
 }
 
 /**
@@ -39,7 +39,7 @@ function isNumber(value) {
  */
 function isPositive(value) {
     if (!isNumber(value)) return false;
-    return Number(value) > 0;
+    return parseFloat(value) > 0;
 }
 
 /**
@@ -51,8 +51,8 @@ function isPositive(value) {
  */
 function isInRange(value, min, max) {
     if (!isNumber(value)) return false;
-    const numValue = Number(value);
-    return numValue >= min && numValue <= max;
+    const num = parseFloat(value);
+    return num >= min && num <= max;
 }
 
 /**
@@ -63,7 +63,6 @@ function isInRange(value, min, max) {
 function isValidDate(dateStr) {
     if (!dateStr) return false;
     
-    // Try to create a date from the string
     const date = new Date(dateStr);
     return !isNaN(date.getTime());
 }
@@ -78,9 +77,9 @@ function isFutureDate(dateStr) {
     
     const date = new Date(dateStr);
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Reset time part for comparison
+    today.setHours(0, 0, 0, 0);
     
-    return date >= today;
+    return date > today;
 }
 
 /**
@@ -93,7 +92,7 @@ function isPastDate(dateStr) {
     
     const date = new Date(dateStr);
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Reset time part for comparison
+    today.setHours(0, 0, 0, 0);
     
     return date < today;
 }
@@ -105,7 +104,7 @@ function isPastDate(dateStr) {
  * @returns {boolean} - True if the password meets the minimum requirements
  */
 function isStrongPassword(password, minLength = 8) {
-    if (!password) return false;
+    if (!password || typeof password !== 'string') return false;
     
     // Check minimum length
     if (password.length < minLength) return false;
@@ -132,8 +131,8 @@ function isStrongPassword(password, minLength = 8) {
  * @returns {boolean} - True if the string has at least the minimum length
  */
 function hasMinLength(value, minLength) {
-    if (!value) return false;
-    return value.length >= minLength;
+    if (value === null || value === undefined) return false;
+    return String(value).length >= minLength;
 }
 
 /**
@@ -143,8 +142,8 @@ function hasMinLength(value, minLength) {
  * @returns {boolean} - True if the string has at most the maximum length
  */
 function hasMaxLength(value, maxLength) {
-    if (!value) return true; // Empty string has 0 length
-    return value.length <= maxLength;
+    if (value === null || value === undefined) return false;
+    return String(value).length <= maxLength;
 }
 
 /**
@@ -154,7 +153,7 @@ function hasMaxLength(value, maxLength) {
  * @returns {boolean} - True if the value exists in the array
  */
 function isInArray(value, array) {
-    if (!array || !Array.isArray(array)) return false;
+    if (!Array.isArray(array)) return false;
     return array.includes(value);
 }
 
@@ -168,97 +167,132 @@ function validateForm(formData, validationRules) {
     const errors = {};
     let isValid = true;
     
+    // Process each field in the validation rules
     for (const field in validationRules) {
         const rules = validationRules[field];
         const value = formData[field];
         
-        // Required check
-        if (rules.required && !isNotEmpty(value)) {
-            errors[field] = rules.requiredMessage || 'Este campo es requerido';
-            isValid = false;
-            continue; // Skip other validations if required check failed
-        }
+        // Skip if no rules for this field
+        if (!rules) continue;
         
-        // Skip other validations if value is empty and not required
-        if (!isNotEmpty(value) && !rules.required) {
-            continue;
-        }
-        
-        // Email check
-        if (rules.email && !isValidEmail(value)) {
-            errors[field] = rules.emailMessage || 'Correo electrónico no válido';
-            isValid = false;
-        }
-        
-        // Number check
-        if (rules.number && !isNumber(value)) {
-            errors[field] = rules.numberMessage || 'Debe ser un número';
-            isValid = false;
-        }
-        
-        // Positive number check
-        if (rules.positive && !isPositive(value)) {
-            errors[field] = rules.positiveMessage || 'Debe ser un número positivo';
-            isValid = false;
-        }
-        
-        // Range check
-        if (rules.min !== undefined && rules.max !== undefined && !isInRange(value, rules.min, rules.max)) {
-            errors[field] = rules.rangeMessage || `Debe estar entre ${rules.min} y ${rules.max}`;
-            isValid = false;
-        }
-        
-        // Min length check
-        if (rules.minLength && !hasMinLength(value, rules.minLength)) {
-            errors[field] = rules.minLengthMessage || `Debe tener al menos ${rules.minLength} caracteres`;
-            isValid = false;
-        }
-        
-        // Max length check
-        if (rules.maxLength && !hasMaxLength(value, rules.maxLength)) {
-            errors[field] = rules.maxLengthMessage || `Debe tener como máximo ${rules.maxLength} caracteres`;
-            isValid = false;
-        }
-        
-        // Date check
-        if (rules.date && !isValidDate(value)) {
-            errors[field] = rules.dateMessage || 'Fecha no válida';
-            isValid = false;
-        }
-        
-        // Future date check
-        if (rules.futureDate && !isFutureDate(value)) {
-            errors[field] = rules.futureDateMessage || 'La fecha debe ser en el futuro';
-            isValid = false;
-        }
-        
-        // Past date check
-        if (rules.pastDate && !isPastDate(value)) {
-            errors[field] = rules.pastDateMessage || 'La fecha debe ser en el pasado';
-            isValid = false;
-        }
-        
-        // Strong password check
-        if (rules.strongPassword && !isStrongPassword(value, rules.minLength || 8)) {
-            errors[field] = rules.strongPasswordMessage || 'La contraseña no cumple con los requisitos mínimos';
-            isValid = false;
-        }
-        
-        // Custom validator
-        if (rules.validator && typeof rules.validator === 'function') {
-            const isValidCustom = rules.validator(value, formData);
-            if (!isValidCustom) {
-                errors[field] = rules.validatorMessage || 'Valor no válido';
+        // Process each rule for the current field
+        for (const rule of rules) {
+            let valid = true;
+            let errorMessage = '';
+            
+            // Check rule type and validate accordingly
+            switch (rule.type) {
+                case 'required':
+                    valid = isNotEmpty(value);
+                    errorMessage = rule.message || 'Este campo es obligatorio';
+                    break;
+                    
+                case 'email':
+                    valid = !value || isValidEmail(value);
+                    errorMessage = rule.message || 'Correo electrónico inválido';
+                    break;
+                    
+                case 'number':
+                    valid = !value || isNumber(value);
+                    errorMessage = rule.message || 'Debe ser un número';
+                    break;
+                    
+                case 'positive':
+                    valid = !value || isPositive(value);
+                    errorMessage = rule.message || 'Debe ser un número positivo';
+                    break;
+                    
+                case 'range':
+                    valid = !value || isInRange(value, rule.min, rule.max);
+                    errorMessage = rule.message || `Debe estar entre ${rule.min} y ${rule.max}`;
+                    break;
+                    
+                case 'minLength':
+                    valid = !value || hasMinLength(value, rule.length);
+                    errorMessage = rule.message || `Debe tener al menos ${rule.length} caracteres`;
+                    break;
+                    
+                case 'maxLength':
+                    valid = !value || hasMaxLength(value, rule.length);
+                    errorMessage = rule.message || `Debe tener como máximo ${rule.length} caracteres`;
+                    break;
+                    
+                case 'date':
+                    valid = !value || isValidDate(value);
+                    errorMessage = rule.message || 'Fecha inválida';
+                    break;
+                    
+                case 'futureDate':
+                    valid = !value || isFutureDate(value);
+                    errorMessage = rule.message || 'La fecha debe ser futura';
+                    break;
+                    
+                case 'pastDate':
+                    valid = !value || isPastDate(value);
+                    errorMessage = rule.message || 'La fecha debe ser pasada';
+                    break;
+                    
+                case 'password':
+                    valid = !value || isStrongPassword(value, rule.minLength || 8);
+                    errorMessage = rule.message || 'La contraseña no cumple los requisitos mínimos';
+                    break;
+                    
+                case 'inArray':
+                    valid = !value || isInArray(value, rule.array);
+                    errorMessage = rule.message || 'Valor no permitido';
+                    break;
+                    
+                case 'custom':
+                    if (typeof rule.validator === 'function') {
+                        valid = rule.validator(value, formData);
+                        errorMessage = rule.message || 'Valor inválido';
+                    }
+                    break;
+            }
+            
+            // If validation failed, add error and set isValid to false
+            if (!valid) {
+                if (!errors[field]) {
+                    errors[field] = [];
+                }
+                errors[field].push(errorMessage);
                 isValid = false;
             }
         }
     }
     
-    return {
-        isValid,
-        errors
-    };
+    return { isValid, errors };
 }
 
-// Export functions for use in other scripts
-// These will be available globally 
+// Export validation patterns for reuse
+const ValidationPatterns = {
+    EMAIL: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+    PASSWORD: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/,
+    NAME: /^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s'-]{2,50}$/,
+    PHONE: /^(\+?\d{1,3}[- ]?)?\d{10}$/,
+    NUMERIC: /^\d+$/,
+    DATE: /^\d{4}-\d{2}-\d{2}$/
+};
+
+// Export all validators as a global object
+window.validators = {
+    isValidEmail,
+    isNotEmpty,
+    isNumber,
+    isPositive,
+    isInRange,
+    isValidDate,
+    isFutureDate,
+    isPastDate,
+    isStrongPassword,
+    hasMinLength,
+    hasMaxLength,
+    isInArray,
+    validateForm,
+    ValidationPatterns
+};
+
+// Export for module usage
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = window.validators;
+}

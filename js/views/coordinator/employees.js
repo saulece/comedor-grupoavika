@@ -145,7 +145,23 @@ function loadEmployees() {
     // Clear employees list
     currentEmployees = [];
     
-    // Get employees from Firestore usando el servicio centralizado
+    // Usar el servicio de empleados si está disponible
+    if (window.firestoreServices && window.firestoreServices.employee && window.firestoreServices.employee.getEmployeesByDepartment) {
+        window.firestoreServices.employee.getEmployeesByDepartment(departmentId)
+            .then(employees => {
+                currentEmployees = employees;
+                displayEmployees(currentEmployees);
+                showLoadingState(false);
+            })
+            .catch(error => {
+                console.error("Error loading employees:", error);
+                showErrorMessage("Error al cargar la lista de empleados. Por favor intente de nuevo.");
+                showLoadingState(false);
+            });
+        return;
+    }
+    
+    // Implementación de respaldo usando el servicio centralizado
     const employeesCollection = firebaseService.getCollection('employees');
     employeesCollection
         .where('departmentId', '==', departmentId)
@@ -752,6 +768,12 @@ function exportEmployees() {
 
 // Format date for file names (YYYYMMDD)
 function formatDateForFile(date) {
+    // Usar la utilidad compartida si está disponible
+    if (window.DateUtils && window.DateUtils.formatDateForFile) {
+        return window.DateUtils.formatDateForFile(date);
+    }
+    
+    // Implementación de respaldo
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
@@ -760,6 +782,23 @@ function formatDateForFile(date) {
 
 // Validate employee form
 function validateEmployeeForm() {
+    // Usar la utilidad compartida si está disponible
+    if (window.EmployeeUtils && window.EmployeeUtils.validateEmployee) {
+        const employeeData = {
+            name: document.getElementById('employee-name')?.value.trim() || '',
+            email: document.getElementById('employee-email')?.value.trim() || '',
+            departmentId: currentUser.departmentId
+        };
+        
+        const validation = window.EmployeeUtils.validateEmployee(employeeData);
+        if (!validation.isValid) {
+            showErrorMessage(validation.errors[0] || "Error en la validación del empleado.");
+            return false;
+        }
+        return true;
+    }
+    
+    // Implementación de respaldo
     const nameField = document.getElementById('employee-name');
     
     if (!nameField || !nameField.value.trim()) {
@@ -782,6 +821,13 @@ function validateEmployeeForm() {
 
 // Show loading state
 function showLoadingState(isLoading) {
+    // Usar la utilidad compartida si está disponible
+    if (window.UIMessageUtils && window.UIMessageUtils.toggleLoading) {
+        window.UIMessageUtils.toggleLoading(isLoading);
+        return;
+    }
+    
+    // Implementación de respaldo
     const loadingIndicator = document.getElementById('loading-indicator');
     if (loadingIndicator) {
         loadingIndicator.style.display = isLoading ? 'block' : 'none';
@@ -795,6 +841,13 @@ function showLoadingState(isLoading) {
 
 // Show error message
 function showErrorMessage(message) {
+    // Usar la utilidad compartida si está disponible
+    if (window.UIMessageUtils && window.UIMessageUtils.showError) {
+        window.UIMessageUtils.showError(message);
+        return;
+    }
+    
+    // Implementación de respaldo
     const errorAlert = document.getElementById('error-alert');
     if (errorAlert) {
         errorAlert.textContent = message;
@@ -805,8 +858,7 @@ function showErrorMessage(message) {
             errorAlert.style.display = 'none';
         }, 5000);
     } else {
-        // Fallback to alert
-        alert('Error: ' + message);
+        console.error('Error:', message);
     }
 }
 
