@@ -294,20 +294,23 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     
     <!-- Firebase Config - Debe cargarse después de Firebase pero antes de los módulos de utilidad -->
-    <script src="../../js/firebase-config.js"></script>
+    <script src="../../js/services/firebase/firebase-config.js"></script>
     
     <!-- Utility Scripts - Módulos de utilidad en orden de dependencia -->
     <script src="../../js/utils/logger.js"></script>
     <script src="../../js/utils/date-utils.js"></script>
     <script src="../../js/utils/error-handler.js"></script>
-    <script src="../../js/utils/excel-handler.js"></script>
+    <script src="../../js/utils/formatting/excel-handler.js"></script>
+    <script src="../../js/utils/employee-utils.js"></script>
+    <script src="../../js/utils/ui-message-utils.js"></script>
+    <script src="../../js/utils/validation/validators.js"></script>
     
     <!-- Servicios y autenticación -->
-    <script src="../../js/services/firestore.js"></script>
+    <script src="../../js/services/firebase/firebase-service.js"></script>
     <script src="../../js/auth.js"></script>
     
     <!-- Script principal de la página -->
-    <script src="../../js/coordinator/employees-fixed.js"></script>
+    <script src="../../js/views/coordinator/employees.js"></script>
     
     <!-- Script para verificar la carga de XLSX -->
     <script>
