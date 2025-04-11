@@ -283,16 +283,50 @@ function initMenuView(branchId) {
             // Find the day menu, handling possible normalization issues
             let dayMenu = null;
             
+            console.log('Buscando menú para el día:', currentDay);
+            console.log('Menús diarios disponibles:', Object.keys(currentMenu.dailyMenus));
+            
             // First try direct access
             if (currentMenu.dailyMenus[currentDay]) {
+                console.log('Menú encontrado directamente para:', currentDay);
                 dayMenu = currentMenu.dailyMenus[currentDay];
             } else {
                 // Try to find by normalized day name
                 const normalizedCurrentDay = normalizeDayName(currentDay);
+                console.log('Buscando menú para el día normalizado:', normalizedCurrentDay);
+                
                 for (const [day, menu] of Object.entries(currentMenu.dailyMenus)) {
-                    if (normalizeDayName(day) === normalizedCurrentDay) {
+                    const normalizedDay = normalizeDayName(day);
+                    console.log(`Comparando: ${day} (normalizado: ${normalizedDay}) con ${normalizedCurrentDay}`);
+                    
+                    if (normalizedDay === normalizedCurrentDay) {
+                        console.log(`Menú encontrado para ${day} que coincide con ${currentDay}`);
                         dayMenu = menu;
                         break;
+                    }
+                }
+                
+                // Si aún no se encuentra, intentar con una comparación más flexible
+                if (!dayMenu) {
+                    console.log('Intentando búsqueda flexible...');
+                    const dayMap = {
+                        'monday': ['lunes', 'monday'],
+                        'tuesday': ['martes', 'tuesday'],
+                        'wednesday': ['miercoles', 'miércoles', 'wednesday'],
+                        'thursday': ['jueves', 'thursday'],
+                        'friday': ['viernes', 'friday'],
+                        'saturday': ['sabado', 'sábado', 'saturday'],
+                        'sunday': ['domingo', 'sunday']
+                    };
+                    
+                    const possibleMatches = dayMap[currentDay] || [];
+                    for (const [day, menu] of Object.entries(currentMenu.dailyMenus)) {
+                        const normalizedDay = normalizeDayName(day);
+                        if (possibleMatches.includes(normalizedDay)) {
+                            console.log(`Menú encontrado en búsqueda flexible: ${day}`);
+                            dayMenu = menu;
+                            break;
+                        }
                     }
                 }
             }
@@ -711,8 +745,23 @@ function initMenuView(branchId) {
 // Normalize day name to handle accented characters
 function normalizeDayName(dayName) {
     if (!dayName) return '';
-    // Convert to lowercase and remove accents
-    return dayName.toLowerCase()
+    
+    // Mapa de normalización específico para días con acentos
+    const dayMap = {
+        'miércoles': 'miercoles',
+        'sábado': 'sabado',
+        'miÉrcoles': 'miercoles',  // Variante con mayúscula
+        'sÁbado': 'sabado'         // Variante con mayúscula
+    };
+    
+    // Primero intentar con el mapa específico
+    const lowerDay = dayName.toLowerCase();
+    if (dayMap[lowerDay]) {
+        return dayMap[lowerDay];
+    }
+    
+    // Si no está en el mapa, aplicar normalización estándar
+    return lowerDay
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '');
 }

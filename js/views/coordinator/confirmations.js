@@ -2,7 +2,7 @@
 
 document.addEventListener('DOMContentLoaded', () => {
     // Check authentication and role
-    auth.onAuthStateChanged(async (user) => {
+    firebase.auth().onAuthStateChanged(async (user) => {
         if (!user) {
             // Redirect to login if not authenticated
             window.location.href = '../../index.html';
@@ -10,7 +10,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         // Check if user is coordinator
-        const userDoc = await db.collection('users').doc(user.uid).get();
+        const firestore = firebase.firestore();
+        const userDoc = await firestore.collection('users').doc(user.uid).get();
         if (!userDoc.exists || userDoc.data().role !== 'coordinator') {
             // Redirect non-coordinator users
             window.location.href = '../../index.html';
@@ -31,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('userName').textContent = userData.displayName || 'Coordinador';
         
         // Get branch details
-        const branchDoc = await db.collection('branches').doc(userData.branch).get();
+        const branchDoc = await firestore.collection('branches').doc(userData.branch).get();
         if (branchDoc.exists) {
             const branchData = branchDoc.data();
             document.getElementById('branchName').textContent = branchData.name;
