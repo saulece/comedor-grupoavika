@@ -67,19 +67,23 @@
                 <div class="menu-status-container">
                     <div class="menu-status">
                         <h2>Menú Semanal: <span id="weekDates">Cargando...</span></h2>
-                        <div class="status-badge" id="statusBadge">Pendiente</div>
-                    </div>
-                    
-                    <div class="menu-actions">
-                        <button id="createMenuBtn" class="btn btn-primary">
-                            <i class="material-icons">add</i>
-                            Crear Menú
-                        </button>
-                        
-                        <button id="publishMenuBtn" class="btn btn-secondary" disabled>
-                            <i class="material-icons">publish</i>
-                            Publicar Menú
-                        </button>
+                        <div class="menu-actions">
+                            <div class="menu-selector">
+                                <select id="menuSelector" class="form-control">
+                                    <option value="current">Menú Actual</option>
+                                    <option value="next">Próxima Semana</option>
+                                </select>
+                            </div>
+                            <button id="createMenuBtn" class="btn btn-primary">
+                                <i class="material-icons">add</i>
+                                Crear Menú
+                            </button>
+                            <button id="publishMenuBtn" class="btn btn-secondary" disabled>
+                                <i class="material-icons">publish</i>
+                                Publicar Menú
+                            </button>
+                        </div>
+                        <div class="status-badge pending" id="menuStatus">Pendiente</div>
                     </div>
                 </div>
                 

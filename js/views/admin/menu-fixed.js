@@ -43,9 +43,10 @@ document.addEventListener('DOMContentLoaded', () => {
 function initMenuManagement() {
     // DOM elements
     const weekDatesElement = document.getElementById('weekDates');
-    const statusBadgeElement = document.getElementById('statusBadge');
+    const menuStatusElement = document.getElementById('menuStatus');
     const createMenuBtn = document.getElementById('createMenuBtn');
     const publishMenuBtn = document.getElementById('publishMenuBtn');
+    const menuSelector = document.getElementById('menuSelector');
     const saveMenuBtn = document.getElementById('saveMenuBtn');
     const dayTabs = document.querySelectorAll('.day-tab');
     const menuFormMessage = document.getElementById('menuFormMessage');
@@ -61,11 +62,39 @@ function initMenuManagement() {
     const dessertInput = document.getElementById('dessert');
     const vegetarianOptionInput = document.getElementById('vegetarianOption');
     
-    // Current state
-    let currentWeekId = null;
+    // State variables
     let currentDay = 'monday';
+    let currentWeekId = null;
+    let nextWeekId = null;
     let menuData = null;
-    let countdownInterval = null;
+    let nextMenuData = null;
+    let activeMenuType = 'current'; // 'current' or 'next'
+    
+    // Menu selector change event
+    if (menuSelector) {
+        menuSelector.addEventListener('change', () => {
+            activeMenuType = menuSelector.value;
+            console.log('Cambiando a menú:', activeMenuType);
+            
+            if (activeMenuType === 'current') {
+                // Switch to current menu
+                if (currentWeekId) {
+                    displayMenuData(currentWeekId, menuData);
+                } else {
+                    // No current menu, show empty state
+                    showEmptyState('No hay menú para la semana actual.');
+                }
+            } else {
+                // Switch to next week menu
+                if (nextWeekId) {
+                    displayMenuData(nextWeekId, nextMenuData);
+                } else {
+                    // No next week menu, show empty state
+                    showEmptyState('No hay menú creado para la próxima semana.');
+                }
+            }
+        });
+    }
     
     // Get current menu or create a new one
     loadCurrentMenu();
@@ -73,189 +102,213 @@ function initMenuManagement() {
     // Event listeners for day tabs
     dayTabs.forEach(tab => {
         tab.addEventListener('click', () => {
-            // Deactivate all tabs
-            dayTabs.forEach(t => t.classList.remove('active'));
+            // Update current day
+            currentDay = tab.dataset.day;
             
-            // Activate clicked tab
+            // Update active tab
+            dayTabs.forEach(t => t.classList.remove('active'));
             tab.classList.add('active');
             
-            // Update current day and load day menu
-            currentDay = tab.dataset.day;
+            // Load day menu
             loadDayMenu();
+            
+            console.log('Día seleccionado:', currentDay);
         });
     });
     
     // Save menu button
-    saveMenuBtn.addEventListener('click', async () => {
-        if (!currentWeekId || !currentDay) return;
-        
-        try {
-            // Validate inputs
-            if (!mainDishInput.value.trim()) {
-                showMessage('Por favor ingrese el platillo principal.', 'error');
-                return;
-            }
-            
-            // Prepare menu data
-            const dayMenuData = {
-                mainDish: mainDishInput.value.trim(),
-                sideDish: sideDishInput.value.trim(),
-                dessert: dessertInput.value.trim(),
-                vegetarianOption: vegetarianOptionInput.value.trim()
-            };
-            
-            // Check if the document exists first
-            const docRef = db.collection('weeklyMenus').doc(currentWeekId)
-                .collection('dailyMenus').doc(currentDay);
-            
-            const docSnapshot = await docRef.get();
-            
-            if (docSnapshot.exists) {
-                // Update existing document
-                await docRef.update(dayMenuData);
-            } else {
-                // Create new document with date field
-                const dayDate = new Date(menuData.startDate.toDate());
-                const dayIndex = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].indexOf(currentDay);
-                if (dayIndex !== -1) {
-                    dayDate.setDate(dayDate.getDate() + dayIndex);
-                }
-                
-                await docRef.set({
-                    ...dayMenuData,
-                    date: firebase.firestore.Timestamp.fromDate(dayDate)
-                });
-            }
-            
-            showMessage('Menú guardado correctamente.', 'success');
-            
-            // Update local data
-            if (menuData && menuData.dailyMenus) {
-                menuData.dailyMenus[currentDay] = dayMenuData;
-            }
-            
-            // Check if all days have a main dish
-            checkMenuCompleteness();
-        } catch (error) {
-            console.error('Error saving menu:', error);
-            showMessage('Error al guardar el menú. Intente nuevamente.', 'error');
-        }
-    });
+    saveMenuBtn.addEventListener('click', saveDayMenu);
     
     // Create menu button
     createMenuBtn.addEventListener('click', async () => {
+        // Show modal
+        createMenuModal.style.display = 'block';
+        
+        // Set default date to today
+        const today = new Date();
+        menuStartDateInput.valueAsDate = today;
+        
+        // Clear error message
+        createMenuError.textContent = '';
+        createMenuError.style.display = 'none';
+    });
+    
+    // Close modal button
+    closeModalBtn.addEventListener('click', () => {
+        createMenuModal.style.display = 'none';
+    });
+    
+    // Cancel create menu button
+    cancelCreateMenuBtn.addEventListener('click', () => {
+        createMenuModal.style.display = 'none';
+    });
+    
+    // Confirm create menu button
+    createMenuForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
         try {
-            // Show create menu modal
-            createMenuModal.style.display = 'flex';
+            // Get selected date
+            const selectedDate = menuStartDateInput.valueAsDate;
             
-            // Set default date to next Monday
-            const nextMonday = getNextMonday();
-            menuStartDateInput.value = formatDateYMD(nextMonday);
-            menuStartDateInput.min = formatDateYMD(new Date()); // Prevent past dates
-            
-            // Clear previous error
-            if (createMenuError) {
-                createMenuError.textContent = '';
-                createMenuError.style.display = 'none';
-            }
-        } catch (error) {
-            console.error('Error showing create menu modal:', error);
-        }
-    });
-    
-    // Close modal when clicking on X
-    if (closeModalBtn) {
-        closeModalBtn.addEventListener('click', () => {
-            createMenuModal.style.display = 'none';
-        });
-    }
-    
-    // Close modal when clicking on Cancel button
-    if (cancelCreateMenuBtn) {
-        cancelCreateMenuBtn.addEventListener('click', () => {
-            createMenuModal.style.display = 'none';
-        });
-    }
-    
-    // Close modal when clicking outside of it
-    window.addEventListener('click', (event) => {
-        if (event.target === createMenuModal) {
-            createMenuModal.style.display = 'none';
-        }
-    });
-    
-    // Create menu form submit
-    if (createMenuForm) {
-        createMenuForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const startDateStr = menuStartDateInput.value;
-            
-            if (!startDateStr) {
-                if (createMenuError) {
-                    createMenuError.textContent = 'Por favor seleccione una fecha de inicio.';
-                    createMenuError.style.display = 'block';
-                } else {
-                    alert('Por favor seleccione una fecha de inicio.');
-                }
+            if (!selectedDate) {
+                createMenuError.textContent = 'Por favor seleccione una fecha de inicio.';
+                createMenuError.style.display = 'block';
                 return;
             }
             
-            try {
-                // Show loading state
-                createMenuBtn.disabled = true;
-                confirmCreateMenuBtn.disabled = true;
-                confirmCreateMenuBtn.innerHTML = '<span class="spinner"></span> Creando...';
-                
-                // Create weekly menu
-                await createWeeklyMenu(startDateStr);
-                
-                // Close modal and reload menu
-                createMenuModal.style.display = 'none';
-                createMenuBtn.disabled = false;
-                confirmCreateMenuBtn.disabled = false;
-                confirmCreateMenuBtn.innerHTML = 'Crear Menú';
-                
-                // Show success message
-                showMessage('Menú creado correctamente.', 'success');
-                
-                // Reload menu
-                loadCurrentMenu();
-            } catch (error) {
-                console.error('Error creating menu:', error);
-                
-                if (createMenuError) {
-                    createMenuError.textContent = error.message || 'Error al crear el menú. Intente nuevamente.';
-                    createMenuError.style.display = 'block';
-                } else {
-                    alert('Error al crear el menú: ' + error.message);
-                }
-                
-                createMenuBtn.disabled = false;
-                confirmCreateMenuBtn.disabled = false;
-                confirmCreateMenuBtn.innerHTML = 'Crear Menú';
+            // Determine if we're creating for current or next week based on the active menu type
+            const targetWeek = activeMenuType;
+            console.log(`Creando menú para la ${targetWeek === 'current' ? 'semana actual' : 'próxima semana'}`);
+            
+            // Calculate the Monday of the selected week
+            const monday = new Date(selectedDate);
+            const dayOfWeek = monday.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+            
+            // Adjust to previous Monday
+            monday.setDate(monday.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+            
+            // Set time to midnight
+            monday.setHours(0, 0, 0, 0);
+            
+            console.log('Fecha de inicio seleccionada:', selectedDate);
+            console.log('Lunes calculado:', monday);
+            
+            // Check if a menu already exists for this week
+            const existingMenuQuery = await db.collection('weeklyMenus')
+                .where('startDate', '==', firebase.firestore.Timestamp.fromDate(monday))
+                .get();
+            
+            if (!existingMenuQuery.empty) {
+                createMenuError.textContent = 'Ya existe un menú para esta semana. Por favor seleccione otra fecha.';
+                createMenuError.style.display = 'block';
+                return;
             }
-        });
-    } else {
-        console.error('Error: createMenuForm not found');
-    }
+            
+            // Create new menu
+            const newMenuRef = await db.collection('weeklyMenus').add({
+                startDate: firebase.firestore.Timestamp.fromDate(monday),
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                createdBy: auth.currentUser.uid,
+                status: 'pending',
+                totalEmployees: 0,
+                confirmedEmployees: 0
+            });
+            
+            console.log('Nuevo menú creado con ID:', newMenuRef.id);
+            
+            // Create empty daily menus
+            const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+            const batch = db.batch();
+            
+            days.forEach((day, index) => {
+                const dayDate = new Date(monday);
+                dayDate.setDate(dayDate.getDate() + index);
+                
+                const dayMenuRef = db.collection('weeklyMenus')
+                    .doc(newMenuRef.id)
+                    .collection('dailyMenus')
+                    .doc(day);
+                
+                batch.set(dayMenuRef, {
+                    date: firebase.firestore.Timestamp.fromDate(dayDate),
+                    mainDish: '',
+                    sideDish: '',
+                    dessert: '',
+                    vegetarianOption: '',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            });
+            
+            await batch.commit();
+            console.log('Menús diarios creados');
+            
+            // Close modal
+            createMenuModal.style.display = 'none';
+            
+            // Show success message
+            showMessage('Menú creado correctamente.', 'success');
+            
+            // Reload menu data
+            await loadCurrentMenu();
+            
+            // Set the menu selector to the type we just created
+            menuSelector.value = targetWeek;
+            
+            // Trigger the change event to display the correct menu
+            const changeEvent = new Event('change');
+            menuSelector.dispatchEvent(changeEvent);
+        } catch (error) {
+            console.error('Error creating menu:', error);
+            createMenuError.textContent = 'Error al crear el menú. Intente nuevamente.';
+            createMenuError.style.display = 'block';
+        }
+    });
     
     // Publish menu button
     publishMenuBtn.addEventListener('click', async () => {
-        if (!currentWeekId) return;
-        
         try {
-            // Update menu status to in-progress
-            await db.collection('weeklyMenus').doc(currentWeekId).update({
-                status: 'in-progress',
-                publishedBy: auth.currentUser.uid,
+            // Determine which menu ID to use based on active menu type
+            const activeMenuId = activeMenuType === 'current' ? currentWeekId : nextWeekId;
+            const activeMenuData = activeMenuType === 'current' ? menuData : nextMenuData;
+            
+            if (!activeMenuId || !activeMenuData) {
+                console.log('No hay un menú activo para publicar');
+                showMessage('No hay un menú para publicar.', 'error');
+                return;
+            }
+            
+            // Check if menu is complete
+            const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+            let isComplete = true;
+            
+            for (const day of days) {
+                const dayMenu = activeMenuData.dailyMenus[day];
+                if (!dayMenu || !dayMenu.mainDish || dayMenu.mainDish.trim() === '') {
+                    isComplete = false;
+                    break;
+                }
+            }
+            
+            if (!isComplete) {
+                showMessage('Para publicar el menú, debe completar el platillo principal para todos los días.', 'warning');
+                return;
+            }
+            
+            // Confirm publish
+            if (!confirm('¿Está seguro de publicar este menú? Una vez publicado, no podrá modificarlo.')) {
+                return;
+            }
+            
+            console.log(`Publicando menú ${activeMenuType}...`);
+            
+            // Update menu status
+            await db.collection('weeklyMenus').doc(activeMenuId).update({
+                status: 'published',
                 publishedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
             
-            // Reload menu data
-            loadCurrentMenu();
+            console.log('Menú publicado correctamente');
             
-            showMessage('Menú publicado correctamente. Los coordinadores ya pueden realizar confirmaciones.', 'success');
+            // Update local data
+            if (activeMenuType === 'current' && menuData) {
+                menuData.status = 'published';
+                menuData.publishedAt = new Date();
+            } else if (activeMenuType === 'next' && nextMenuData) {
+                nextMenuData.status = 'published';
+                nextMenuData.publishedAt = new Date();
+            }
+            
+            // Update UI
+            displayMenuDetails(activeMenuType === 'current' ? menuData : nextMenuData);
+            
+            // Disable form
+            toggleFormEditable(false);
+            
+            // Disable publish button
+            publishMenuBtn.disabled = true;
+            
+            showMessage('Menú publicado correctamente. Los empleados ahora pueden verlo.', 'success');
         } catch (error) {
             console.error('Error publishing menu:', error);
             showMessage('Error al publicar el menú. Intente nuevamente.', 'error');
@@ -265,24 +318,75 @@ function initMenuManagement() {
     // Load current menu data
     async function loadCurrentMenu() {
         try {
+            console.log('Cargando menús...');
+            
+            // Reset current state
+            currentWeekId = null;
+            nextWeekId = null;
+            menuData = null;
+            nextMenuData = null;
+            
             // Get current date
             const today = new Date();
             
-            // Query for the most recent menu
+            // Query for all menus, ordered by start date
+            console.log('Buscando menús...');
             const menuSnapshot = await db.collection('weeklyMenus')
                 .orderBy('startDate', 'desc')
-                .limit(1)
+                .limit(5) // Get more menus to find current and next week
                 .get();
             
-            if (!menuSnapshot.empty) {
-                const menuDoc = menuSnapshot.docs[0];
-                currentWeekId = menuDoc.id;
-                menuData = menuDoc.data();
+            console.log('Menús encontrados:', menuSnapshot.size);
+            
+            if (menuSnapshot.empty) {
+                console.log('No se encontraron menús');
+                showEmptyState('No hay ningún menú creado. Utilice el botón "Crear Menú" para crear uno nuevo.');
+                return;
+            }
+            
+            // Find current and next week menus
+            const menus = menuSnapshot.docs.map(doc => {
+                return {
+                    id: doc.id,
+                    data: doc.data(),
+                    startDate: doc.data().startDate.toDate()
+                };
+            });
+            
+            // Sort menus by start date (ascending)
+            menus.sort((a, b) => a.startDate - b.startDate);
+            
+            // Find current week menu (the menu with start date closest to today but not in the future)
+            const currentWeekMenu = menus.find(menu => {
+                const menuStartDate = menu.startDate;
+                const menuEndDate = new Date(menuStartDate);
+                menuEndDate.setDate(menuEndDate.getDate() + 6); // End date is 6 days after start date
                 
-                // Load menu details
-                displayMenuDetails();
+                return today >= menuStartDate && today <= menuEndDate;
+            });
+            
+            // Find next week menu (the menu with start date after current week end date)
+            let nextWeekMenu = null;
+            
+            if (currentWeekMenu) {
+                const currentWeekEndDate = new Date(currentWeekMenu.startDate);
+                currentWeekEndDate.setDate(currentWeekEndDate.getDate() + 6);
                 
-                // Load daily menus
+                nextWeekMenu = menus.find(menu => menu.startDate > currentWeekEndDate);
+            } else {
+                // If no current week menu, next week menu is the first menu with start date in the future
+                nextWeekMenu = menus.find(menu => menu.startDate > today);
+            }
+            
+            console.log('Menú semana actual:', currentWeekMenu);
+            console.log('Menú próxima semana:', nextWeekMenu);
+            
+            // Set current week menu
+            if (currentWeekMenu) {
+                currentWeekId = currentWeekMenu.id;
+                menuData = currentWeekMenu.data;
+                
+                // Load daily menus for current week
                 const dailyMenusSnapshot = await db.collection('weeklyMenus')
                     .doc(currentWeekId)
                     .collection('dailyMenus')
@@ -293,37 +397,87 @@ function initMenuManagement() {
                 dailyMenusSnapshot.forEach(doc => {
                     menuData.dailyMenus[doc.id] = doc.data();
                 });
-                
-                // Load first day menu
-                loadDayMenu();
-                
-                // Check menu completeness
-                checkMenuCompleteness();
-                
-                // Start countdown timer if in-progress
-                startCountdownTimer();
-                
-                // Always enable create menu button
-                createMenuBtn.disabled = false;
-            } else {
-                // No menu found, hide form
-                document.getElementById('menuForm').innerHTML = `
-                    <div class="empty-state">
-                        <p>No hay ningún menú creado para esta semana.</p>
-                        <p>Utilice el botón "Crear Menú" para crear uno nuevo.</p>
-                    </div>
-                `;
-                
-                weekDatesElement.textContent = 'Sin menú';
-                statusBadgeElement.textContent = 'No Creado';
-                statusBadgeElement.className = 'status-badge pending';
-                
-                // Reset stats
-                updateStats(0, 0);
-                
-                // Enable create menu button
-                createMenuBtn.disabled = false;
             }
+            
+            // Set next week menu
+            if (nextWeekMenu) {
+                nextWeekId = nextWeekMenu.id;
+                nextMenuData = nextWeekMenu.data;
+                
+                // Load daily menus for next week
+                const nextDailyMenusSnapshot = await db.collection('weeklyMenus')
+                    .doc(nextWeekId)
+                    .collection('dailyMenus')
+                    .get();
+                
+                nextMenuData.dailyMenus = {};
+                
+                nextDailyMenusSnapshot.forEach(doc => {
+                    nextMenuData.dailyMenus[doc.id] = doc.data();
+                });
+            }
+            
+            // Display menu based on active menu type
+            if (activeMenuType === 'current') {
+                if (currentWeekId) {
+                    // Display current week menu
+                    displayMenuDetails(menuData);
+                    
+                    // Set current day to Monday by default if not set
+                    if (!currentDay) {
+                        currentDay = 'monday';
+                        
+                        // Highlight Monday tab
+                        dayTabs.forEach(tab => {
+                            if (tab.dataset.day === 'monday') {
+                                tab.classList.add('active');
+                            } else {
+                                tab.classList.remove('active');
+                            }
+                        });
+                    }
+                    
+                    // Load first day menu
+                    loadDayMenu();
+                    
+                    // Check menu completeness
+                    checkMenuCompleteness();
+                } else {
+                    // No current week menu
+                    showEmptyState('No hay menú para la semana actual. Utilice el botón "Crear Menú" para crear uno nuevo.');
+                }
+            } else {
+                if (nextWeekId) {
+                    // Display next week menu
+                    displayMenuDetails(nextMenuData);
+                    
+                    // Set current day to Monday by default if not set
+                    if (!currentDay) {
+                        currentDay = 'monday';
+                        
+                        // Highlight Monday tab
+                        dayTabs.forEach(tab => {
+                            if (tab.dataset.day === 'monday') {
+                                tab.classList.add('active');
+                            } else {
+                                tab.classList.remove('active');
+                            }
+                        });
+                    }
+                    
+                    // Load first day menu
+                    loadDayMenu();
+                    
+                    // Check menu completeness
+                    checkMenuCompleteness();
+                } else {
+                    // No next week menu
+                    showEmptyState('No hay menú creado para la próxima semana. Utilice el botón "Crear Menú" para crear uno nuevo.');
+                }
+            }
+            
+            // Always enable create menu button
+            createMenuBtn.disabled = false;
         } catch (error) {
             console.error('Error loading menu:', error);
             showMessage('Error al cargar los datos del menú.', 'error');
@@ -334,8 +488,13 @@ function initMenuManagement() {
     }
     
     // Display menu details
-    function displayMenuDetails() {
-        if (!menuData) return;
+    function displayMenuDetails(menuData) {
+        if (!menuData) {
+            console.log('No hay datos de menú para mostrar');
+            return;
+        }
+        
+        console.log('Mostrando detalles del menú...');
         
         // Format dates
         const startDate = menuData.startDate.toDate();
@@ -343,11 +502,15 @@ function initMenuManagement() {
         endDate.setDate(endDate.getDate() + 6); // Add 6 days to get to Sunday
         
         // Display date range
-        weekDatesElement.textContent = `${formatDateDMY(startDate)} al ${formatDateDMY(endDate)}`;
+        const dateRange = `${formatDateDMY(startDate)} al ${formatDateDMY(endDate)}`;
+        weekDatesElement.textContent = dateRange;
+        console.log('Rango de fechas:', dateRange);
         
         // Display status
-        statusBadgeElement.textContent = getStatusText(menuData.status);
-        statusBadgeElement.className = `status-badge ${menuData.status}`;
+        const statusText = getStatusText(menuData.status);
+        menuStatusElement.textContent = statusText;
+        menuStatusElement.className = `status-badge ${menuData.status}`;
+        console.log('Estado del menú:', statusText);
         
         // Enable/disable publish button based on status
         publishMenuBtn.disabled = menuData.status !== 'pending';
@@ -361,13 +524,29 @@ function initMenuManagement() {
     
     // Load day menu
     function loadDayMenu() {
-        if (!menuData || !menuData.dailyMenus || !menuData.dailyMenus[currentDay]) {
-            // Clear form
+        console.log('Cargando menú del día:', currentDay);
+        
+        // Determine which menu data to use based on active menu type
+        const activeMenuId = activeMenuType === 'current' ? currentWeekId : nextWeekId;
+        const activeMenuData = activeMenuType === 'current' ? menuData : nextMenuData;
+        
+        console.log('Tipo de menú activo:', activeMenuType);
+        console.log('ID del menú activo:', activeMenuId);
+        
+        if (!activeMenuData || !activeMenuData.dailyMenus) {
+            console.log('No hay datos de menú disponibles');
             clearMenuForm();
             return;
         }
         
-        const dayMenu = menuData.dailyMenus[currentDay];
+        if (!activeMenuData.dailyMenus[currentDay]) {
+            console.log(`No se encontró el menú para el día ${currentDay}`);
+            clearMenuForm();
+            return;
+        }
+        
+        const dayMenu = activeMenuData.dailyMenus[currentDay];
+        console.log('Datos del menú del día:', dayMenu);
         
         // Fill form
         mainDishInput.value = dayMenu.mainDish || '';
@@ -375,9 +554,12 @@ function initMenuManagement() {
         dessertInput.value = dayMenu.dessert || '';
         vegetarianOptionInput.value = dayMenu.vegetarianOption || '';
         
+        console.log('Formulario completado con los datos del día');
+        
         // Disable form if menu is not in pending status
-        const isEditable = menuData.status === 'pending';
+        const isEditable = activeMenuData.status === 'pending';
         toggleFormEditable(isEditable);
+        console.log('Estado de edición del formulario:', isEditable ? 'Editable' : 'No editable');
     }
     
     // Clear menu form
@@ -399,23 +581,43 @@ function initMenuManagement() {
     
     // Check if menu is complete to enable publish button
     function checkMenuCompleteness() {
-        if (!menuData || !menuData.dailyMenus || menuData.status !== 'pending') return;
+        // Determine which menu data to use based on active menu type
+        const activeMenuData = activeMenuType === 'current' ? menuData : nextMenuData;
         
-        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-        let isComplete = true;
-        
-        for (const day of days) {
-            const dayMenu = menuData.dailyMenus[day];
-            if (!dayMenu || !dayMenu.mainDish || dayMenu.mainDish.trim() === '') {
-                isComplete = false;
-                break;
-            }
+        if (!activeMenuData || !activeMenuData.dailyMenus) {
+            console.log('No hay datos de menú para verificar completitud');
+            return;
         }
         
-        publishMenuBtn.disabled = !isComplete;
+        console.log('Verificando completitud del menú:', activeMenuType);
         
-        if (!isComplete && publishMenuBtn.disabled) {
-            showMessage('Para publicar el menú, debe completar el platillo principal para todos los días.', 'info');
+        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        let completedDays = 0;
+        
+        days.forEach(day => {
+            const dayMenu = activeMenuData.dailyMenus[day];
+            if (dayMenu && dayMenu.mainDish && dayMenu.mainDish.trim() !== '') {
+                completedDays++;
+            }
+        });
+        
+        console.log(`Días completados: ${completedDays}/${days.length}`);
+        
+        // Update stats
+        updateStats(days.length, completedDays);
+        
+        // Enable/disable publish button based on completeness and status
+        const isComplete = completedDays === days.length;
+        const isPending = activeMenuData.status === 'pending';
+        
+        publishMenuBtn.disabled = !isComplete || !isPending;
+        
+        if (!isComplete && isPending) {
+            publishMenuBtn.title = 'Debe completar todos los días del menú para publicarlo';
+        } else if (!isPending) {
+            publishMenuBtn.title = 'Este menú ya ha sido publicado';
+        } else {
+            publishMenuBtn.title = 'Publicar menú';
         }
     }
     
@@ -498,113 +700,71 @@ function initMenuManagement() {
         }, 5000);
     }
     
-    // Create a new weekly menu
-    async function createWeeklyMenu(startDateStr) {
+    // Save day menu
+    async function saveDayMenu() {
         try {
-            const selectedDate = new Date(startDateStr);
+            // Determine which menu ID to use based on active menu type
+            const activeMenuId = activeMenuType === 'current' ? currentWeekId : nextWeekId;
             
-            // Ajustar la fecha para que el lunes sea el primer día de la semana
-            // Si la fecha seleccionada no es lunes, encontramos el lunes de esa semana
-            const dayOfWeek = selectedDate.getDay(); // 0 = domingo, 1 = lunes, ..., 6 = sábado
-            const startDate = new Date(selectedDate);
-            
-            // Si es domingo (0), retrocedemos 6 días para llegar al lunes anterior
-            // Si es otro día, retrocedemos (dayOfWeek - 1) días
-            const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-            startDate.setDate(startDate.getDate() - daysToSubtract);
-            startDate.setHours(0, 0, 0, 0);
-            
-            console.log('Fecha seleccionada:', formatDateDMY(selectedDate), 'día de la semana:', dayOfWeek);
-            console.log('Fecha de inicio ajustada (lunes):', formatDateDMY(startDate));
-            
-            const weekId = formatDateYMD(startDate);
-            
-            console.log('Creating menu for week:', weekId);
-            
-            // Check if menu already exists
-            const existingMenu = await db.collection('weeklyMenus').doc(weekId).get();
-            
-            if (existingMenu.exists) {
-                throw new Error('Ya existe un menú para esta semana.');
+            if (!activeMenuId) {
+                console.log('No hay un menú activo para guardar');
+                showMessage('No hay un menú para guardar.', 'error');
+                return;
             }
             
-            // Get total employees count
-            const employeesSnapshot = await db.collection('employees')
-                .where('active', '==', true)
-                .get();
+            console.log(`Guardando menú del día ${currentDay} para el menú ${activeMenuType}`);
             
-            const totalEmployees = employeesSnapshot.size;
+            // Get form values
+            const mainDish = mainDishInput.value.trim();
+            const sideDish = sideDishInput.value.trim();
+            const dessert = dessertInput.value.trim();
+            const vegetarianOption = vegetarianOptionInput.value.trim();
             
-            // Get app settings for confirmation window
-            const settingsSnapshot = await db.collection('settings').doc('appSettings').get();
-            let confirmStartTime, confirmEndTime;
-            
-            if (settingsSnapshot.exists) {
-                const settings = settingsSnapshot.data();
-                
-                // Calculate confirmation start and end times based on settings
-                confirmStartTime = new Date(startDate);
-                confirmStartTime.setDate(confirmStartTime.getDate() - 4); // Thursday before the week
-                confirmStartTime.setHours(16, 10, 0, 0); // 16:10
-                
-                confirmEndTime = new Date(startDate);
-                confirmEndTime.setDate(confirmEndTime.getDate() - 2); // Saturday before the week
-                confirmEndTime.setHours(10, 0, 0, 0); // 10:00
-            } else {
-                // Default times if settings don't exist
-                confirmStartTime = new Date(startDate);
-                confirmStartTime.setDate(confirmStartTime.getDate() - 4); // Thursday
-                confirmStartTime.setHours(16, 10, 0, 0); // 16:10
-                
-                confirmEndTime = new Date(startDate);
-                confirmEndTime.setDate(confirmEndTime.getDate() - 2); // Saturday
-                confirmEndTime.setHours(10, 0, 0, 0); // 10:00
+            // Validate form
+            if (!mainDish || !sideDish || !dessert) {
+                showMessage('Por favor complete todos los campos obligatorios.', 'error');
+                return;
             }
             
-            console.log('Creating weekly menu document...');
+            // Save to Firestore
+            await db.collection('weeklyMenus')
+                .doc(activeMenuId)
+                .collection('dailyMenus')
+                .doc(currentDay)
+                .set({
+                    mainDish,
+                    sideDish,
+                    dessert,
+                    vegetarianOption,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
             
-            // Create weeklyMenu document
-            await db.collection('weeklyMenus').doc(weekId).set({
-                startDate: firebase.firestore.Timestamp.fromDate(startDate),
-                status: 'pending',
-                confirmStartDate: firebase.firestore.Timestamp.fromDate(confirmStartTime),
-                confirmEndDate: firebase.firestore.Timestamp.fromDate(confirmEndTime),
-                totalEmployees,
-                confirmedEmployees: 0,
-                createdBy: auth.currentUser.uid,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
+            console.log(`Menú del día ${currentDay} guardado correctamente`);
             
-            console.log('Creating daily menus...');
-            
-            // Create dailyMenus subcollection - use individual set operations instead of batch
-            const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-            
-            // Create each day document individually to ensure they are all created
-            for (let i = 0; i < days.length; i++) {
-                const day = days[i];
-                const dayDate = new Date(startDate);
-                dayDate.setDate(dayDate.getDate() + i);
-                
-                console.log(`Creating day document for ${day} (${formatDateDMY(dayDate)})`);
-                
-                await db.collection('weeklyMenus')
-                    .doc(weekId)
-                    .collection('dailyMenus')
-                    .doc(day)
-                    .set({
-                        date: firebase.firestore.Timestamp.fromDate(dayDate),
-                        mainDish: '',
-                        sideDish: '',
-                        dessert: '',
-                        vegetarianOption: ''
-                    });
+            // Update local data
+            if (activeMenuType === 'current' && menuData && menuData.dailyMenus) {
+                menuData.dailyMenus[currentDay] = {
+                    mainDish,
+                    sideDish,
+                    dessert,
+                    vegetarianOption
+                };
+            } else if (activeMenuType === 'next' && nextMenuData && nextMenuData.dailyMenus) {
+                nextMenuData.dailyMenus[currentDay] = {
+                    mainDish,
+                    sideDish,
+                    dessert,
+                    vegetarianOption
+                };
             }
             
-            console.log('Weekly menu created successfully!');
+            // Check menu completeness
+            checkMenuCompleteness();
+            
+            showMessage('Menú guardado correctamente.', 'success');
         } catch (error) {
-            console.error('Error in createWeeklyMenu:', error);
-            throw error;
+            console.error('Error saving day menu:', error);
+            showMessage('Error al guardar el menú.', 'error');
         }
     }
 }
@@ -660,4 +820,64 @@ function getStatusText(status) {
         default:
             return 'Desconocido';
     }
+}
+
+// Display empty state
+function showEmptyState(message) {
+    document.getElementById('menuForm').innerHTML = `
+        <div class="empty-state">
+            <p>${message}</p>
+        </div>
+    `;
+}
+
+// Display menu data
+function displayMenuData(weekId, menuData) {
+    // Update menu details
+    displayMenuDetails(menuData);
+    
+    // Load daily menus
+    console.log('Cargando menús diarios...');
+    const dailyMenusSnapshot = db.collection('weeklyMenus')
+        .doc(weekId)
+        .collection('dailyMenus')
+        .get();
+    
+    console.log('Menús diarios encontrados:', dailyMenusSnapshot.size);
+    
+    menuData.dailyMenus = {};
+    
+    dailyMenusSnapshot.forEach(doc => {
+        console.log(`Menú diario ${doc.id}:`, doc.data());
+        menuData.dailyMenus[doc.id] = doc.data();
+    });
+    
+    // Set current day to Monday by default if not set
+    if (!currentDay) {
+        currentDay = 'monday';
+        
+        // Highlight Monday tab
+        dayTabs.forEach(tab => {
+            if (tab.dataset.day === 'monday') {
+                tab.classList.add('active');
+            } else {
+                tab.classList.remove('active');
+            }
+        });
+    }
+    
+    // Load first day menu
+    loadDayMenu();
+    
+    // Check menu completeness
+    checkMenuCompleteness();
+    
+    // Start countdown timer if in-progress
+    startCountdownTimer();
+    
+    // Show menu form
+    document.getElementById('menuForm').style.display = 'block';
+    
+    // Always enable create menu button
+    createMenuBtn.disabled = false;
 }
