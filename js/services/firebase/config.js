@@ -11,13 +11,40 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-firebase.initializeApp(firebaseConfig);
-
-// Initialize services
-const auth = firebase.auth();
-const db = firebase.firestore();
-
-// Optional: Initialize Analytics
-const analytics = firebase.analytics ? firebase.analytics() : null;
-
-console.log("Firebase initialized");
+try {
+    // Verificar si Firebase ya está inicializado para evitar inicializaciones múltiples
+    if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+        console.log("Firebase inicializado correctamente");
+    } else {
+        console.log("Firebase ya estaba inicializado");
+    }
+    
+    // Initialize services
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    
+    // Configurar persistencia para mejorar la experiencia offline
+    db.enablePersistence({ synchronizeTabs: true })
+        .catch(err => {
+            if (err.code === 'failed-precondition') {
+                // Múltiples pestañas abiertas, la persistencia solo puede habilitarse en una pestaña a la vez
+                console.warn('La persistencia de Firebase no pudo habilitarse: múltiples pestañas abiertas');
+            } else if (err.code === 'unimplemented') {
+                // El navegador actual no soporta todas las características necesarias
+                console.warn('La persistencia de Firebase no está disponible en este navegador');
+            }
+        });
+    
+    // Optional: Initialize Analytics
+    const analytics = firebase.analytics ? firebase.analytics() : null;
+    
+    // Hacer que las variables estén disponibles globalmente
+    window.auth = auth;
+    window.db = db;
+    window.analytics = analytics;
+    
+} catch (error) {
+    console.error("Error al inicializar Firebase:", error);
+    alert("Error al conectar con el servidor. Por favor, recargue la página o inténtelo más tarde.");
+}

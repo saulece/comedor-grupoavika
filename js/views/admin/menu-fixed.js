@@ -543,12 +543,17 @@ function initMenuManagement() {
         const normalizedCurrentDay = normalizeDayName(currentDay);
         let dayKey = currentDay;
         
+        console.log(`Día actual: ${currentDay}, Día normalizado: ${normalizedCurrentDay}`);
+        console.log('Días disponibles en el menú:', Object.keys(activeMenuData.dailyMenus).join(', '));
+        
         // Check if we need to find the day with a different key due to accents
         if (!activeMenuData.dailyMenus[currentDay]) {
             console.log(`Buscando menú para el día ${currentDay} usando normalización`);
             // Try to find the day using normalized comparison
             for (const day in activeMenuData.dailyMenus) {
-                if (normalizeDayName(day) === normalizedCurrentDay) {
+                const normalizedDay = normalizeDayName(day);
+                console.log(`Comparando: ${day} (normalizado: ${normalizedDay}) con ${normalizedCurrentDay}`);
+                if (normalizedDay === normalizedCurrentDay) {
                     dayKey = day;
                     console.log(`Día encontrado con clave: ${dayKey}`);
                     break;
@@ -748,7 +753,8 @@ function initMenuManagement() {
             let dayKey = currentDay;
             
             // Check if we need to find the day with a different key due to accents
-            const dailyMenusRef = db.collection('weeklyMenus').doc(activeMenuId).collection('dailyMenus');
+            const firestore = firebase.firestore();
+            const dailyMenusRef = firestore.collection('weeklyMenus').doc(activeMenuId).collection('dailyMenus');
             const dailyMenusSnapshot = await dailyMenusRef.get();
             
             // Try to find the day using normalized comparison if it doesn't exist directly
@@ -765,8 +771,8 @@ function initMenuManagement() {
                 }
             }
             
-            // Save to Firestore
-            await db.collection('weeklyMenus')
+            // Save to Firestore usando la misma instancia de firestore
+            await firestore.collection('weeklyMenus')
                 .doc(activeMenuId)
                 .collection('dailyMenus')
                 .doc(dayKey)
@@ -775,6 +781,9 @@ function initMenuManagement() {
                     sideDish,
                     dessert,
                     vegetarianOption,
+                    date: new Date(), // Agregar fecha para mejor ordenamiento
+                    day: dayKey, // Guardar el nombre del día para referencia
+                    normalizedDay: normalizedCurrentDay, // Guardar el nombre normalizado para búsquedas
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
             
@@ -880,13 +889,14 @@ function showEmptyState(message) {
 }
 
 // Display menu data
-function displayMenuData(weekId, menuData) {
+async function displayMenuData(weekId, menuData) {
     // Update menu details
     displayMenuDetails(menuData);
     
     // Load daily menus
     console.log('Cargando menús diarios...');
-    const dailyMenusSnapshot = db.collection('weeklyMenus')
+    const firestore = firebase.firestore();
+    const dailyMenusSnapshot = await firestore.collection('weeklyMenus')
         .doc(weekId)
         .collection('dailyMenus')
         .get();

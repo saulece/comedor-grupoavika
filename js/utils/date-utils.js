@@ -124,6 +124,28 @@ function formatTime(date) {
     return `${hours}:${minutes}`;
 }
 
+/**
+ * Normaliza el nombre del día eliminando acentos y convirtiendo a minúsculas
+ * @param {string} dayName - Nombre del día
+ * @returns {string} Nombre del día normalizado
+ */
+function normalizeDayName(dayName) {
+    if (!dayName) return '';
+    // Convertir a minúsculas y eliminar acentos
+    return dayName.toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+}
+
+/**
+ * Obtiene el nombre del día normalizado a partir de su índice
+ * @param {number} dayIndex - Índice del día (0-6)
+ * @returns {string} Nombre del día normalizado
+ */
+function getNormalizedDayName(dayIndex) {
+    return normalizeDayName(getDayName(dayIndex));
+}
+
 // Hacer las funciones disponibles globalmente
 window.dateUtils = {
     formatDateYMD,
@@ -135,5 +157,7 @@ window.dateUtils = {
     getDayName,
     getShortDayName,
     getMonthName,
-    formatTime
+    formatTime,
+    normalizeDayName,
+    getNormalizedDayName
 };

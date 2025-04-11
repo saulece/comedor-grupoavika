@@ -1,6 +1,11 @@
 // Firestore Service - Handles all Firestore operations
 // Usar variables globales en lugar de importaciones ES modules
 const logger = window.logger || console;
+
+// Asegurar que siempre usamos la misma instancia de Firestore
+function getFirestore() {
+    return firebase.firestore();
+}
 const handleFirebaseError = (error, functionName, options = {}) => {
     console.error(`Error en ${functionName}:`, error);
     return {
@@ -21,7 +26,8 @@ async function getCurrentWeeklyMenu() {
         logger.debug('Fetching current weekly menu');
         
         // First try to find a menu where today falls within its date range
-        let menuSnapshot = await db.collection('weeklyMenus')
+        const firestore = getFirestore();
+        let menuSnapshot = await firestore.collection('weeklyMenus')
             .where('status', 'in', ['published', 'in-progress'])
             .orderBy('startDate', 'desc')
             .get();
@@ -58,7 +64,7 @@ async function getCurrentWeeklyMenu() {
             logger.debug('Found weekly menu', { id: menuDoc.id, status: menuData.status });
             
             // Get daily menus
-            const dailyMenusSnapshot = await db.collection('weeklyMenus')
+            const dailyMenusSnapshot = await firestore.collection('weeklyMenus')
                 .doc(menuDoc.id)
                 .collection('dailyMenus')
                 .get();
@@ -101,7 +107,8 @@ async function getEmployeesByBranch(branchId) {
     try {
         logger.debug('Fetching employees by branch', { branchId });
         
-        const employeesSnapshot = await db.collection('employees')
+        const firestore = getFirestore();
+        const employeesSnapshot = await firestore.collection('employees')
             .where('branch', '==', branchId)
             .orderBy('name')
             .get();
@@ -134,7 +141,8 @@ async function getBranchDetails(branchId) {
     try {
         logger.debug('Fetching branch details', { branchId });
         
-        const branchDoc = await db.collection('branches').doc(branchId).get();
+        const firestore = getFirestore();
+        const branchDoc = await firestore.collection('branches').doc(branchId).get();
         
         if (branchDoc.exists) {
             logger.debug('Found branch', { id: branchDoc.id });
@@ -164,7 +172,8 @@ async function getConfirmationsByBranch(weekId, branchId) {
     try {
         logger.debug('Fetching confirmations by branch', { weekId, branchId });
         
-        const confirmationQuery = await db.collection('confirmations')
+        const firestore = getFirestore();
+        const confirmationQuery = await firestore.collection('confirmations')
             .where('weekId', '==', weekId)
             .where('branchId', '==', branchId)
             .limit(1)
@@ -201,20 +210,22 @@ async function submitConfirmations(weekId, branchId, coordinatorId, employees) {
     try {
         logger.debug('Submitting confirmations', { weekId, branchId });
         
+        const firestore = getFirestore();
+        
         // Check if confirmation already exists
-        const existingQuery = await db.collection('confirmations')
+        const existingQuery = await firestore.collection('confirmations')
             .where('weekId', '==', weekId)
             .where('branchId', '==', branchId)
             .limit(1)
             .get();
         
-        const batch = db.batch();
+        const batch = firestore.batch();
         let confirmationId;
         
         if (!existingQuery.empty) {
             // Update existing confirmation
             confirmationId = existingQuery.docs[0].id;
-            const confirmationRef = db.collection('confirmations').doc(confirmationId);
+            const confirmationRef = firestore.collection('confirmations').doc(confirmationId);
             
             batch.update(confirmationRef, {
                 employees,
@@ -223,7 +234,7 @@ async function submitConfirmations(weekId, branchId, coordinatorId, employees) {
             });
         } else {
             // Create new confirmation
-            const confirmationRef = db.collection('confirmations').doc();
+            const confirmationRef = firestore.collection('confirmations').doc();
             confirmationId = confirmationRef.id;
             
             batch.set(confirmationRef, {
@@ -235,7 +246,7 @@ async function submitConfirmations(weekId, branchId, coordinatorId, employees) {
             });
             
             // Increment confirmedEmployees count on weekly menu
-            const weeklyMenuRef = db.collection('weeklyMenus').doc(weekId);
+            const weeklyMenuRef = firestore.collection('weeklyMenus').doc(weekId);
             batch.update(weeklyMenuRef, {
                 confirmedEmployees: firebase.firestore.FieldValue.increment(
                     employees.filter(emp => emp.days.length > 0).length
@@ -265,7 +276,8 @@ async function addEmployee(employeeData, coordinatorId) {
     try {
         logger.debug('Adding employee', { employeeData });
         
-        const employeeRef = db.collection('employees').doc();
+        const firestore = getFirestore();
+        const employeeRef = firestore.collection('employees').doc();
         
         await employeeRef.set({
             ...employeeData,
@@ -274,7 +286,7 @@ async function addEmployee(employeeData, coordinatorId) {
         });
         
         // Update branch employee count
-        const branchRef = db.collection('branches').doc(employeeData.branch);
+        const branchRef = firestore.collection('branches').doc(employeeData.branch);
         
         if (employeeData.active) {
             await branchRef.update({
@@ -302,23 +314,25 @@ async function updateEmployee(employeeId, employeeData) {
     try {
         logger.debug('Updating employee', { employeeId });
         
+        const firestore = getFirestore();
+        
         // Get employee data before update
-        const employeeDoc = await db.collection('employees').doc(employeeId).get();
+        const employeeDoc = await firestore.collection('employees').doc(employeeId).get();
         const oldData = employeeDoc.data();
         
         // Update employee
-        await db.collection('employees').doc(employeeId).update({
+        await firestore.collection('employees').doc(employeeId).update({
             ...employeeData,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         
         // If branch changed or active status changed, update branch counts
         if (oldData.branch !== employeeData.branch || oldData.active !== employeeData.active) {
-            const batch = db.batch();
+            const batch = firestore.batch();
             
             // Decrement old branch count if was active
             if (oldData.active) {
-                const oldBranchRef = db.collection('branches').doc(oldData.branch);
+                const oldBranchRef = firestore.collection('branches').doc(oldData.branch);
                 batch.update(oldBranchRef, {
                     employeeCount: firebase.firestore.FieldValue.increment(-1)
                 });
@@ -326,7 +340,7 @@ async function updateEmployee(employeeId, employeeData) {
             
             // Increment new branch count if active
             if (employeeData.active) {
-                const newBranchRef = db.collection('branches').doc(employeeData.branch);
+                const newBranchRef = firestore.collection('branches').doc(employeeData.branch);
                 batch.update(newBranchRef, {
                     employeeCount: firebase.firestore.FieldValue.increment(1)
                 });
@@ -353,8 +367,10 @@ async function deleteEmployee(employeeId) {
     try {
         logger.debug('Deleting employee', { employeeId });
         
+        const firestore = getFirestore();
+        
         // Get employee data before deletion
-        const employeeDoc = await db.collection('employees').doc(employeeId).get();
+        const employeeDoc = await firestore.collection('employees').doc(employeeId).get();
         
         if (!employeeDoc.exists) {
             throw new Error('Empleado no encontrado');
@@ -363,11 +379,11 @@ async function deleteEmployee(employeeId) {
         const employeeData = employeeDoc.data();
         
         // Delete employee
-        await db.collection('employees').doc(employeeId).delete();
+        await firestore.collection('employees').doc(employeeId).delete();
         
         // Update branch count if employee was active
         if (employeeData.active) {
-            await db.collection('branches').doc(employeeData.branch).update({
+            await firestore.collection('branches').doc(employeeData.branch).update({
                 employeeCount: firebase.firestore.FieldValue.increment(-1)
             });
         }
@@ -392,7 +408,8 @@ async function importEmployees(employees, branchId, coordinatorId) {
     try {
         logger.debug('Importing employees', { count: employees.length });
         
-        const batch = db.batch();
+        const firestore = getFirestore();
+        const batch = firestore.batch();
         const timestamp = firebase.firestore.FieldValue.serverTimestamp();
         
         // Count active employees for branch count update
@@ -400,7 +417,7 @@ async function importEmployees(employees, branchId, coordinatorId) {
         
         // Create batch of employee documents
         for (const employee of employees) {
-            const employeeRef = db.collection('employees').doc();
+            const employeeRef = firestore.collection('employees').doc();
             
             batch.set(employeeRef, {
                 name: employee.name,
@@ -418,7 +435,7 @@ async function importEmployees(employees, branchId, coordinatorId) {
         }
         
         // Update branch employee count
-        const branchRef = db.collection('branches').doc(branchId);
+        const branchRef = firestore.collection('branches').doc(branchId);
         batch.update(branchRef, {
             employeeCount: firebase.firestore.FieldValue.increment(activeCount)
         });
@@ -447,7 +464,8 @@ async function getAppSettings() {
     try {
         logger.debug('Fetching app settings');
         
-        const settingsDoc = await db.collection('settings').doc('appSettings').get();
+        const firestore = getFirestore();
+        const settingsDoc = await firestore.collection('settings').doc('appSettings').get();
         
         if (settingsDoc.exists) {
             logger.debug('Found app settings');
