@@ -1,528 +1,469 @@
-// Dashboard.js - Controlador para la vista de dashboard del administrador
+// Dashboard.js - Admin Dashboard
 
-/**
- * Inicializa la página de dashboard
- */
-document.addEventListener('DOMContentLoaded', async () => {
-    try {
-        // Verificar autenticación
-        await checkAuth();
+document.addEventListener('DOMContentLoaded', () => {
+    // Check authentication and role
+    auth.onAuthStateChanged(async (user) => {
+        if (!user) {
+            // Redirect to login if not authenticated
+            window.location.href = '../../index.html';
+            return;
+        }
         
-        // Cargar datos del dashboard
-        await loadDashboardData();
+        // Check if user is admin
+        const isAdmin = await isUserAdmin();
         
-        // Configurar eventos
-        setupEventListeners();
+        if (!isAdmin) {
+            // Redirect non-admin users
+            window.location.href = '../../index.html';
+            return;
+        }
         
-    } catch (error) {
-        console.error('Error al inicializar dashboard:', error);
-        showNotification('error', 'Error al cargar el dashboard');
-    }
+        // Display user name
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        if (userDoc.exists) {
+            document.getElementById('userName').textContent = userDoc.data().displayName || 'Administrador';
+        }
+        
+        // Initialize dashboard
+        initDashboard();
+    });
+    
+    // Logout functionality
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+        try {
+            await logout();
+            window.location.href = '../../index.html';
+        } catch (error) {
+            console.error('Error logging out:', error);
+        }
+    });
 });
 
-/**
- * Verifica que el usuario esté autenticado y tenga rol de administrador
- */
-async function checkAuth() {
-    return new Promise((resolve, reject) => {
-        firebase.auth().onAuthStateChanged(async (user) => {
-            if (user) {
-                try {
-                    // Obtener datos del usuario
-                    const userDoc = await firebase.firestore().collection('users').doc(user.uid).get();
-                    
-                    if (userDoc.exists) {
-                        const userData = userDoc.data();
-                        
-                        // Verificar rol de administrador
-                        if (userData.role === 'admin') {
-                            // Mostrar nombre del usuario
-                            document.getElementById('userName').textContent = userData.name || 'Administrador';
-                            resolve(userData);
-                        } else {
-                            // Redirigir si no es administrador
-                            window.location.href = '../../index.html';
-                            reject(new Error('Acceso no autorizado'));
-                        }
-                    } else {
-                        window.location.href = '../../index.html';
-                        reject(new Error('Usuario no encontrado'));
-                    }
-                } catch (error) {
-                    console.error('Error al verificar usuario:', error);
-                    reject(error);
-                }
-            } else {
-                // Redirigir a login si no hay usuario
-                window.location.href = '../../index.html';
-                reject(new Error('Usuario no autenticado'));
-            }
-        });
-    });
-}
-
-/**
- * Carga todos los datos necesarios para el dashboard
- */
-async function loadDashboardData() {
-    try {
-        // Obtener menú semanal actual
-        const weeklyMenu = await getCurrentWeeklyMenu();
-        
-        // Obtener configuración de la aplicación
-        const appSettings = await getAppSettings();
-        
-        // Actualizar estado del menú
-        updateMenuStatus(weeklyMenu);
-        
-        // Cargar resumen del menú semanal
-        await loadMenuSummary(weeklyMenu);
-        
-        // Cargar confirmaciones por sucursal
-        await loadBranchConfirmations(weeklyMenu, appSettings);
-        
-        // Calcular y mostrar ahorro estimado
-        updateEstimatedSavings(weeklyMenu, appSettings);
-        
-    } catch (error) {
-        console.error('Error al cargar datos del dashboard:', error);
-        showNotification('error', 'Error al cargar datos');
-    }
-}
-
-/**
- * Actualiza el estado del menú en la tarjeta correspondiente
- * @param {Object} weeklyMenu - Datos del menú semanal
- */
-function updateMenuStatus(weeklyMenu) {
+// Initialize dashboard
+function initDashboard() {
+    // DOM elements
     const menuStatusElement = document.getElementById('menuStatus');
-    
-    if (!weeklyMenu) {
-        menuStatusElement.textContent = 'No hay menú activo';
-        menuStatusElement.classList.add('status-warning');
-        return;
-    }
-    
-    // Crear modelo de menú para acceder a métodos de utilidad
-    const menuModel = new MenuModel(weeklyMenu);
-    
-    // Mostrar estado y fechas
-    let statusText = menuModel.getStatusText();
-    let dateRange = menuModel.getFormattedDateRange();
-    
-    menuStatusElement.textContent = `${statusText} (${dateRange})`;
-    
-    // Aplicar clase de estilo según estado
-    menuStatusElement.className = '';
-    
-    switch (weeklyMenu.status) {
-        case 'pending':
-            menuStatusElement.classList.add('status-warning');
-            break;
-        case 'in-progress':
-            menuStatusElement.classList.add('status-success');
-            break;
-        case 'completed':
-            menuStatusElement.classList.add('status-info');
-            break;
-        default:
-            menuStatusElement.classList.add('status-warning');
-    }
-}
-
-/**
- * Carga y muestra el resumen del menú semanal
- * @param {Object} weeklyMenu - Datos del menú semanal
- */
-async function loadMenuSummary(weeklyMenu) {
+    const confirmationCountElement = document.getElementById('confirmationCount');
+    const estimatedSavingsElement = document.getElementById('estimatedSavings');
     const menuSummaryBody = document.getElementById('menuSummaryBody');
+    const branchConfirmationsBody = document.getElementById('branchConfirmationsBody');
+    const pendingConfirmationsAlert = document.getElementById('pendingConfirmationsAlert');
+    const pendingBranchesList = document.getElementById('pendingBranchesList');
+    const createMenuBtn = document.getElementById('createMenuBtn');
     
-    // Limpiar contenido actual
-    menuSummaryBody.innerHTML = '';
+    // Load dashboard data
+    loadDashboardData();
     
-    if (!weeklyMenu || !weeklyMenu.dailyMenus) {
-        menuSummaryBody.innerHTML = '<tr><td colspan="5">No hay menú semanal disponible</td></tr>';
-        return;
+    // Event listener for create menu button
+    if (createMenuBtn) {
+        createMenuBtn.addEventListener('click', () => {
+            window.location.href = 'menu.html';
+        });
     }
     
-    // Definir los días de la semana
-    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-    const dayNames = {
-        monday: 'Lunes',
-        tuesday: 'Martes',
-        wednesday: 'Miércoles',
-        thursday: 'Jueves',
-        friday: 'Viernes',
-        saturday: 'Sabado',
-        sunday: 'Domingo'
-    };
-    
-    // Obtener confirmaciones por día si están disponibles
-    let confirmationCounts = {};
-    if (weeklyMenu.id) {
+    // Load dashboard data
+    async function loadDashboardData() {
         try {
-            const confirmationsSnapshot = await firebase.firestore().collection('confirmations')
-                .where('weekId', '==', weeklyMenu.id)
+            // Set loading states
+            menuStatusElement.textContent = 'Cargando...';
+            confirmationCountElement.textContent = 'Cargando...';
+            estimatedSavingsElement.textContent = 'Cargando...';
+            
+            // Get current menu
+            const menuSnapshot = await db.collection('weeklyMenus')
+                .orderBy('startDate', 'desc')
+                .limit(1)
                 .get();
             
-            // Inicializar contadores para cada día
-            days.forEach(day => confirmationCounts[day] = 0);
+            if (menuSnapshot.empty) {
+                // No menu exists yet
+                menuStatusElement.textContent = 'No creado';
+                confirmationCountElement.textContent = '0';
+                estimatedSavingsElement.textContent = '$0';
+                
+                menuSummaryBody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="text-center">
+                            No hay menú creado aún. 
+                            <a href="menu.html">Haga clic aquí para crear uno.</a>
+                        </td>
+                    </tr>
+                `;
+                
+                branchConfirmationsBody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center">No hay datos disponibles</td>
+                    </tr>
+                `;
+                
+                pendingConfirmationsAlert.style.display = 'none';
+                return;
+            }
             
-            // Sumar confirmaciones por día
+            // Get menu data
+            const menuDoc = menuSnapshot.docs[0];
+            const menuData = menuDoc.data();
+            
+            // Display menu status
+            menuStatusElement.textContent = getStatusText(menuData.status);
+            
+            // Get confirmations count
+            const confirmedEmployees = menuData.confirmedEmployees || 0;
+            confirmationCountElement.textContent = confirmedEmployees;
+            
+            // Calculate estimated savings
+            const settingsDoc = await db.collection('settings').doc('appSettings').get();
+            let mealCost = 50; // Default value
+            
+            if (settingsDoc.exists) {
+                mealCost = settingsDoc.data().mealCost || 50;
+            }
+            
+            const totalEmployees = menuData.totalEmployees || 0;
+            const totalMealSlots = totalEmployees * 5; // 5 days
+            const confirmedSlots = await getConfirmedMealSlots(menuDoc.id);
+            const unconfirmedSlots = totalMealSlots - confirmedSlots;
+            const estimatedSavings = unconfirmedSlots * mealCost;
+            
+            estimatedSavingsElement.textContent = `$${estimatedSavings.toLocaleString()}`;
+            
+            // Load menu summary
+            await loadMenuSummary(menuDoc.id);
+            
+            // Load branch confirmations
+            await loadBranchConfirmations(menuDoc.id);
+            
+            // Check for pending confirmations
+            await checkPendingConfirmations(menuDoc.id);
+        } catch (error) {
+            console.error('Error loading dashboard data:', error);
+            
+            menuStatusElement.textContent = 'Error';
+            confirmationCountElement.textContent = 'Error';
+            estimatedSavingsElement.textContent = 'Error';
+            
+            menuSummaryBody.innerHTML = `
+                <tr>
+                    <td colspan="5" class="text-center">Error al cargar datos</td>
+                </tr>
+            `;
+            
+            branchConfirmationsBody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center">Error al cargar datos</td>
+                </tr>
+            `;
+        }
+    }
+    
+    // Load menu summary
+    async function loadMenuSummary(menuId) {
+        try {
+            // Get daily menus
+            const dailyMenusSnapshot = await db.collection('weeklyMenus')
+                .doc(menuId)
+                .collection('dailyMenus')
+                .get();
+            
+            if (dailyMenusSnapshot.empty) {
+                menuSummaryBody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="text-center">No hay detalles del menú disponibles</td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            const dayNames = {
+                'monday': 'Lunes',
+                'tuesday': 'Martes',
+                'wednesday': 'Miércoles',
+                'thursday': 'Jueves',
+                'friday': 'Viernes'
+            };
+            
+            let html = '';
+            
+            // Get confirmations for each day
+            const confirmationsData = await getConfirmationsByDay(menuId);
+            
+            // Sort days
+            const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+            
+            for (const day of days) {
+                const dayMenu = dailyMenusSnapshot.docs.find(doc => doc.id === day);
+                
+                if (dayMenu) {
+                    const menuData = dayMenu.data();
+                    html += `
+                        <tr>
+                            <td>${dayNames[day]}</td>
+                            <td>${menuData.mainDish || 'No especificado'}</td>
+                            <td>${menuData.sideDish || 'No especificado'}</td>
+                            <td>${menuData.dessert || 'No especificado'}</td>
+                            <td>${confirmationsData[day] || 0}</td>
+                        </tr>
+                    `;
+                }
+            }
+            
+            if (html) {
+                menuSummaryBody.innerHTML = html;
+            } else {
+                menuSummaryBody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="text-center">No hay detalles del menú disponibles</td>
+                    </tr>
+                `;
+            }
+        } catch (error) {
+            console.error('Error loading menu summary:', error);
+            menuSummaryBody.innerHTML = `
+                <tr>
+                    <td colspan="5" class="text-center">Error al cargar detalles del menú</td>
+                </tr>
+            `;
+        }
+    }
+    
+    // Load branch confirmations
+    async function loadBranchConfirmations(menuId) {
+        try {
+            // Get all branches
+            const branchesSnapshot = await db.collection('branches').get();
+            
+            if (branchesSnapshot.empty) {
+                branchConfirmationsBody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center">No hay sucursales registradas</td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            // Get all confirmations for the menu
+            const confirmationsSnapshot = await db.collection('confirmations')
+                .where('weekId', '==', menuId)
+                .get();
+            
+            // Create a map of branch confirmations
+            const branchConfirmations = {};
+            
+            branchesSnapshot.forEach(doc => {
+                branchConfirmations[doc.id] = {
+                    id: doc.id,
+                    name: doc.data().name,
+                    days: {
+                        monday: 0,
+                        tuesday: 0,
+                        wednesday: 0,
+                        thursday: 0,
+                        friday: 0
+                    },
+                    total: 0,
+                    confirmed: false
+                };
+            });
+            
+            // Fill confirmation data
             confirmationsSnapshot.forEach(doc => {
-                const confirmation = doc.data();
-                if (confirmation.employees && Array.isArray(confirmation.employees)) {
-                    confirmation.employees.forEach(emp => {
-                        if (emp.days && Array.isArray(emp.days)) {
-                            emp.days.forEach(day => {
-                                if (confirmationCounts[day] !== undefined) {
-                                    confirmationCounts[day]++;
+                const confirmationData = doc.data();
+                const branchId = confirmationData.branchId;
+                
+                if (branchConfirmations[branchId]) {
+                    branchConfirmations[branchId].confirmed = true;
+                    
+                    // Count confirmations by day
+                    if (confirmationData.employees && Array.isArray(confirmationData.employees)) {
+                        confirmationData.employees.forEach(employee => {
+                            if (employee.days && Array.isArray(employee.days)) {
+                                employee.days.forEach(day => {
+                                    if (branchConfirmations[branchId].days[day] !== undefined) {
+                                        branchConfirmations[branchId].days[day]++;
+                                        branchConfirmations[branchId].total++;
+                                    }
+                                });
+                            }
+                        });
+                    }
+                }
+            });
+            
+            // Build HTML
+            let html = '';
+            
+            Object.values(branchConfirmations).forEach(branch => {
+                html += `
+                    <tr>
+                        <td>${branch.name}</td>
+                        <td>${branch.days.monday}</td>
+                        <td>${branch.days.tuesday}</td>
+                        <td>${branch.days.wednesday}</td>
+                        <td>${branch.days.thursday}</td>
+                        <td>${branch.days.friday}</td>
+                        <td>${branch.total}</td>
+                    </tr>
+                `;
+            });
+            
+            if (html) {
+                branchConfirmationsBody.innerHTML = html;
+            } else {
+                branchConfirmationsBody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center">No hay datos disponibles</td>
+                    </tr>
+                `;
+            }
+        } catch (error) {
+            console.error('Error loading branch confirmations:', error);
+            branchConfirmationsBody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center">Error al cargar confirmaciones</td>
+                </tr>
+            `;
+        }
+    }
+    
+    // Check for pending confirmations
+    async function checkPendingConfirmations(menuId) {
+        try {
+            // Get all branches
+            const branchesSnapshot = await db.collection('branches').get();
+            
+            if (branchesSnapshot.empty) {
+                pendingConfirmationsAlert.style.display = 'none';
+                return;
+            }
+            
+            // Get all confirmations for the menu
+            const confirmationsSnapshot = await db.collection('confirmations')
+                .where('weekId', '==', menuId)
+                .get();
+            
+            // Find branches without confirmations
+            const branchesWithConfirmations = new Set();
+            confirmationsSnapshot.forEach(doc => {
+                branchesWithConfirmations.add(doc.data().branchId);
+            });
+            
+            const pendingBranches = [];
+            branchesSnapshot.forEach(doc => {
+                if (!branchesWithConfirmations.has(doc.id)) {
+                    pendingBranches.push({
+                        id: doc.id,
+                        name: doc.data().name
+                    });
+                }
+            });
+            
+            // Display pending confirmations alert if needed
+            if (pendingBranches.length > 0) {
+                let html = '';
+                pendingBranches.forEach(branch => {
+                    html += `<li>${branch.name}</li>`;
+                });
+                
+                pendingBranchesList.innerHTML = html;
+                pendingConfirmationsAlert.style.display = 'flex';
+            } else {
+                pendingConfirmationsAlert.style.display = 'none';
+            }
+        } catch (error) {
+            console.error('Error checking pending confirmations:', error);
+            pendingConfirmationsAlert.style.display = 'none';
+        }
+    }
+    
+    // Get confirmations by day
+    async function getConfirmationsByDay(menuId) {
+        try {
+            // Get all confirmations for the menu
+            const confirmationsSnapshot = await db.collection('confirmations')
+                .where('weekId', '==', menuId)
+                .get();
+            
+            const days = {
+                monday: 0,
+                tuesday: 0,
+                wednesday: 0,
+                thursday: 0,
+                friday: 0
+            };
+            
+            // Count confirmations by day
+            confirmationsSnapshot.forEach(doc => {
+                const confirmationData = doc.data();
+                
+                if (confirmationData.employees && Array.isArray(confirmationData.employees)) {
+                    confirmationData.employees.forEach(employee => {
+                        if (employee.days && Array.isArray(employee.days)) {
+                            employee.days.forEach(day => {
+                                if (days[day] !== undefined) {
+                                    days[day]++;
                                 }
                             });
                         }
                     });
                 }
             });
+            
+            return days;
         } catch (error) {
-            console.error('Error al obtener confirmaciones:', error);
+            console.error('Error getting confirmations by day:', error);
+            return {
+                monday: 0,
+                tuesday: 0,
+                wednesday: 0,
+                thursday: 0,
+                friday: 0
+            };
         }
     }
     
-    // Crear filas para cada día
-    days.forEach(day => {
-        const dailyMenu = weeklyMenu.dailyMenus[day];
-        if (!dailyMenu) return;
-        
-        const row = document.createElement('tr');
-        
-        // Día
-        const dayCell = document.createElement('td');
-        dayCell.textContent = dayNames[day] || day;
-        row.appendChild(dayCell);
-        
-        // Platillo principal
-        const mainDishCell = document.createElement('td');
-        mainDishCell.textContent = dailyMenu.mainDish || 'No definido';
-        row.appendChild(mainDishCell);
-        
-        // Guarnición
-        const sideCell = document.createElement('td');
-        sideCell.textContent = dailyMenu.sideDish || 'No definido';
-        row.appendChild(sideCell);
-        
-        // Postre
-        const dessertCell = document.createElement('td');
-        dessertCell.textContent = dailyMenu.dessert || 'No definido';
-        row.appendChild(dessertCell);
-        
-        // Confirmaciones
-        const confirmationsCell = document.createElement('td');
-        confirmationsCell.textContent = confirmationCounts[day] || 0;
-        row.appendChild(confirmationsCell);
-        
-        menuSummaryBody.appendChild(row);
-    });
-}
-
-/**
- * Carga y muestra las confirmaciones por sucursal
- * @param {Object} weeklyMenu - Datos del menú semanal
- * @param {Object} appSettings - Configuración de la aplicación
- */
-async function loadBranchConfirmations(weeklyMenu, appSettings) {
-    const branchConfirmationsBody = document.getElementById('branchConfirmationsBody');
-    const pendingConfirmationsAlert = document.getElementById('pendingConfirmationsAlert');
-    const pendingBranchesList = document.getElementById('pendingBranchesList');
-    
-    // Limpiar contenido actual
-    branchConfirmationsBody.innerHTML = '';
-    pendingBranchesList.innerHTML = '';
-    pendingConfirmationsAlert.style.display = 'none';
-    
-    if (!weeklyMenu || !weeklyMenu.id) {
-        branchConfirmationsBody.innerHTML = '<tr><td colspan="7">No hay menú semanal disponible</td></tr>';
-        return;
-    }
-    
-    try {
-        // Obtener todas las sucursales
-        const branchesSnapshot = await firebase.firestore().collection('branches').get();
-        const branches = [];
-        
-        branchesSnapshot.forEach(doc => {
-            branches.push({
-                id: doc.id,
-                ...doc.data()
-            });
-        });
-        
-        // Obtener confirmaciones para el menú actual
-        const confirmationsSnapshot = await firebase.firestore().collection('confirmations')
-            .where('weekId', '==', weeklyMenu.id)
-            .get();
-        
-        const confirmations = [];
-        confirmationsSnapshot.forEach(doc => {
-            confirmations.push({
-                id: doc.id,
-                ...doc.data()
-            });
-        });
-        
-        // Definir los días de la semana
-        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-        const dayNames = {
-            monday: 'Lunes',
-            tuesday: 'Martes',
-            wednesday: 'Miércoles',
-            thursday: 'Jueves',
-            friday: 'Viernes',
-            saturday: 'Sabado',
-            sunday: 'Domingo'
-        };
-        
-        // Crear filas para cada sucursal
-        const pendingBranches = [];
-        
-        branches.forEach(branch => {
-            const row = document.createElement('tr');
+    // Get confirmed meal slots
+    async function getConfirmedMealSlots(menuId) {
+        try {
+            // Get all confirmations for the menu
+            const confirmationsSnapshot = await db.collection('confirmations')
+                .where('weekId', '==', menuId)
+                .get();
             
-            // Nombre de la sucursal
-            const branchCell = document.createElement('td');
-            branchCell.textContent = branch.name;
-            row.appendChild(branchCell);
+            let totalSlots = 0;
             
-            // Encontrar confirmación para esta sucursal
-            const branchConfirmation = confirmations.find(c => c.branchId === branch.id);
-            
-            // Contadores por día y total
-            let totalConfirmations = 0;
-            
-            // Crear celdas para cada día
-            days.forEach(day => {
-                const dayCell = document.createElement('td');
+            // Count confirmed meal slots
+            confirmationsSnapshot.forEach(doc => {
+                const confirmationData = doc.data();
                 
-                if (branchConfirmation && branchConfirmation.employees) {
-                    // Contar confirmaciones para este día
-                    const count = branchConfirmation.employees.filter(emp => 
-                        emp.days && emp.days.includes(day)
-                    ).length;
-                    
-                    dayCell.textContent = count;
-                    totalConfirmations += count;
-                } else {
-                    dayCell.textContent = '0';
-                }
-                
-                row.appendChild(dayCell);
-            });
-            
-            // Total de confirmaciones
-            const totalCell = document.createElement('td');
-            totalCell.textContent = totalConfirmations;
-            totalCell.classList.add('total-column');
-            row.appendChild(totalCell);
-            
-            branchConfirmationsBody.appendChild(row);
-            
-            // Verificar si la sucursal no ha confirmado
-            if (!branchConfirmation && branch.employeeCount > 0) {
-                pendingBranches.push(branch.name);
-            }
-        });
-        
-        // Mostrar alerta de sucursales pendientes si es necesario
-        if (pendingBranches.length > 0 && weeklyMenu.status === 'in-progress') {
-            pendingBranches.forEach(branchName => {
-                const li = document.createElement('li');
-                li.textContent = branchName;
-                pendingBranchesList.appendChild(li);
-            });
-            
-            pendingConfirmationsAlert.style.display = 'flex';
-        }
-        
-        // Actualizar contador de confirmaciones
-        updateConfirmationCount(confirmations);
-        
-    } catch (error) {
-        console.error('Error al cargar confirmaciones por sucursal:', error);
-        branchConfirmationsBody.innerHTML = '<tr><td colspan="7">Error al cargar datos</td></tr>';
-    }
-}
-
-/**
- * Actualiza el contador de confirmaciones en la tarjeta correspondiente
- * @param {Array} confirmations - Lista de confirmaciones
- */
-function updateConfirmationCount(confirmations) {
-    const confirmationCountElement = document.getElementById('confirmationCount');
-    
-    if (!confirmations || confirmations.length === 0) {
-        confirmationCountElement.textContent = '0 confirmaciones';
-        return;
-    }
-    
-    // Contar empleados confirmados (al menos un día)
-    let confirmedEmployees = 0;
-    let totalConfirmations = 0;
-    
-    confirmations.forEach(confirmation => {
-        if (confirmation.employees && Array.isArray(confirmation.employees)) {
-            // Contar empleados con al menos un día confirmado
-            const confirmed = confirmation.employees.filter(emp => 
-                emp.days && Array.isArray(emp.days) && emp.days.length > 0
-            ).length;
-            
-            confirmedEmployees += confirmed;
-            
-            // Contar total de confirmaciones (suma de todos los días)
-            confirmation.employees.forEach(emp => {
-                if (emp.days && Array.isArray(emp.days)) {
-                    totalConfirmations += emp.days.length;
+                if (confirmationData.employees && Array.isArray(confirmationData.employees)) {
+                    confirmationData.employees.forEach(employee => {
+                        if (employee.days && Array.isArray(employee.days)) {
+                            totalSlots += employee.days.length;
+                        }
+                    });
                 }
             });
+            
+            return totalSlots;
+        } catch (error) {
+            console.error('Error getting confirmed meal slots:', error);
+            return 0;
         }
-    });
-    
-    confirmationCountElement.textContent = `${confirmedEmployees} empleados / ${totalConfirmations} comidas`;
-}
-
-/**
- * Calcula y muestra el ahorro estimado
- * @param {Object} weeklyMenu - Datos del menú semanal
- * @param {Object} appSettings - Configuración de la aplicación
- */
-function updateEstimatedSavings(weeklyMenu, appSettings) {
-    const savingsElement = document.getElementById('estimatedSavings');
-    
-    if (!weeklyMenu) {
-        savingsElement.textContent = '$0.00';
-        return;
     }
     
-    // Obtener costo por comida de la configuración
-    const mealCost = appSettings && appSettings.mealCost ? appSettings.mealCost : 50;
+    // Helper functions
     
-    // Crear modelo de menú para usar método de cálculo
-    const menuModel = new MenuModel(weeklyMenu);
-    const savings = menuModel.calculateSavings(mealCost);
-    
-    // Formatear como moneda
-    const formattedSavings = new Intl.NumberFormat('es-MX', {
-        style: 'currency',
-        currency: 'MXN'
-    }).format(savings);
-    
-    savingsElement.textContent = formattedSavings;
-}
-
-/**
- * Configura los event listeners para los elementos interactivos
- */
-function setupEventListeners() {
-    // Botón de cerrar sesión
-    const logoutBtn = document.getElementById('logoutBtn');
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', async () => {
-            try {
-                await firebase.auth().signOut();
-                window.location.href = '../../index.html';
-            } catch (error) {
-                console.error('Error al cerrar sesión:', error);
-                showNotification('error', 'Error al cerrar sesión');
-            }
-        });
-    }
-    
-    // Botón para crear menú
-    const createMenuBtn = document.getElementById('createMenuBtn');
-    if (createMenuBtn) {
-        createMenuBtn.addEventListener('click', () => {
-            window.location.href = 'menu.html';
-        });
-    }
-}
-
-/**
- * Obtiene el menú semanal actual
- * @returns {Promise<Object>} Datos del menú semanal
- */
-async function getCurrentWeeklyMenu() {
-    try {
-        // Obtener fecha actual
-        const now = new Date();
-        
-        // Consultar menú activo (simplificado para evitar necesidad de índice compuesto)
-        const menuSnapshot = await firebase.firestore().collection('weeklyMenus')
-            .where('startDate', '<=', now)
-            .get();
-        
-        if (menuSnapshot.empty) {
-            console.log('No hay menú activo para la semana actual');
-            return null;
+    // Get status text
+    function getStatusText(status) {
+        switch (status) {
+            case 'pending':
+                return 'Pendiente';
+            case 'in-progress':
+                return 'En Progreso';
+            case 'completed':
+                return 'Completado';
+            default:
+                return 'Desconocido';
         }
-        
-        // Filtrar menús cuya fecha de fin sea mayor o igual a hoy
-        // y ordenar por fecha de inicio (más reciente primero)
-        const validMenus = menuSnapshot.docs
-            .filter(doc => {
-                const data = doc.data();
-                const endDate = data.endDate.toDate ? data.endDate.toDate() : data.endDate;
-                return endDate >= now;
-            })
-            .sort((a, b) => {
-                const dateA = a.data().startDate.toDate ? a.data().startDate.toDate() : a.data().startDate;
-                const dateB = b.data().startDate.toDate ? b.data().startDate.toDate() : b.data().startDate;
-                return dateB - dateA; // Orden descendente
-            });
-        
-        if (validMenus.length === 0) {
-            console.log('No hay menú activo para la semana actual');
-            return null;
-        }
-        
-        // Obtener datos del menú más reciente
-        const menuDoc = validMenus[0];
-        const menuData = menuDoc.data();
-        menuData.id = menuDoc.id;
-        
-        // Obtener subcolección de menús diarios
-        const dailyMenusSnapshot = await firebase.firestore().collection('weeklyMenus')
-            .doc(menuDoc.id)
-            .collection('dailyMenus')
-            .get();
-        
-        // Organizar menús diarios por día
-        menuData.dailyMenus = {};
-        dailyMenusSnapshot.forEach(doc => {
-            const dailyMenu = doc.data();
-            menuData.dailyMenus[dailyMenu.day] = dailyMenu;
-        });
-        
-        return menuData;
-    } catch (error) {
-        console.error('Error al obtener menú semanal:', error);
-        throw error;
-    }
-}
-
-/**
- * Obtiene la configuración de la aplicación
- * @returns {Promise<Object>} Configuración de la aplicación
- */
-async function getAppSettings() {
-    try {
-        const settingsDoc = await firebase.firestore().collection('settings').doc('appSettings').get();
-        
-        if (!settingsDoc.exists) {
-            console.log('No se encontró la configuración de la aplicación');
-            return { mealCost: 50 }; // Valor predeterminado
-        }
-        
-        return settingsDoc.data();
-    } catch (error) {
-        console.error('Error al obtener configuración:', error);
-        throw error;
     }
 }

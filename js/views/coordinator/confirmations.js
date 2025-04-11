@@ -101,7 +101,7 @@ function initConfirmations(branchId, coordinatorId) {
         updateSummary();
     });
     
-    // Save confirmation button
+    // Save confirmation button - THIS CREATES THE CONFIRMATIONS COLLECTION
     saveConfirmationBtn.addEventListener('click', async () => {
         try {
             // Disable save button
@@ -457,6 +457,51 @@ function initConfirmations(branchId, coordinatorId) {
         }
     }
     
+    // Submit confirmations - THIS CREATES THE CONFIRMATIONS COLLECTION
+    async function submitConfirmations(weekId, branchId, coordinatorId, employees) {
+        try {
+            // Check if confirmation already exists
+            const existingQuery = await db.collection('confirmations')
+                .where('weekId', '==', weekId)
+                .where('branchId', '==', branchId)
+                .limit(1)
+                .get();
+            
+            let confirmationId;
+            
+            if (!existingQuery.empty) {
+                // Update existing confirmation
+                confirmationId = existingQuery.docs[0].id;
+                await db.collection('confirmations').doc(confirmationId).update({
+                    employees,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            } else {
+                // Create new confirmation
+                const confirmationRef = await db.collection('confirmations').add({
+                    weekId,
+                    branchId,
+                    coordinatorId,
+                    employees,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                confirmationId = confirmationRef.id;
+                
+                // Update confirmed count on menu
+                const confirmedEmployees = employees.filter(emp => emp.days.length > 0).length;
+                await db.collection('weeklyMenus').doc(weekId).update({
+                    confirmedEmployees: firebase.firestore.FieldValue.increment(confirmedEmployees)
+                });
+            }
+            
+            return { success: true, confirmationId };
+        } catch (error) {
+            console.error('Error submitting confirmations:', error);
+            throw error;
+        }
+    }
+    
     // Get day name from index
     function getDayFromIndex(index) {
         const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
@@ -468,18 +513,22 @@ function initConfirmations(branchId, coordinatorId) {
         return num.toString().padStart(2, '0');
     }
     
-    // Get status text based on confirmation status
-    function getStatusText(status) {
-        switch(status) {
-            case 'confirmed':
-                return 'Confirmado';
-            case 'pending':
-                return 'Pendiente';
-            case 'declined':
-                return 'Rechazado';
-            default:
-                return 'Desconocido';
-        }
+    // Format date as DD/MM/YYYY
+    function formatDateDMY(date) {
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        
+        return `${day}/${month}/${year}`;
+    }
+    
+    // Format date and time (DD/MM/YYYY HH:MM)
+    function formatDateTime(date) {
+        const formattedDate = formatDateDMY(date);
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        
+        return `${formattedDate} ${hours}:${minutes}`;
     }
 }
 
