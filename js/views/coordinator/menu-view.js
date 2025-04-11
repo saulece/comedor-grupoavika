@@ -1,6 +1,6 @@
 // Menu View - Coordinator Menu View
-import logger from '../../utils/logger.js';
-import { showErrorNotification } from '../../utils/error-handler.js';
+// Use global variables instead of imports
+const logger = window.logger || console;
 
 document.addEventListener('DOMContentLoaded', () => {
     // Check authentication and role
@@ -11,8 +11,9 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
-        // Check if user is coordinator
-        const userDoc = await db.collection('users').doc(user.uid).get();
+        // Check if user is coordinator using firebase.firestore() directly
+        const firestore = firebase.firestore();
+        const userDoc = await firestore.collection('users').doc(user.uid).get();
         if (!userDoc.exists || userDoc.data().role !== 'coordinator') {
             // Redirect non-coordinator users
             window.location.href = '../../index.html';
@@ -28,8 +29,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Display user info
         document.getElementById('userName').textContent = userData.displayName || 'Coordinador';
         
-        // Get branch details
-        const branchDoc = await db.collection('branches').doc(userData.branch).get();
+        // Get branch details using firebase.firestore() directly
+        const branchDoc = await firestore.collection('branches').doc(userData.branch).get();
         if (branchDoc.exists) {
             const branchData = branchDoc.data();
             document.getElementById('branchName').textContent = branchData.name;
@@ -47,7 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error('Error logging out:', error);
             logger.error('Error logging out:', error);
-            showErrorNotification(error);
+            showError('Error al cerrar sesión. Intente nuevamente.');
         }
     });
 });
@@ -106,13 +107,68 @@ function initMenuView(branchId) {
             menuStatusBadge.textContent = 'Cargando...';
             menuStatusBadge.className = 'status-badge';
             
-            // Get current menu
+            // Get current menu using firebase.firestore() directly
             logger.info('Cargando menú semanal actual');
             try {
-                currentMenu = await getCurrentWeeklyMenu();
+                // Get current date
+                const today = new Date();
+                const firestore = firebase.firestore();
+                
+                // First try to find a menu where today falls within its date range
+                let menuSnapshot = await firestore.collection('weeklyMenus')
+                    .where('status', 'in', ['published', 'in-progress'])
+                    .orderBy('startDate', 'desc')
+                    .get();
+                
+                logger.debug(`Found ${menuSnapshot.size} menus`);
+                
+                let menuDoc = null;
+                
+                // Find a menu where today is within the week range
+                for (const doc of menuSnapshot.docs) {
+                    const menuData = doc.data();
+                    const startDate = menuData.startDate.toDate();
+                    const endDate = new Date(startDate);
+                    endDate.setDate(endDate.getDate() + 6); // End date is start date + 6 days
+                    
+                    if (today >= startDate && today <= endDate) {
+                        menuDoc = doc;
+                        logger.info(`Found current week menu: ${doc.id}`);
+                        break;
+                    }
+                }
+                
+                // If no current week menu found, get the most recent one
+                if (!menuDoc && !menuSnapshot.empty) {
+                    menuDoc = menuSnapshot.docs[0];
+                    logger.info(`No current week menu found, using most recent: ${menuDoc.id}`);
+                }
+                
+                if (menuDoc) {
+                    const menuData = menuDoc.data();
+                    
+                    // Get daily menus
+                    const dailyMenusSnapshot = await firestore.collection('weeklyMenus')
+                        .doc(menuDoc.id)
+                        .collection('dailyMenus')
+                        .get();
+                    
+                    const dailyMenus = {};
+                    dailyMenusSnapshot.forEach(doc => {
+                        dailyMenus[doc.id] = doc.data();
+                    });
+                    
+                    currentMenu = {
+                        id: menuDoc.id,
+                        ...menuData,
+                        dailyMenus
+                    };
+                } else {
+                    currentMenu = null;
+                }
             } catch (error) {
                 logger.error('Error getting current weekly menu:', error);
-                showErrorNotification(error);
+                showError('Error al cargar el menú semanal. Intente nuevamente.');
                 
                 // Show fallback UI
                 weekDatesElement.textContent = 'Error al cargar';
@@ -240,7 +296,7 @@ function initMenuView(branchId) {
     
     // Display menu details for current day
     function displayMenuDetails() {
-        if (!currentMenu || !currentMenu.dailyMenus || !currentMenu.dailyMenus[currentDay]) {
+        if (!currentMenu || !currentMenu.dailyMenus) {
             menuDetails.innerHTML = `
                 <div class="empty-message">
                     No hay detalles disponibles para este día.
@@ -249,7 +305,29 @@ function initMenuView(branchId) {
             return;
         }
         
-        const dayMenu = currentMenu.dailyMenus[currentDay];
+        // Normalize the current day to handle accented characters
+        const normalizedCurrentDay = normalizeDayName(currentDay);
+        let dayKey = currentDay;
+        let dayMenu = null;
+        
+        // Try to find the day menu using normalized comparison
+        for (const [day, menu] of Object.entries(currentMenu.dailyMenus)) {
+            if (normalizeDayName(day) === normalizedCurrentDay) {
+                dayKey = day;
+                dayMenu = menu;
+                break;
+            }
+        }
+        
+        // If day menu not found, show empty message
+        if (!dayMenu) {
+            menuDetails.innerHTML = `
+                <div class="empty-message">
+                    No hay detalles disponibles para este día.
+                </div>
+            `;
+            return;
+        }
         const dayDate = dayMenu.date.toDate();
         
         // Format day and date
@@ -310,8 +388,22 @@ function initMenuView(branchId) {
                 <div class="loading-message">Cargando confirmaciones...</div>
             `;
             
-            // Get branch confirmations
-            const confirmation = await getConfirmationsByBranch(currentMenu.id, branchId);
+            // Get branch confirmations using firebase.firestore() directly
+            const firestore = firebase.firestore();
+            const confirmationSnapshot = await firestore.collection('confirmations')
+                .where('weekId', '==', currentMenu.id)
+                .where('branchId', '==', branchId)
+                .limit(1)
+                .get();
+                
+            let confirmation = null;
+            if (!confirmationSnapshot.empty) {
+                confirmation = {
+                    id: confirmationSnapshot.docs[0].id,
+                    ...confirmationSnapshot.docs[0].data()
+                };
+                logger.info(`Found confirmation for branch ${branchId}: ${confirmation.id}`);
+            }
             
             if (!confirmation || !confirmation.employees || confirmation.employees.length === 0) {
                 branchConfirmations.innerHTML = `
@@ -430,8 +522,9 @@ function initMenuView(branchId) {
                 </tr>
             `;
             
-            // Get all branches
-            const branchesSnapshot = await db.collection('branches').get();
+            // Get all branches using firebase.firestore() directly
+            const firestore = firebase.firestore();
+            const branchesSnapshot = await firestore.collection('branches').get();
             branchesData = [];
             
             branchesSnapshot.forEach(doc => {
@@ -443,8 +536,8 @@ function initMenuView(branchId) {
                 });
             });
             
-            // Get all confirmations for this menu
-            const confirmationsSnapshot = await db.collection('confirmations')
+            // Get all confirmations for this menu using the same firestore instance
+            const confirmationsSnapshot = await firestore.collection('confirmations')
                 .where('weekId', '==', currentMenu.id)
                 .get();
             
@@ -495,6 +588,15 @@ function initMenuView(branchId) {
         }
     }
     
+    // Normalize day name to handle accented characters
+    function normalizeDayName(dayName) {
+        if (!dayName) return '';
+        // Convert to lowercase and remove accents
+        return dayName.toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '');
+    }
+    
     // Get status text
     function getStatusText(status) {
         switch (status) {
@@ -520,4 +622,25 @@ function showSuccess(message) {
 function showError(message) {
     logger.error('Error:', message);
     showNotification(message, { type: 'error' });
+}
+
+// Helper function to get day name from day index (0-6)
+function getDayName(dayIndex) {
+    const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    return days[dayIndex] || '';
+}
+
+// Helper function to get short day name from day index (0-6)
+function getShortDayName(dayIndex) {
+    const shortDays = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    return shortDays[dayIndex] || '';
+}
+
+// Helper function to format date as DD/MM/YYYY
+function formatDateDMY(date) {
+    if (!date || !(date instanceof Date)) return '';
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
 }
