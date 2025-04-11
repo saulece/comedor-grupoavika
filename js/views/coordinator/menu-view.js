@@ -329,7 +329,9 @@ function initMenuView(branchId) {
                 tuesday: 0,
                 wednesday: 0,
                 thursday: 0,
-                friday: 0
+                friday: 0,
+                saturday: 0,
+                sunday: 0
             };
             
             confirmation.employees.forEach(employee => {
@@ -383,7 +385,7 @@ function initMenuView(branchId) {
                 `;
                 
                 // Show days as badges
-                const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+                const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
                 days.forEach((day, index) => {
                     const shortDayName = getShortDayName(index + 1); // Monday is 1
                     const isConfirmed = employee.days.includes(day);

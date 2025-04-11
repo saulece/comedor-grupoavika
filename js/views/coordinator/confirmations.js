@@ -231,7 +231,7 @@ function initConfirmations(branchId, coordinatorId) {
         
         const startDate = currentMenu.startDate.toDate();
         const endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + 4); // Add 4 days to get to Friday
+        endDate.setDate(endDate.getDate() + 6); // Add 6 days to get to Sunday
         
         weekDatesElement.textContent = `${formatDateDMY(startDate)} al ${formatDateDMY(endDate)}`;
     }
@@ -299,6 +299,18 @@ function initConfirmations(branchId, coordinatorId) {
                             ${confirmedDays.includes('friday') ? 'checked' : ''} 
                             ${confirmationState !== 'available' ? 'disabled' : ''}>
                     </div>
+                    
+                    <div class="day-checkbox">
+                        <input type="checkbox" class="employee-day-checkbox" data-day="saturday" 
+                            ${confirmedDays.includes('saturday') ? 'checked' : ''} 
+                            ${confirmationState !== 'available' ? 'disabled' : ''}>
+                    </div>
+                    
+                    <div class="day-checkbox">
+                        <input type="checkbox" class="employee-day-checkbox" data-day="sunday" 
+                            ${confirmedDays.includes('sunday') ? 'checked' : ''} 
+                            ${confirmationState !== 'available' ? 'disabled' : ''}>
+                    </div>
                 </div>
             `;
         });
@@ -324,7 +336,7 @@ function initConfirmations(branchId, coordinatorId) {
         }
         
         // Count confirmations for each day
-        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
         const counts = {};
         const totalEmployees = employees.length;
         
@@ -346,7 +358,7 @@ function initConfirmations(branchId, coordinatorId) {
         let html = '';
         
         days.forEach((day, index) => {
-            const dayName = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'][index];
+            const dayName = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'][index];
             const confirmedCount = counts[day];
             const percentage = totalEmployees > 0 ? Math.round((confirmedCount / totalEmployees) * 100) : 0;
             
@@ -504,7 +516,7 @@ function initConfirmations(branchId, coordinatorId) {
     
     // Get day name from index
     function getDayFromIndex(index) {
-        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
         return days[index];
     }
     
