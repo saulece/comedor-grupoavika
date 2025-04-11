@@ -241,7 +241,21 @@ function initConfirmations(branchId, coordinatorId) {
             const confirmStart = currentMenu.confirmStartDate ? currentMenu.confirmStartDate.toDate() : null;
             const confirmEnd = currentMenu.confirmEndDate ? currentMenu.confirmEndDate.toDate() : null;
             
-            if (!confirmStart || !confirmEnd) {
+            // Verificar si estamos en modo desarrollo con bypass de fechas
+            let bypassDateValidation = false;
+            if (typeof DEVELOPMENT_MODE !== 'undefined' && DEVELOPMENT_MODE && 
+                typeof DEV_CONFIG !== 'undefined' && DEV_CONFIG.bypassDateValidations) {
+                
+                if (typeof devLog === 'function') {
+                    devLog('Bypass de validación de fechas de confirmación activado');
+                } else {
+                    console.log('[DEV] Bypass de validación de fechas de confirmación activado');
+                }
+                
+                bypassDateValidation = true;
+            }
+            
+            if (!bypassDateValidation && (!confirmStart || !confirmEnd)) {
                 console.error('Fechas de confirmación no definidas en el menú', { menuId: currentMenu.id });
                 showError('El menú no tiene fechas de confirmación definidas. Contacte al administrador.');
                 confirmationState = 'unavailable';
@@ -250,14 +264,34 @@ function initConfirmations(branchId, coordinatorId) {
                 return;
             }
             
+            // Si estamos en modo desarrollo, crear fechas válidas si no existen
+            if (bypassDateValidation && (!confirmStart || !confirmEnd)) {
+                if (typeof devLog === 'function') {
+                    devLog('Creando fechas de confirmación válidas para modo desarrollo');
+                }
+                
+                // Crear fechas válidas para el periodo de confirmación
+                const today = new Date();
+                if (!confirmStart) {
+                    confirmStart = new Date(today);
+                    confirmStart.setDate(today.getDate() - 3); // 3 días antes
+                }
+                
+                if (!confirmEnd) {
+                    confirmEnd = new Date(today);
+                    confirmEnd.setDate(today.getDate() + 3); // 3 días después
+                }
+            }
+            
             console.log('Periodo de confirmación', { 
-                start: confirmStart.toISOString(), 
-                end: confirmEnd.toISOString(),
+                start: confirmStart ? confirmStart.toISOString() : 'No definido', 
+                end: confirmEnd ? confirmEnd.toISOString() : 'No definido',
                 now: now.toISOString(),
-                isOpen: now >= confirmStart && now <= confirmEnd
+                isOpen: bypassDateValidation || (confirmStart && confirmEnd && now >= confirmStart && now <= confirmEnd),
+                bypassActivated: bypassDateValidation
             });
             
-            if (!viewOnly && (now < confirmStart || now > confirmEnd)) {
+            if (!bypassDateValidation && !viewOnly && (now < confirmStart || now > confirmEnd)) {
                 console.log('Periodo de confirmación cerrado');
                 confirmationState = 'closed';
                 confirmStartDate.textContent = formatDateTime(confirmStart);
@@ -265,6 +299,18 @@ function initConfirmations(branchId, coordinatorId) {
                 updateUI();
                 confirmationClosedModal.style.display = 'block';
                 return;
+            }
+            
+            // Si estamos en modo desarrollo con bypass, mostrar un mensaje
+            if (bypassDateValidation && (now < confirmStart || now > confirmEnd)) {
+                if (typeof devLog === 'function') {
+                    devLog('Permitiendo confirmaciones fuera del periodo válido (modo desarrollo)');
+                }
+                
+                // Mostrar una notificación en el panel de desarrollo si existe
+                if (typeof updateDevLog === 'function') {
+                    updateDevLog('Confirmaciones habilitadas fuera de periodo válido');
+                }
             }
             
             // Load employees - try multiple approaches
