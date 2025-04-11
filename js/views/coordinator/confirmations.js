@@ -174,10 +174,25 @@ function initConfirmations(branchId, coordinatorId) {
             confirmationState = 'loading';
             updateUI();
             
-            // Load current menu
-            currentMenu = await getCurrentWeeklyMenu();
+            logger.info('Cargando datos de confirmaciones');
             
-            if (!currentMenu) {
+            // Load current menu
+            try {
+                logger.debug('Intentando obtener el menú semanal actual');
+                currentMenu = await getCurrentWeeklyMenu();
+                
+                if (!currentMenu) {
+                    logger.warn('No se encontró un menú activo');
+                    confirmationState = 'unavailable';
+                    updateUI();
+                    noMenuModal.style.display = 'block';
+                    return;
+                }
+                
+                logger.debug('Menú encontrado', { id: currentMenu.id, status: currentMenu.status });
+            } catch (error) {
+                logger.error('Error al cargar el menú actual', error);
+                showError('Error al cargar el menú. Intente refrescar la página.');
                 confirmationState = 'unavailable';
                 updateUI();
                 noMenuModal.style.display = 'block';
@@ -186,10 +201,27 @@ function initConfirmations(branchId, coordinatorId) {
             
             // Check if confirmation period is open
             const now = new Date();
-            const confirmStart = currentMenu.confirmStartDate.toDate();
-            const confirmEnd = currentMenu.confirmEndDate.toDate();
+            const confirmStart = currentMenu.confirmStartDate ? currentMenu.confirmStartDate.toDate() : null;
+            const confirmEnd = currentMenu.confirmEndDate ? currentMenu.confirmEndDate.toDate() : null;
+            
+            if (!confirmStart || !confirmEnd) {
+                logger.error('Fechas de confirmación no definidas en el menú', { menuId: currentMenu.id });
+                showError('El menú no tiene fechas de confirmación definidas. Contacte al administrador.');
+                confirmationState = 'unavailable';
+                updateUI();
+                noMenuModal.style.display = 'block';
+                return;
+            }
+            
+            logger.debug('Periodo de confirmación', { 
+                start: confirmStart.toISOString(), 
+                end: confirmEnd.toISOString(),
+                now: now.toISOString(),
+                isOpen: now >= confirmStart && now <= confirmEnd
+            });
             
             if (!viewOnly && (now < confirmStart || now > confirmEnd)) {
+                logger.info('Periodo de confirmación cerrado');
                 confirmationState = 'closed';
                 confirmStartDate.textContent = formatDateTime(confirmStart);
                 confirmEndDate.textContent = formatDateTime(confirmEnd);

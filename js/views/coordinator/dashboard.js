@@ -1,4 +1,7 @@
 // Dashboard.js - Coordinator Dashboard
+import logger from '../../utils/logger.js';
+import { formatDateDMY, getDayName } from '../../utils/date-utils.js';
+import { handleFirebaseError } from '../../utils/error-handler.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     // Check authentication and role
@@ -94,12 +97,49 @@ function initDashboard(branchId, coordinatorId) {
     // Load dashboard data
     async function loadDashboardData() {
         try {
+            // Show loading state
+            confirmationStatus.innerHTML = '<span class="loading-spinner"></span> Cargando...';
+            weekDates.textContent = 'Cargando...';
+            
+            logger.info('Cargando datos del dashboard');
+            
             // Load current menu
-            currentMenu = await getCurrentWeeklyMenu();
+            try {
+                logger.debug('Intentando obtener el menú semanal actual');
+                currentMenu = await getCurrentWeeklyMenu();
+                
+                if (currentMenu) {
+                    logger.debug('Menú encontrado', { id: currentMenu.id, status: currentMenu.status });
+                } else {
+                    logger.warn('No se encontró un menú activo');
+                }
+            } catch (error) {
+                logger.error('Error al cargar el menú actual', error);
+                showError('Error al cargar el menú. Intente refrescar la página.');
+                
+                // Display fallback UI
+                weekDates.textContent = 'No disponible';
+                menuPreview.innerHTML = `
+                    <div class="empty-message">
+                        <p>No se pudo cargar el menú. Por favor, intente nuevamente.</p>
+                        <button class="btn btn-primary" onclick="location.reload()">Refrescar página</button>
+                    </div>
+                `;
+                dayTabsContainer.innerHTML = '';
+                return;
+            }
             
             // Load employees data
-            const employeesResult = await getEmployeesByBranch(branchId);
-            employeesData = employeesResult;
+            try {
+                logger.debug('Cargando empleados de la sucursal', { branchId });
+                const employeesResult = await getEmployeesByBranch(branchId);
+                employeesData = employeesResult;
+                logger.debug(`Se encontraron ${employeesData.length} empleados`);
+            } catch (error) {
+                logger.error('Error al cargar los empleados', error);
+                showError('Error al cargar los datos de empleados. Intente refrescar la página.');
+                employeesData = [];
+            }
             
             // Display menu preview
             displayMenuPreview();
@@ -114,11 +154,17 @@ function initDashboard(branchId, coordinatorId) {
             loadRecentActivity();
             
             // Store in state manager
-            setCurrentMenu(currentMenu);
+            if (currentMenu) setCurrentMenu(currentMenu);
             setCurrentEmployees(employeesData.filter(e => e.active));
+            
+            logger.info('Dashboard cargado correctamente');
         } catch (error) {
-            console.error('Error loading dashboard data:', error);
-            showError('Error al cargar datos del dashboard. Intente nuevamente.');
+            const handledError = handleFirebaseError(error, 'loadDashboardData', {
+                userMessage: 'Error al cargar datos del dashboard. Intente nuevamente.'
+            });
+            
+            logger.error('Error general al cargar el dashboard', handledError);
+            showError(handledError.userMessage || 'Error al cargar datos del dashboard. Intente nuevamente.');
         }
     }
     

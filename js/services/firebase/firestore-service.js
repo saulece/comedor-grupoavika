@@ -13,24 +13,50 @@ async function getCurrentWeeklyMenu() {
         
         logger.debug('Fetching current weekly menu');
         
-        // Query for the most recent active menu
-        const menuSnapshot = await db.collection('weeklyMenus')
-            .where('status', 'in', ['in-progress', 'pending'])
+        // First try to find a menu where today falls within its date range
+        let menuSnapshot = await db.collection('weeklyMenus')
+            .where('status', 'in', ['published', 'in-progress'])
             .orderBy('startDate', 'desc')
-            .limit(1)
             .get();
         
-        if (!menuSnapshot.empty) {
-            const menuDoc = menuSnapshot.docs[0];
+        logger.debug(`Found ${menuSnapshot.size} menus`);
+        
+        let menuDoc = null;
+        
+        // Find a menu where today is within the week range
+        for (const doc of menuSnapshot.docs) {
+            const menuData = doc.data();
+            const startDate = menuData.startDate.toDate();
+            const endDate = new Date(startDate);
+            endDate.setDate(endDate.getDate() + 6); // End date is start date + 6 days
+            
+            logger.debug(`Checking menu ${doc.id}: ${startDate.toDateString()} to ${endDate.toDateString()}`);
+            
+            if (today >= startDate && today <= endDate) {
+                menuDoc = doc;
+                logger.info(`Found current week menu: ${doc.id}`);
+                break;
+            }
+        }
+        
+        // If no current week menu found, get the most recent one
+        if (!menuDoc && !menuSnapshot.empty) {
+            menuDoc = menuSnapshot.docs[0];
+            logger.info(`No current week menu found, using most recent: ${menuDoc.id}`);
+        }
+        
+        if (menuDoc) {
             const menuData = menuDoc.data();
             
-            logger.debug('Found weekly menu', { id: menuDoc.id });
+            logger.debug('Found weekly menu', { id: menuDoc.id, status: menuData.status });
             
             // Get daily menus
             const dailyMenusSnapshot = await db.collection('weeklyMenus')
                 .doc(menuDoc.id)
                 .collection('dailyMenus')
                 .get();
+            
+            logger.debug(`Found ${dailyMenusSnapshot.size} daily menus`);
             
             const dailyMenus = {};
             dailyMenusSnapshot.forEach(doc => {
@@ -48,8 +74,11 @@ async function getCurrentWeeklyMenu() {
         return null;
     } catch (error) {
         const handledError = handleFirebaseError(error, 'getCurrentWeeklyMenu', {
-            indexHelp: 'Es posible que necesites crear un índice compuesto para la colección "weeklyMenus" con los campos "status" y "startDate"'
+            indexHelp: 'Es posible que necesites crear un índice compuesto para la colección "weeklyMenus" con los campos "status" y "startDate"',
+            userMessage: 'No se pudo cargar el menú semanal. Intente nuevamente más tarde.'
         });
+        
+        logger.error('Error getting current weekly menu', handledError);
         
         // Re-throw the error to be handled by the caller
         throw handledError;
