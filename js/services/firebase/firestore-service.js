@@ -1,21 +1,27 @@
 // Firestore Service - Handles all Firestore operations
-// Usar variables globales en lugar de importaciones ES modules
-const logger = window.logger || console;
 
 /**
- * Asegurar que siempre usamos la misma instancia de Firestore
+ * Get Firestore instance
+ * @returns {Object} Firebase Firestore instance
  */
 function getFirestore() {
     return firebase.firestore();
 }
 
-const handleFirebaseError = (error, functionName, options = {}) => {
+/**
+ * Handle Firebase errors with better messages
+ * @param {Error} error - The error object
+ * @param {string} functionName - The function where the error occurred
+ * @param {Object} options - Additional options
+ * @returns {Object} Formatted error object
+ */
+function handleFirebaseError(error, functionName, options = {}) {
     console.error(`Error en ${functionName}:`, error);
     return {
         ...error,
         userMessage: options.userMessage || 'Ha ocurrido un error. Intente nuevamente más tarde.'
     };
-};
+}
 
 /**
  * Get current weekly menu
@@ -26,7 +32,12 @@ async function getCurrentWeeklyMenu() {
         // Get current date
         const today = new Date();
         
-        logger.debug('Fetching current weekly menu');
+        // Log attempt to fetch menu
+        if (window.logger) {
+            window.logger.debug('Fetching current weekly menu');
+        } else {
+            console.log('Fetching current weekly menu');
+        }
         
         // First try to find a menu where today falls within its date range
         const firestore = getFirestore();
@@ -35,7 +46,11 @@ async function getCurrentWeeklyMenu() {
             .orderBy('startDate', 'desc')
             .get();
         
-        logger.debug(`Found ${menuSnapshot.size} menus`);
+        if (window.logger) {
+            window.logger.debug(`Found ${menuSnapshot.size} menus`);
+        } else {
+            console.log(`Found ${menuSnapshot.size} menus`);
+        }
         
         let menuDoc = null;
         
@@ -46,11 +61,9 @@ async function getCurrentWeeklyMenu() {
             const endDate = new Date(startDate);
             endDate.setDate(endDate.getDate() + 6); // End date is start date + 6 days
             
-            logger.debug(`Checking menu ${doc.id}: ${startDate.toDateString()} to ${endDate.toDateString()}`);
-            
             if (today >= startDate && today <= endDate) {
                 menuDoc = doc;
-                logger.info(`Found current week menu: ${doc.id}`);
+                console.log(`Found current week menu: ${doc.id}`);
                 break;
             }
         }
@@ -58,21 +71,17 @@ async function getCurrentWeeklyMenu() {
         // If no current week menu found, get the most recent one
         if (!menuDoc && !menuSnapshot.empty) {
             menuDoc = menuSnapshot.docs[0];
-            logger.info(`No current week menu found, using most recent: ${menuDoc.id}`);
+            console.log(`No current week menu found, using most recent: ${menuDoc.id}`);
         }
         
         if (menuDoc) {
             const menuData = menuDoc.data();
-            
-            logger.debug('Found weekly menu', { id: menuDoc.id, status: menuData.status });
             
             // Get daily menus
             const dailyMenusSnapshot = await firestore.collection('weeklyMenus')
                 .doc(menuDoc.id)
                 .collection('dailyMenus')
                 .get();
-            
-            logger.debug(`Found ${dailyMenusSnapshot.size} daily menus`);
             
             const dailyMenus = {};
             dailyMenusSnapshot.forEach(doc => {
@@ -86,18 +95,17 @@ async function getCurrentWeeklyMenu() {
             };
         }
         
-        logger.info('No active weekly menu found');
+        console.log('No active weekly menu found');
         return null;
     } catch (error) {
-        const handledError = handleFirebaseError(error, 'getCurrentWeeklyMenu', {
-            indexHelp: 'Es posible que necesites crear un índice compuesto para la colección "weeklyMenus" con los campos "status" y "startDate"',
+        const formattedError = handleFirebaseError(error, 'getCurrentWeeklyMenu', {
             userMessage: 'No se pudo cargar el menú semanal. Intente nuevamente más tarde.'
         });
         
-        logger.error('Error getting current weekly menu', handledError);
+        console.error('Error getting current weekly menu:', formattedError);
         
         // Re-throw the error to be handled by the caller
-        throw handledError;
+        throw formattedError;
     }
 }
 
@@ -108,8 +116,6 @@ async function getCurrentWeeklyMenu() {
  */
 async function getEmployeesByBranch(branchId) {
     try {
-        logger.debug('Fetching employees by branch', { branchId });
-        
         const firestore = getFirestore();
         const employeesSnapshot = await firestore.collection('employees')
             .where('branch', '==', branchId)
@@ -125,13 +131,12 @@ async function getEmployeesByBranch(branchId) {
             });
         });
         
-        logger.debug('Fetched employees', { count: employees.length });
         return employees;
     } catch (error) {
-        const handledError = handleFirebaseError(error, 'getEmployeesByBranch');
+        const formattedError = handleFirebaseError(error, 'getEmployeesByBranch');
         
         // Re-throw the error to be handled by the caller
-        throw handledError;
+        throw formattedError;
     }
 }
 
@@ -142,26 +147,22 @@ async function getEmployeesByBranch(branchId) {
  */
 async function getBranchDetails(branchId) {
     try {
-        logger.debug('Fetching branch details', { branchId });
-        
         const firestore = getFirestore();
         const branchDoc = await firestore.collection('branches').doc(branchId).get();
         
         if (branchDoc.exists) {
-            logger.debug('Found branch', { id: branchDoc.id });
             return {
                 id: branchDoc.id,
                 ...branchDoc.data()
             };
         }
         
-        logger.info('Branch not found');
         return null;
     } catch (error) {
-        const handledError = handleFirebaseError(error, 'getBranchDetails');
+        const formattedError = handleFirebaseError(error, 'getBranchDetails');
         
         // Re-throw the error to be handled by the caller
-        throw handledError;
+        throw formattedError;
     }
 }
 
@@ -173,8 +174,6 @@ async function getBranchDetails(branchId) {
  */
 async function getConfirmationsByBranch(weekId, branchId) {
     try {
-        logger.debug('Fetching confirmations by branch', { weekId, branchId });
-        
         const firestore = getFirestore();
         const confirmationQuery = await firestore.collection('confirmations')
             .where('weekId', '==', weekId)
@@ -184,20 +183,18 @@ async function getConfirmationsByBranch(weekId, branchId) {
         
         if (!confirmationQuery.empty) {
             const confirmationDoc = confirmationQuery.docs[0];
-            logger.debug('Found confirmation', { id: confirmationDoc.id });
             return {
                 id: confirmationDoc.id,
                 ...confirmationDoc.data()
             };
         }
         
-        logger.info('No confirmations found');
         return null;
     } catch (error) {
-        const handledError = handleFirebaseError(error, 'getConfirmationsByBranch');
+        const formattedError = handleFirebaseError(error, 'getConfirmationsByBranch');
         
         // Re-throw the error to be handled by the caller
-        throw handledError;
+        throw formattedError;
     }
 }
 
@@ -211,8 +208,6 @@ async function getConfirmationsByBranch(weekId, branchId) {
  */
 async function submitConfirmations(weekId, branchId, coordinatorId, employees) {
     try {
-        logger.debug('Submitting confirmations', { weekId, branchId });
-        
         const firestore = getFirestore();
         
         // Check if confirmation already exists
@@ -231,8 +226,6 @@ async function submitConfirmations(weekId, branchId, coordinatorId, employees) {
                 employees,
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
-            
-            logger.debug('Updated existing confirmation', { id: confirmationId });
         } else {
             // Create new confirmation
             const confirmationRef = await firestore.collection('confirmations').add({
@@ -245,10 +238,9 @@ async function submitConfirmations(weekId, branchId, coordinatorId, employees) {
             });
             
             confirmationId = confirmationRef.id;
-            logger.debug('Created new confirmation', { id: confirmationId });
             
             // Update confirmed count on menu
-            const confirmedEmployees = employees.filter(emp => emp.days.length > 0).length;
+            const confirmedEmployees = employees.filter(emp => emp.days && emp.days.length > 0).length;
             await firestore.collection('weeklyMenus').doc(weekId).update({
                 confirmedEmployees: firebase.firestore.FieldValue.increment(confirmedEmployees)
             });
@@ -256,10 +248,10 @@ async function submitConfirmations(weekId, branchId, coordinatorId, employees) {
         
         return { success: true, confirmationId };
     } catch (error) {
-        const handledError = handleFirebaseError(error, 'submitConfirmations');
+        const formattedError = handleFirebaseError(error, 'submitConfirmations');
         
         // Re-throw the error to be handled by the caller
-        throw handledError;
+        throw formattedError;
     }
 }
 
@@ -271,8 +263,6 @@ async function submitConfirmations(weekId, branchId, coordinatorId, employees) {
  */
 async function addEmployee(employeeData, coordinatorId) {
     try {
-        logger.debug('Adding employee', { name: employeeData.name });
-        
         const firestore = getFirestore();
         
         // Add employee to Firestore
@@ -290,13 +280,12 @@ async function addEmployee(employeeData, coordinatorId) {
             });
         }
         
-        logger.debug('Employee added', { id: employeeRef.id });
         return employeeRef.id;
     } catch (error) {
-        const handledError = handleFirebaseError(error, 'addEmployee');
+        const formattedError = handleFirebaseError(error, 'addEmployee');
         
         // Re-throw the error to be handled by the caller
-        throw handledError;
+        throw formattedError;
     }
 }
 
@@ -308,8 +297,6 @@ async function addEmployee(employeeData, coordinatorId) {
  */
 async function updateEmployee(employeeId, employeeData) {
     try {
-        logger.debug('Updating employee', { id: employeeId });
-        
         const firestore = getFirestore();
         
         // Get current employee data
@@ -336,13 +323,11 @@ async function updateEmployee(employeeId, employeeData) {
                 employeeCount: firebase.firestore.FieldValue.increment(change)
             });
         }
-        
-        logger.debug('Employee updated', { id: employeeId });
     } catch (error) {
-        const handledError = handleFirebaseError(error, 'updateEmployee');
+        const formattedError = handleFirebaseError(error, 'updateEmployee');
         
         // Re-throw the error to be handled by the caller
-        throw handledError;
+        throw formattedError;
     }
 }
 
@@ -353,8 +338,6 @@ async function updateEmployee(employeeId, employeeData) {
  */
 async function deleteEmployee(employeeId) {
     try {
-        logger.debug('Deleting employee', { id: employeeId });
-        
         const firestore = getFirestore();
         
         // Get employee data
@@ -375,13 +358,11 @@ async function deleteEmployee(employeeId) {
                 employeeCount: firebase.firestore.FieldValue.increment(-1)
             });
         }
-        
-        logger.debug('Employee deleted', { id: employeeId });
     } catch (error) {
-        const handledError = handleFirebaseError(error, 'deleteEmployee');
+        const formattedError = handleFirebaseError(error, 'deleteEmployee');
         
         // Re-throw the error to be handled by the caller
-        throw handledError;
+        throw formattedError;
     }
 }
 
@@ -394,8 +375,6 @@ async function deleteEmployee(employeeId) {
  */
 async function importEmployees(employees, branchId, coordinatorId) {
     try {
-        logger.debug('Importing employees', { count: employees.length });
-        
         const firestore = getFirestore();
         const batch = firestore.batch();
         const timestamp = firebase.firestore.FieldValue.serverTimestamp();
@@ -408,21 +387,21 @@ async function importEmployees(employees, branchId, coordinatorId) {
         // Create batch of employee documents
         for (const employee of employees) {
             try {
-                // Validar datos requeridos
+                // Validate required data
                 if (!employee.name || typeof employee.name !== 'string') {
-                    logger.error('Invalid employee data: missing name', employee);
+                    console.error('Invalid employee data: missing name', employee);
                     errorCount++;
                     continue;
                 }
                 
                 const employeeRef = firestore.collection('employees').doc();
                 
-                // Determinar si el puesto indica un rol de coordinador
+                // Check if position indicates a coordinator role
                 const position = employee.position || '';
                 const isCoordinator = position.toLowerCase().includes('coordinador') || 
                                      position.toLowerCase().includes('coordinator');
                 
-                // Preparar datos del empleado con validación adecuada
+                // Prepare employee data with validation
                 const employeeData = {
                     name: employee.name.trim(),
                     position: position.trim(),
@@ -434,7 +413,7 @@ async function importEmployees(employees, branchId, coordinatorId) {
                     updatedAt: timestamp
                 };
                 
-                // Si el empleado es coordinador, agregar información de rol
+                // If employee is coordinator, add role information
                 if (isCoordinator) {
                     employeeData.role = 'coordinator';
                 }
@@ -447,7 +426,7 @@ async function importEmployees(employees, branchId, coordinatorId) {
                 
                 successCount++;
             } catch (error) {
-                logger.error('Error processing employee during import', { error, employee });
+                console.error('Error processing employee during import', { error, employee });
                 errorCount++;
             }
         }
@@ -458,16 +437,11 @@ async function importEmployees(employees, branchId, coordinatorId) {
             employeeCount: firebase.firestore.FieldValue.increment(activeCount)
         });
         
-        // Solo actualizar si hay empleados procesados exitosamente
+        // Only commit if there are successfully processed employees
         if (successCount > 0) {
             await batch.commit();
-            logger.debug('Employees imported', { 
-                success: successCount, 
-                errors: errorCount, 
-                active: activeCount 
-            });
         } else {
-            logger.warn('No valid employees to import');
+            console.warn('No valid employees to import');
         }
         
         return {
@@ -477,10 +451,10 @@ async function importEmployees(employees, branchId, coordinatorId) {
             errors: errorCount
         };
     } catch (error) {
-        const handledError = handleFirebaseError(error, 'importEmployees');
+        const formattedError = handleFirebaseError(error, 'importEmployees');
         
         // Re-throw the error to be handled by the caller
-        throw handledError;
+        throw formattedError;
     }
 }
 
@@ -490,18 +464,14 @@ async function importEmployees(employees, branchId, coordinatorId) {
  */
 async function getAppSettings() {
     try {
-        logger.debug('Fetching app settings');
-        
         const firestore = getFirestore();
         const settingsDoc = await firestore.collection('settings').doc('appSettings').get();
         
         if (settingsDoc.exists) {
-            logger.debug('Found app settings');
             return settingsDoc.data();
         }
         
         // Return default settings if not found
-        logger.info('No app settings found, using defaults');
         return {
             confirmationWindow: {
                 startDay: 'thursday',
@@ -513,14 +483,14 @@ async function getAppSettings() {
             branches: ['CDO', 'Ishinoka', 'Centenario', 'Delicias', 'Fuentes', 'Matriz', 'Corporativo']
         };
     } catch (error) {
-        const handledError = handleFirebaseError(error, 'getAppSettings');
+        const formattedError = handleFirebaseError(error, 'getAppSettings');
         
         // Re-throw the error to be handled by the caller
-        throw handledError;
+        throw formattedError;
     }
 }
 
-// Exportar todas las funciones individualmente para compatibilidad con código existente
+// Make functions globally available
 window.getFirestore = getFirestore;
 window.getCurrentWeeklyMenu = getCurrentWeeklyMenu;
 window.getEmployeesByBranch = getEmployeesByBranch;
@@ -533,7 +503,7 @@ window.deleteEmployee = deleteEmployee;
 window.importEmployees = importEmployees;
 window.getAppSettings = getAppSettings;
 
-// Exportar todas las funciones como un objeto global para facilitar el acceso
+// Also expose as a single object for more reliable access
 window.firestoreService = {
     getFirestore,
     getCurrentWeeklyMenu,

@@ -19,9 +19,13 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Store user data
         const userData = userDoc.data();
-        setCurrentUser(userData);
-        setUserRole(userData.role);
-        setUserBranch(userData.branch);
+        
+        // Use state manager if available
+        if (typeof setCurrentUser === 'function') {
+            setCurrentUser(userData);
+            setUserRole(userData.role);
+            setUserBranch(userData.branch);
+        }
         
         // Display user info
         document.getElementById('userName').textContent = userData.displayName || 'Coordinador';
@@ -101,7 +105,7 @@ function initConfirmations(branchId, coordinatorId) {
         updateSummary();
     });
     
-    // Save confirmation button - THIS CREATES THE CONFIRMATIONS COLLECTION
+    // Save confirmation button
     saveConfirmationBtn.addEventListener('click', async () => {
         try {
             // Disable save button
@@ -132,7 +136,7 @@ function initConfirmations(branchId, coordinatorId) {
                 });
             });
             
-            // Submit confirmations
+            // Submit confirmations - use the global function or firestoreService object
             if (typeof submitConfirmations === 'function') {
                 await submitConfirmations(
                     currentMenu.id, 
@@ -140,11 +144,19 @@ function initConfirmations(branchId, coordinatorId) {
                     coordinatorId, 
                     employeeConfirmations
                 );
-            } else {
+            } else if (window.firestoreService && typeof window.firestoreService.submitConfirmations === 'function') {
                 await window.firestoreService.submitConfirmations(
-                    currentMenu.id, 
-                    branchId, 
-                    coordinatorId, 
+                    currentMenu.id,
+                    branchId,
+                    coordinatorId,
+                    employeeConfirmations
+                );
+            } else {
+                // Fallback to direct Firebase access
+                await submitConfirmationsDirectly(
+                    currentMenu.id,
+                    branchId,
+                    coordinatorId,
                     employeeConfirmations
                 );
             }
@@ -183,27 +195,39 @@ function initConfirmations(branchId, coordinatorId) {
             confirmationState = 'loading';
             updateUI();
             
-            logger.info('Cargando datos de confirmaciones');
+            console.log('Cargando datos de confirmaciones');
             
-            // Load current menu
+            // Load current menu - try multiple approaches for better compatibility
             try {
-                logger.debug('Intentando obtener el menú semanal actual');
-                // Usar la función global o el objeto firestoreService para mayor compatibilidad
-                currentMenu = typeof getCurrentWeeklyMenu === 'function' ? 
-                    await getCurrentWeeklyMenu() : 
-                    await window.firestoreService.getCurrentWeeklyMenu();
+                console.log('Intentando obtener el menú semanal actual');
+                
+                // First try using the global function
+                if (typeof getCurrentWeeklyMenu === 'function') {
+                    console.log('Usando función global getCurrentWeeklyMenu');
+                    currentMenu = await getCurrentWeeklyMenu();
+                } 
+                // Then try using the firestoreService object
+                else if (window.firestoreService && typeof window.firestoreService.getCurrentWeeklyMenu === 'function') {
+                    console.log('Usando window.firestoreService.getCurrentWeeklyMenu');
+                    currentMenu = await window.firestoreService.getCurrentWeeklyMenu();
+                } 
+                // Last resort: direct Firebase access
+                else {
+                    console.log('Usando acceso directo a Firebase');
+                    currentMenu = await getMenuDirectly();
+                }
                 
                 if (!currentMenu) {
-                    logger.warn('No se encontró un menú activo');
+                    console.warn('No se encontró un menú activo');
                     confirmationState = 'unavailable';
                     updateUI();
                     noMenuModal.style.display = 'block';
                     return;
                 }
                 
-                logger.debug('Menú encontrado', { id: currentMenu.id, status: currentMenu.status });
+                console.log('Menú encontrado', { id: currentMenu.id, status: currentMenu.status });
             } catch (error) {
-                logger.error('Error al cargar el menú actual', error);
+                console.error('Error al cargar el menú actual', error);
                 showError('Error al cargar el menú. Intente refrescar la página.');
                 confirmationState = 'unavailable';
                 updateUI();
@@ -217,7 +241,7 @@ function initConfirmations(branchId, coordinatorId) {
             const confirmEnd = currentMenu.confirmEndDate ? currentMenu.confirmEndDate.toDate() : null;
             
             if (!confirmStart || !confirmEnd) {
-                logger.error('Fechas de confirmación no definidas en el menú', { menuId: currentMenu.id });
+                console.error('Fechas de confirmación no definidas en el menú', { menuId: currentMenu.id });
                 showError('El menú no tiene fechas de confirmación definidas. Contacte al administrador.');
                 confirmationState = 'unavailable';
                 updateUI();
@@ -225,7 +249,7 @@ function initConfirmations(branchId, coordinatorId) {
                 return;
             }
             
-            logger.debug('Periodo de confirmación', { 
+            console.log('Periodo de confirmación', { 
                 start: confirmStart.toISOString(), 
                 end: confirmEnd.toISOString(),
                 now: now.toISOString(),
@@ -233,7 +257,7 @@ function initConfirmations(branchId, coordinatorId) {
             });
             
             if (!viewOnly && (now < confirmStart || now > confirmEnd)) {
-                logger.info('Periodo de confirmación cerrado');
+                console.log('Periodo de confirmación cerrado');
                 confirmationState = 'closed';
                 confirmStartDate.textContent = formatDateTime(confirmStart);
                 confirmEndDate.textContent = formatDateTime(confirmEnd);
@@ -242,16 +266,40 @@ function initConfirmations(branchId, coordinatorId) {
                 return;
             }
             
-            // Load employees
-            const employeesResult = typeof getEmployeesByBranch === 'function' ? 
-                await getEmployeesByBranch(branchId) : 
-                await window.firestoreService.getEmployeesByBranch(branchId);
-            employees = employeesResult.filter(employee => employee.active);
+            // Load employees - try multiple approaches
+            try {
+                if (typeof getEmployeesByBranch === 'function') {
+                    employees = await getEmployeesByBranch(branchId);
+                } else if (window.firestoreService && typeof window.firestoreService.getEmployeesByBranch === 'function') {
+                    employees = await window.firestoreService.getEmployeesByBranch(branchId);
+                } else {
+                    // Direct Firebase access
+                    employees = await getEmployeesDirectly(branchId);
+                }
+                
+                // Filter active employees
+                employees = employees.filter(employee => employee.active);
+            } catch (error) {
+                console.error('Error al cargar empleados:', error);
+                showError('Error al cargar empleados. Intente nuevamente.');
+                employees = [];
+            }
             
-            // Load existing confirmations
-            confirmations = typeof getConfirmationsByBranch === 'function' ? 
-                await getConfirmationsByBranch(currentMenu.id, branchId) : 
-                await window.firestoreService.getConfirmationsByBranch(currentMenu.id, branchId);
+            // Load existing confirmations - try multiple approaches
+            try {
+                if (typeof getConfirmationsByBranch === 'function') {
+                    confirmations = await getConfirmationsByBranch(currentMenu.id, branchId);
+                } else if (window.firestoreService && typeof window.firestoreService.getConfirmationsByBranch === 'function') {
+                    confirmations = await window.firestoreService.getConfirmationsByBranch(currentMenu.id, branchId);
+                } else {
+                    // Direct Firebase access
+                    confirmations = await getConfirmationsDirectly(currentMenu.id, branchId);
+                }
+            } catch (error) {
+                console.error('Error al cargar confirmaciones:', error);
+                showError('Error al cargar confirmaciones. Intente nuevamente.');
+                confirmations = null;
+            }
             
             // Confirmation period is open
             confirmationState = 'available';
@@ -265,341 +313,159 @@ function initConfirmations(branchId, coordinatorId) {
             // Start countdown timer
             startCountdownTimer();
             
-            // Store in state manager
-            setCurrentMenu(currentMenu);
+            // Store in state manager if available
+            if (typeof setCurrentMenu === 'function') {
+                setCurrentMenu(currentMenu);
+            }
         } catch (error) {
             console.error('Error loading data:', error);
             showError('Error al cargar datos. Intente nuevamente.');
         }
     }
     
-    // Display week dates
-    function displayWeekDates() {
-        if (!currentMenu) return;
-        
-        const startDate = currentMenu.startDate.toDate();
-        const endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + 6); // Add 6 days to get to Sunday
-        
-        weekDatesElement.textContent = `${formatDateDMY(startDate)} al ${formatDateDMY(endDate)}`;
-    }
+    // Direct Firebase access functions for fallback
     
-    // Display employees list for confirmation
-    function displayEmployees() {
-        if (!employees || employees.length === 0) {
-            employeeListContainer.innerHTML = `
-                <div class="empty-message">
-                    No hay empleados activos en esta sucursal.
-                    <a href="employees.html">Gestionar empleados</a>
-                </div>
-            `;
-            return;
-        }
+    // Get menu directly from Firestore
+    async function getMenuDirectly() {
+        // Get current date
+        const today = new Date();
         
-        // Create employee list
-        let html = '';
+        // First try to find a menu where today falls within its date range
+        const firestore = firebase.firestore();
+        let menuSnapshot = await firestore.collection('weeklyMenus')
+            .where('status', 'in', ['published', 'in-progress'])
+            .orderBy('startDate', 'desc')
+            .get();
         
-        // Define days for consistency
-        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        console.log(`Found ${menuSnapshot.size} menus`);
         
-        employees.forEach(employee => {
-            // Check if employee has confirmations
-            const employeeConfirmation = confirmations && 
-                confirmations.employees && 
-                confirmations.employees.find(emp => emp.id === employee.id);
+        let menuDoc = null;
+        
+        // Find a menu where today is within the week range
+        for (const doc of menuSnapshot.docs) {
+            const menuData = doc.data();
+            const startDate = menuData.startDate.toDate();
+            const endDate = new Date(startDate);
+            endDate.setDate(endDate.getDate() + 6); // End date is start date + 6 days
             
-            const confirmedDays = employeeConfirmation ? employeeConfirmation.days : [];
-            
-            html += `
-                <div class="employee-item" data-employee-id="${employee.id}" data-employee-name="${employee.name}">
-                    <div class="employee-name">
-                        ${employee.name}
-                        ${employee.dietaryRestrictions ? 
-                            `<span class="dietary-badge" title="Restricciones alimentarias: ${employee.dietaryRestrictions}">
-                                <i class="material-icons">restaurant</i>
-                            </span>` : 
-                            ''}
-                    </div>
-                    
-                    ${days.map(day => `
-                    <div class="day-checkbox">
-                        <input type="checkbox" class="employee-day-checkbox" data-day="${day}" 
-                            ${confirmedDays.includes(day) ? 'checked' : ''} 
-                            ${confirmationState !== 'available' ? 'disabled' : ''}>
-                    </div>
-                    `).join('')}
-                </div>
-            `;
-        });
-        
-        employeeListContainer.innerHTML = html;
-        
-        // Add event listeners for checkboxes
-        const checkboxes = document.querySelectorAll('.employee-day-checkbox');
-        checkboxes.forEach(checkbox => {
-            checkbox.addEventListener('change', updateSummary);
-        });
-    }
-    
-    // Update confirmation summary
-    function updateSummary() {
-        if (!employees || employees.length === 0) {
-            summaryTableBody.innerHTML = `
-                <tr>
-                    <td colspan="4" class="text-center">No hay empleados para confirmar.</td>
-                </tr>
-            `;
-            return;
-        }
-        
-        // Count confirmations for each day
-        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-        const dayNames = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-        const counts = {};
-        const totalEmployees = employees.length;
-        
-        // Initialize counts
-        days.forEach(day => {
-            counts[day] = 0;
-        });
-        
-        // Count checked checkboxes
-        const checkboxes = document.querySelectorAll('.employee-day-checkbox');
-        checkboxes.forEach(checkbox => {
-            const day = checkbox.dataset.day;
-            // Asegurarse de que el día se normalice correctamente
-            const normalizedDay = mapDayNameToCode(day);
-            if (checkbox.checked && counts[normalizedDay] !== undefined) {
-                counts[normalizedDay]++;
+            if (today >= startDate && today <= endDate) {
+                menuDoc = doc;
+                console.log(`Found current week menu: ${doc.id}`);
+                break;
             }
-        });
-        
-        // Build summary table
-        let html = '';
-        
-        days.forEach((day, index) => {
-            const dayName = dayNames[index];
-            const confirmedCount = counts[day];
-            const percentage = totalEmployees > 0 ? Math.round((confirmedCount / totalEmployees) * 100) : 0;
-            
-            html += `
-                <tr>
-                    <td>${dayName}</td>
-                    <td>${confirmedCount}</td>
-                    <td>${totalEmployees}</td>
-                    <td>${percentage}%</td>
-                </tr>
-            `;
-        });
-        
-        summaryTableBody.innerHTML = html;
-    }
-    
-    // Start countdown timer
-    function startCountdownTimer() {
-        // Clear existing interval
-        if (countdownInterval) {
-            clearInterval(countdownInterval);
-            countdownInterval = null;
         }
         
-        if (!currentMenu || confirmationState !== 'available') {
-            timeRemainingValue.textContent = '--:--:--';
-            return;
+        // If no current week menu found, get the most recent one
+        if (!menuDoc && menuSnapshot.size > 0) {
+            menuDoc = menuSnapshot.docs[0];
+            console.log(`No current week menu found, using most recent: ${menuDoc.id}`);
         }
         
-        const endTime = currentMenu.confirmEndDate.toDate();
-        
-        updateCountdown();
-        countdownInterval = setInterval(updateCountdown, 1000);
-        
-        function updateCountdown() {
-            const now = new Date();
-            const timeDiff = endTime - now;
+        if (menuDoc) {
+            const menuData = menuDoc.data();
             
-            if (timeDiff <= 0) {
-                // Time expired
-                clearInterval(countdownInterval);
-                timeRemainingValue.textContent = 'Finalizado';
-                confirmationState = 'closed';
-                updateUI();
-                return;
-            }
-            
-            // Calculate hours, minutes, seconds
-            const hours = Math.floor(timeDiff / (1000 * 60 * 60));
-            const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
-            const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000);
-            
-            // Format time
-            timeRemainingValue.textContent = `${padZero(hours)}:${padZero(minutes)}:${padZero(seconds)}`;
-        }
-    }
-    
-    // Update UI based on confirmation state
-    function updateUI() {
-        switch (confirmationState) {
-            case 'loading':
-                confirmationStatusElement.innerHTML = `
-                    <div class="loading-status">
-                        <i class="material-icons loading-icon">sync</i>
-                        <span>Cargando datos...</span>
-                    </div>
-                `;
-                timeRemainingContainer.style.display = 'none';
-                confirmationSection.style.display = 'none';
-                break;
-                
-            case 'available':
-                confirmationStatusElement.innerHTML = `
-                    <div class="available-status">
-                        <i class="material-icons">check_circle</i>
-                        <span>Período de confirmación abierto</span>
-                    </div>
-                `;
-                timeRemainingContainer.style.display = 'block';
-                confirmationSection.style.display = 'block';
-                saveConfirmationBtn.disabled = false;
-                break;
-                
-            case 'unavailable':
-                confirmationStatusElement.innerHTML = `
-                    <div class="unavailable-status">
-                        <i class="material-icons">error</i>
-                        <span>No hay menú disponible para confirmar</span>
-                    </div>
-                `;
-                timeRemainingContainer.style.display = 'none';
-                confirmationSection.style.display = 'none';
-                break;
-                
-            case 'closed':
-                confirmationStatusElement.innerHTML = `
-                    <div class="closed-status">
-                        <i class="material-icons">schedule</i>
-                        <span>Período de confirmación cerrado</span>
-                    </div>
-                `;
-                timeRemainingContainer.style.display = 'none';
-                
-                // Still show confirmation section but in read-only mode
-                confirmationSection.style.display = 'block';
-                saveConfirmationBtn.disabled = true;
-                break;
-        }
-    }
-    
-    // Submit confirmations - THIS CREATES THE CONFIRMATIONS COLLECTION
-    async function submitConfirmations(weekId, branchId, coordinatorId, employees) {
-        try {
-            // Get Firestore instance
-            const firestore = firebase.firestore();
-            
-            // Check if confirmation already exists
-            const existingQuery = await firestore.collection('confirmations')
-                .where('weekId', '==', weekId)
-                .where('branchId', '==', branchId)
-                .limit(1)
+            // Get daily menus
+            const dailyMenusSnapshot = await firestore.collection('weeklyMenus')
+                .doc(menuDoc.id)
+                .collection('dailyMenus')
                 .get();
             
-            let confirmationId;
+            const dailyMenus = {};
+            dailyMenusSnapshot.forEach(doc => {
+                dailyMenus[doc.id] = doc.data();
+            });
             
-            if (!existingQuery.empty) {
-                // Update existing confirmation
-                confirmationId = existingQuery.docs[0].id;
-                await firestore.collection('confirmations').doc(confirmationId).update({
-                    employees,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                });
-            } else {
-                // Create new confirmation
-                const confirmationRef = await firestore.collection('confirmations').add({
-                    weekId,
-                    branchId,
-                    coordinatorId,
-                    employees,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                
-                confirmationId = confirmationRef.id;
-                
-                // Update confirmed count on menu
-                const confirmedEmployees = employees.filter(emp => emp.days.length > 0).length;
-                await firestore.collection('weeklyMenus').doc(weekId).update({
-                    confirmedEmployees: firebase.firestore.FieldValue.increment(confirmedEmployees)
-                });
-            }
-            
-            return { success: true, confirmationId };
-        } catch (error) {
-            console.error('Error submitting confirmations:', error);
-            throw error;
+            return {
+                id: menuDoc.id,
+                ...menuData,
+                dailyMenus
+            };
         }
-    }
-    
-    // Get day name from index
-    function getDayFromIndex(index) {
-        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-        return days[index];
-    }
-    
-    // Normalize day name to handle accented characters
-    function normalizeDayName(dayName) {
-        if (!dayName) return '';
-        // Convert to lowercase and remove accents
-        return dayName.toLowerCase()
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '');
-    }
-    
-    // Map Spanish day name to English day code
-    function mapDayNameToCode(dayName) {
-        // Normalize the input to handle accents and case
-        const normalized = normalizeDayName(dayName);
         
-        const dayMap = {
-            'lunes': 'monday',
-            'martes': 'tuesday',
-            'miercoles': 'wednesday',
-            'jueves': 'thursday',
-            'viernes': 'friday',
-            'sabado': 'saturday',
-            'domingo': 'sunday'
-        };
-        
-        return dayMap[normalized] || normalized;
+        console.log('No active weekly menu found');
+        return null;
     }
     
-    // Pad number with leading zero
-    function padZero(num) {
-        return num.toString().padStart(2, '0');
+    // Get employees directly from Firestore
+    async function getEmployeesDirectly(branchId) {
+        const firestore = firebase.firestore();
+        const employeesSnapshot = await firestore.collection('employees')
+            .where('branch', '==', branchId)
+            .orderBy('name')
+            .get();
+        
+        const employees = [];
+        
+        employeesSnapshot.forEach(doc => {
+            employees.push({
+                id: doc.id,
+                ...doc.data()
+            });
+        });
+        
+        return employees;
     }
     
-    // Format date as DD/MM/YYYY
-    function formatDateDMY(date) {
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const year = date.getFullYear();
+    // Get confirmations directly from Firestore
+    async function getConfirmationsDirectly(weekId, branchId) {
+        const firestore = firebase.firestore();
+        const confirmationQuery = await firestore.collection('confirmations')
+            .where('weekId', '==', weekId)
+            .where('branchId', '==', branchId)
+            .limit(1)
+            .get();
         
-        return `${day}/${month}/${year}`;
+        if (!confirmationQuery.empty) {
+            const confirmationDoc = confirmationQuery.docs[0];
+            return {
+                id: confirmationDoc.id,
+                ...confirmationDoc.data()
+            };
+        }
+        
+        return null;
     }
     
-    // Format date and time (DD/MM/YYYY HH:MM)
-    function formatDateTime(date) {
-        const formattedDate = formatDateDMY(date);
-        const hours = String(date.getHours()).padStart(2, '0');
-        const minutes = String(date.getMinutes()).padStart(2, '0');
+    // Submit confirmations directly to Firestore
+    async function submitConfirmationsDirectly(weekId, branchId, coordinatorId, employees) {
+        const firestore = firebase.firestore();
         
-        return `${formattedDate} ${hours}:${minutes}`;
+        // Check if confirmation already exists
+        const confirmationQuery = await firestore.collection('confirmations')
+            .where('weekId', '==', weekId)
+            .where('branchId', '==', branchId)
+            .limit(1)
+            .get();
+        
+        let confirmationId;
+        
+        if (!confirmationQuery.empty) {
+            // Update existing confirmation
+            confirmationId = confirmationQuery.docs[0].id;
+            await firestore.collection('confirmations').doc(confirmationId).update({
+                employees,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        } else {
+            // Create new confirmation
+            const confirmationRef = await firestore.collection('confirmations').add({
+                weekId,
+                branchId,
+                coordinatorId,
+                employees,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            
+            confirmationId = confirmationRef.id;
+            
+            // Update confirmed count on menu
+            const confirmedEmployees = employees.filter(emp => emp.days && emp.days.length > 0).length;
+            await firestore.collection('weeklyMenus').doc(weekId).update({
+                confirmedEmployees: firebase.firestore.FieldValue.increment(confirmedEmployees)
+            });
+        }
+        
+        return { success: true, confirmationId };
     }
-}
-
-// Helper function to show success notification
-function showSuccess(message) {
-    showNotification(message, { type: 'success' });
-}
-
-// Helper function to show error notification
-function showError(message) {
-    showNotification(message, { type: 'error' });
-}
+};
