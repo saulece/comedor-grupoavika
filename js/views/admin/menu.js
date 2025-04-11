@@ -245,6 +245,10 @@ function initMenuManagement() {
                 
                 // Start countdown timer if in-progress
                 startCountdownTimer();
+                
+                // Enable or disable create menu button based on current menu status
+                // Allow creating new menu regardless of current menu status
+                createMenuBtn.disabled = false;
             } else {
                 // No menu found, hide form
                 document.getElementById('menuForm').innerHTML = `
@@ -260,6 +264,9 @@ function initMenuManagement() {
                 
                 // Reset stats
                 updateStats(0, 0);
+                
+                // Enable create menu button
+                createMenuBtn.disabled = false;
             }
         } catch (error) {
             console.error('Error loading menu:', error);
