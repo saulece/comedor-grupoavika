@@ -1,5 +1,5 @@
 // Error Handler - Centralizes error handling with improved Firebase error support
-import logger from './logger.js';
+// Usar la variable global logger en lugar de importarla
 
 /**
  * Custom error types
@@ -36,26 +36,32 @@ class ExcelError extends AppError {
  */
 function handleFirebaseError(error, operation, additionalInfo = {}) {
     // Log the error with the logger
-    logger.firebaseError(operation, error, additionalInfo);
+    if (window.logger) {
+        window.logger.firebaseError(operation, error, additionalInfo);
+    } else {
+        console.error(`Firebase Error in ${operation}:`, error, additionalInfo);
+    }
     
     // Check if it's an index error
     const isIndexError = error.message?.includes('index') || 
                         (error.code === 'failed-precondition');
     
     // Create a more user-friendly message
-    let userMessage = 'Error en la operación con la base de datos';
+    let userMessage = additionalInfo.userMessage || 'Error en la operación con la base de datos';
     
     if (isIndexError) {
-        userMessage = 'Se requiere una configuración adicional en la base de datos. Por favor, contacta al administrador.';
+        userMessage = additionalInfo.indexHelp || 'Se requiere una configuración adicional en la base de datos. Por favor, contacta al administrador.';
     } else if (error.code === 'permission-denied') {
         userMessage = 'No tienes permisos para realizar esta operación';
     } else if (error.code === 'not-found') {
-        userMessage = 'El recurso solicitado no existe';
-    } else if (error.code === 'network-request-failed') {
-        userMessage = 'Error de conexión. Verifica tu conexión a internet';
+        userMessage = 'No se encontró el recurso solicitado';
     }
     
-    return new FirebaseError(userMessage, error.code, operation);
+    return {
+        ...error,
+        userMessage,
+        operation
+    };
 }
 
 /**
@@ -65,14 +71,20 @@ function handleFirebaseError(error, operation, additionalInfo = {}) {
  * @returns {Error} Processed error
  */
 function handleExcelError(error, operation) {
-    logger.error(`Excel Error in ${operation}:`, error);
+    // Log the error
+    if (window.logger) {
+        window.logger.error(`Excel Error in ${operation}:`, error);
+    } else {
+        console.error(`Excel Error in ${operation}:`, error);
+    }
     
+    // Create a user-friendly message
     let userMessage = 'Error al procesar el archivo Excel';
     
     if (error.message.includes('format')) {
         userMessage = 'El formato del archivo Excel no es válido';
-    } else if (error.message.includes('read')) {
-        userMessage = 'No se puede leer el archivo Excel';
+    } else if (error.message.includes('missing')) {
+        userMessage = 'Faltan columnas requeridas en el archivo Excel';
     }
     
     return new ExcelError(userMessage);
@@ -83,18 +95,18 @@ function handleExcelError(error, operation) {
  * @param {Error} error - The error object
  */
 function showErrorNotification(error) {
-    // Use the showError function if it exists in the global scope
+    const message = error.userMessage || error.message || 'Ha ocurrido un error';
+    
+    // Use the global showError function if available
     if (typeof showError === 'function') {
-        showError(error.message);
-    } else if (typeof showNotification === 'function') {
-        showNotification(error.message, { type: 'error' });
+        showError(message);
     } else {
-        alert(error.message);
+        alert(message);
     }
 }
 
-// Export error handling functions and classes
-export {
+// Hacer disponible globalmente
+window.errorHandler = {
     AppError,
     FirebaseError,
     ExcelError,

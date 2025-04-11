@@ -1,6 +1,13 @@
 // Firestore Service - Handles all Firestore operations
-import logger from '../../utils/logger.js';
-import { handleFirebaseError } from '../../utils/error-handler.js';
+// Usar variables globales en lugar de importaciones ES modules
+const logger = window.logger || console;
+const handleFirebaseError = (error, functionName, options = {}) => {
+    console.error(`Error en ${functionName}:`, error);
+    return {
+        ...error,
+        userMessage: options.userMessage || 'Ha ocurrido un error. Intente nuevamente más tarde.'
+    };
+};
 
 /**
  * Get current weekly menu

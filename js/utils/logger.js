@@ -89,45 +89,36 @@ function error(message, ...args) {
  * @param {Object} additionalInfo - Additional context information
  */
 function firebaseError(operation, error, additionalInfo = {}) {
-    if (currentLogLevel <= LogLevel.ERROR) {
-        const isFirebaseError = error && error.name === 'FirebaseError';
-        const errorCode = isFirebaseError ? error.code : 'unknown';
-        const errorMessage = error.message || 'Unknown error';
-        
-        // Check if it's an index error
-        const isIndexError = errorMessage.includes('index') || 
-                            (isFirebaseError && errorCode === 'failed-precondition');
-        
-        // Create a more helpful message for index errors
-        let helpfulMessage = errorMessage;
-        if (isIndexError) {
-            helpfulMessage = `Firebase index required: ${errorMessage}. Please create the required index in the Firebase console.`;
-            
-            // Log the URL to create the index if available in the error
-            if (errorMessage.includes('https://console.firebase.google.com')) {
-                const indexUrl = errorMessage.match(/(https:\/\/console\.firebase\.google\.com[^\s"]+)/);
-                if (indexUrl && indexUrl[0]) {
-                    info('Create the index here:', indexUrl[0]);
-                }
-            }
-        }
-        
-        console.error(
-            ...formatLog(`Firebase Error in ${operation}:`, [
-                {
-                    operation,
-                    errorCode,
-                    errorMessage: helpfulMessage,
-                    ...additionalInfo,
-                    originalError: error
-                }
-            ])
-        );
+    const errorInfo = {
+        operation,
+        code: error.code || 'unknown',
+        message: error.message || 'Unknown error',
+        ...additionalInfo
+    };
+    
+    // Log detailed error for development
+    if (environment === 'development') {
+        console.group(`Firebase Error: ${operation}`);
+        console.error('Error details:', errorInfo);
+        console.error('Original error:', error);
+        console.groupEnd();
+    } else {
+        // Simplified logging for production
+        error('Firebase operation failed', errorInfo);
     }
+    
+    // Return formatted error for UI display
+    return {
+        code: error.code || 'unknown',
+        message: error.message || 'Unknown error',
+        operation,
+        timestamp: new Date().toISOString(),
+        ...additionalInfo
+    };
 }
 
-// Export the logger functions
-const logger = {
+// Make logger available globally
+window.logger = {
     LogLevel,
     debug,
     info,
@@ -135,5 +126,3 @@ const logger = {
     error,
     firebaseError
 };
-
-export default logger;

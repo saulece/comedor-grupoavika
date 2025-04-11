@@ -1,7 +1,22 @@
 // Dashboard.js - Coordinator Dashboard
-import logger from '../../utils/logger.js';
-import { formatDateDMY, getDayName } from '../../utils/date-utils.js';
-import { handleFirebaseError } from '../../utils/error-handler.js';
+// Importaciones usando variables globales en lugar de import
+const logger = window.logger || console;
+// Funciones de utilidad
+const formatDateDMY = (date) => {
+    if (!date) return '';
+    return date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+};
+const getDayName = (date) => {
+    if (!date) return '';
+    return date.toLocaleDateString('es-ES', { weekday: 'long' });
+};
+const handleFirebaseError = (error, functionName, options = {}) => {
+    console.error(`Error en ${functionName}:`, error);
+    return {
+        ...error,
+        userMessage: options.userMessage || 'Ha ocurrido un error. Intente nuevamente más tarde.'
+    };
+};
 
 document.addEventListener('DOMContentLoaded', () => {
     // Check authentication and role

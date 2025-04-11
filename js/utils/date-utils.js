@@ -49,7 +49,8 @@ function formatDateTime(date) {
 function getMondayOfWeek(date = new Date()) {
     const day = date.getDay();
     const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
-    return new Date(new Date(date).setDate(diff));
+    
+    return new Date(date.setDate(diff));
 }
 
 /**
@@ -61,6 +62,7 @@ function getFridayOfWeek(date = new Date()) {
     const monday = getMondayOfWeek(date);
     const friday = new Date(monday);
     friday.setDate(monday.getDate() + 4);
+    
     return friday;
 }
 
@@ -70,10 +72,10 @@ function getFridayOfWeek(date = new Date()) {
  * @returns {Date} Next Monday
  */
 function getNextMonday(date = new Date()) {
-    const day = date.getDay();
-    const daysToAdd = day === 0 ? 1 : 8 - day;
-    const nextMonday = new Date(date);
-    nextMonday.setDate(date.getDate() + daysToAdd);
+    const currentMonday = getMondayOfWeek(date);
+    const nextMonday = new Date(currentMonday);
+    nextMonday.setDate(currentMonday.getDate() + 7);
+    
     return nextMonday;
 }
 
@@ -104,7 +106,7 @@ function getShortDayName(dayIndex) {
  */
 function getMonthName(monthIndex) {
     const months = [
-        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
         'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
     ];
     return months[monthIndex];
@@ -121,3 +123,17 @@ function formatTime(date) {
     
     return `${hours}:${minutes}`;
 }
+
+// Hacer las funciones disponibles globalmente
+window.dateUtils = {
+    formatDateYMD,
+    formatDateDMY,
+    formatDateTime,
+    getMondayOfWeek,
+    getFridayOfWeek,
+    getNextMonday,
+    getDayName,
+    getShortDayName,
+    getMonthName,
+    formatTime
+};
