@@ -2,7 +2,7 @@
 
 document.addEventListener('DOMContentLoaded', () => {
     // Check authentication and role
-    firebase.auth().onAuthStateChanged(async (user) => {
+    auth.onAuthStateChanged(async (user) => {
         if (!user) {
             // Redirect to login if not authenticated
             window.location.href = '../../index.html';
@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         // Display user name
-        const userDoc = await firebase.firestore().collection('users').doc(user.uid).get();
+        const userDoc = await db.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
             document.getElementById('userName').textContent = userDoc.data().displayName || 'Administrador';
         }
@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Logout functionality
     document.getElementById('logoutBtn').addEventListener('click', async () => {
         try {
-            await firebase.auth().signOut();
+            await logout();
             window.location.href = '../../index.html';
         } catch (error) {
             console.error('Error logging out:', error);
@@ -56,12 +56,6 @@ function initMenuManagement() {
     const confirmCreateMenuBtn = document.getElementById('confirmCreateMenu');
     const cancelCreateMenuBtn = document.getElementById('cancelCreateMenu');
     const closeModalBtn = document.querySelector('.close-modal');
-    
-    // Stats elements
-    const totalEmployeesElement = document.getElementById('totalEmployees');
-    const confirmedEmployeesElement = document.getElementById('confirmedEmployees');
-    const confirmationPercentageElement = document.getElementById('confirmationPercentage');
-    const timeRemainingElement = document.getElementById('timeRemaining');
     
     // Form inputs
     const mainDishInput = document.getElementById('mainDish');
@@ -113,7 +107,7 @@ function initMenuManagement() {
             };
             
             // Save to Firestore
-            await firebase.firestore().collection('weeklyMenus').doc(currentWeekId)
+            await db.collection('weeklyMenus').doc(currentWeekId)
                 .collection('dailyMenus').doc(currentDay).update(dayMenuData);
             
             showMessage('Menú guardado correctamente.', 'success');
@@ -135,7 +129,7 @@ function initMenuManagement() {
     createMenuBtn.addEventListener('click', () => {
         // Set default date to next Monday
         const nextMonday = getNextMonday();
-        menuStartDateInput.value = formatDateForInput(nextMonday);
+        menuStartDateInput.value = formatDateYMD(nextMonday);
         
         // Show modal
         createMenuModal.style.display = 'block';
@@ -143,35 +137,23 @@ function initMenuManagement() {
     
     // Confirm create menu button
     confirmCreateMenuBtn.addEventListener('click', async () => {
-        console.log('Botón Crear Menú clickeado');
-        const startDateStr = menuStartDateInput.value;
-        console.log('Fecha seleccionada:', startDateStr);
+        const startDate = menuStartDateInput.value;
         
-        if (!startDateStr) {
+        if (!startDate) {
             alert('Por favor seleccione una fecha válida.');
             return;
         }
         
         // Validate if selected date is a Monday
-        // Fix date parsing by splitting the date string and creating a new Date object
-        // Format is expected to be YYYY-MM-DD
-        const [year, month, day] = startDateStr.split('-').map(num => parseInt(num, 10));
-        // Note: month is 0-indexed in JavaScript Date (0 = January, 1 = February, etc.)
-        const date = new Date(year, month - 1, day);
-        
-        console.log('Fecha parseada correctamente:', date);
-        console.log('Día de la semana:', date.getDay()); // 0=Domingo, 1=Lunes, etc.
-        
+        const date = new Date(startDate);
         if (date.getDay() !== 1) { // 1 = Monday
             alert('Por favor seleccione un lunes como fecha inicial.');
             return;
         }
         
         try {
-            console.log('Intentando crear menú semanal...');
             // Create new weekly menu
-            await createWeeklyMenu(startDateStr);
-            console.log('Menú creado exitosamente');
+            await createWeeklyMenu(startDate);
             
             // Close modal
             createMenuModal.style.display = 'none';
@@ -179,8 +161,8 @@ function initMenuManagement() {
             // Reload menu data
             loadCurrentMenu();
         } catch (error) {
-            console.error('Error detallado al crear el menú:', error);
-            alert(`Error al crear el menú: ${error.message}`);
+            console.error('Error creating menu:', error);
+            alert('Error al crear el menú. Intente nuevamente.');
         }
     });
     
@@ -195,8 +177,8 @@ function initMenuManagement() {
     });
     
     // Close modal when clicking outside
-    window.addEventListener('click', (event) => {
-        if (event.target === createMenuModal) {
+    window.addEventListener('click', (e) => {
+        if (e.target === createMenuModal) {
             createMenuModal.style.display = 'none';
         }
     });
@@ -206,16 +188,17 @@ function initMenuManagement() {
         if (!currentWeekId) return;
         
         try {
-            // Update menu status
-            await firebase.firestore().collection('weeklyMenus').doc(currentWeekId).update({
+            // Update menu status to in-progress
+            await db.collection('weeklyMenus').doc(currentWeekId).update({
                 status: 'in-progress',
+                publishedBy: auth.currentUser.uid,
                 publishedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
             
             // Reload menu data
             loadCurrentMenu();
             
-            showMessage('Menú publicado correctamente. Los empleados ya pueden confirmar su asistencia.', 'success');
+            showMessage('Menú publicado correctamente. Los coordinadores ya pueden realizar confirmaciones.', 'success');
         } catch (error) {
             console.error('Error publishing menu:', error);
             showMessage('Error al publicar el menú. Intente nuevamente.', 'error');
@@ -229,7 +212,7 @@ function initMenuManagement() {
             const today = new Date();
             
             // Query for the most recent menu
-            const menuSnapshot = await firebase.firestore().collection('weeklyMenus')
+            const menuSnapshot = await db.collection('weeklyMenus')
                 .orderBy('startDate', 'desc')
                 .limit(1)
                 .get();
@@ -243,7 +226,7 @@ function initMenuManagement() {
                 displayMenuDetails();
                 
                 // Load daily menus
-                const dailyMenusSnapshot = await firebase.firestore().collection('weeklyMenus')
+                const dailyMenusSnapshot = await db.collection('weeklyMenus')
                     .doc(currentWeekId)
                     .collection('dailyMenus')
                     .get();
@@ -262,6 +245,10 @@ function initMenuManagement() {
                 
                 // Start countdown timer if in-progress
                 startCountdownTimer();
+                
+                // Enable or disable create menu button based on current menu status
+                // Allow creating new menu regardless of current menu status
+                createMenuBtn.disabled = false;
             } else {
                 // No menu found, hide form
                 document.getElementById('menuForm').innerHTML = `
@@ -277,6 +264,9 @@ function initMenuManagement() {
                 
                 // Reset stats
                 updateStats(0, 0);
+                
+                // Enable create menu button
+                createMenuBtn.disabled = false;
             }
         } catch (error) {
             console.error('Error loading menu:', error);
@@ -291,10 +281,10 @@ function initMenuManagement() {
         // Format dates
         const startDate = menuData.startDate.toDate();
         const endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + 4); // Add 4 days to get to Friday
+        endDate.setDate(endDate.getDate() + 6); // Add 6 days to get to Sunday
         
         // Display date range
-        weekDatesElement.textContent = `${formatDateShort(startDate)} al ${formatDateShort(endDate)}`;
+        weekDatesElement.textContent = `${formatDateDMY(startDate)} al ${formatDateDMY(endDate)}`;
         
         // Display status
         statusBadgeElement.textContent = getStatusText(menuData.status);
@@ -372,15 +362,21 @@ function initMenuManagement() {
     
     // Update stats display
     function updateStats(totalEmployees, confirmedEmployees) {
-        totalEmployeesElement.textContent = totalEmployees;
-        confirmedEmployeesElement.textContent = confirmedEmployees;
+        const totalEmployeesElement = document.getElementById('totalEmployees');
+        const confirmedEmployeesElement = document.getElementById('confirmedEmployees');
+        const confirmationPercentageElement = document.getElementById('confirmationPercentage');
+        
+        if (totalEmployeesElement) totalEmployeesElement.textContent = totalEmployees;
+        if (confirmedEmployeesElement) confirmedEmployeesElement.textContent = confirmedEmployees;
         
         // Calculate percentage
-        const percentage = totalEmployees > 0 
-            ? Math.round((confirmedEmployees / totalEmployees) * 100) 
-            : 0;
-        
-        confirmationPercentageElement.textContent = `${percentage}%`;
+        if (confirmationPercentageElement) {
+            const percentage = totalEmployees > 0 
+                ? Math.round((confirmedEmployees / totalEmployees) * 100) 
+                : 0;
+            
+            confirmationPercentageElement.textContent = `${percentage}%`;
+        }
     }
     
     // Start countdown timer for confirmation deadline
@@ -392,12 +388,16 @@ function initMenuManagement() {
         
         // If menu is not in-progress, don't start timer
         if (!menuData || menuData.status !== 'in-progress') {
-            timeRemainingElement.textContent = '--:--:--';
+            const timeRemainingElement = document.getElementById('timeRemaining');
+            if (timeRemainingElement) timeRemainingElement.textContent = '--:--:--';
             return;
         }
         
         // Get confirmation end time
         const endTime = menuData.confirmEndDate.toDate();
+        const timeRemainingElement = document.getElementById('timeRemaining');
+        
+        if (!timeRemainingElement) return;
         
         // Update immediately and then every second
         updateCountdown();
@@ -426,6 +426,8 @@ function initMenuManagement() {
     
     // Display message in form
     function showMessage(message, type = 'info') {
+        if (!menuFormMessage) return;
+        
         menuFormMessage.className = 'message-container';
         menuFormMessage.classList.add(`message-${type}`);
         menuFormMessage.textContent = message;
@@ -439,121 +441,80 @@ function initMenuManagement() {
     
     // Create a new weekly menu
     async function createWeeklyMenu(startDateStr) {
-        console.log('Iniciando createWeeklyMenu con fecha:', startDateStr);
-        
-        // Parse date string to Date object correctly
-        // Format is expected to be YYYY-MM-DD
-        const [year, month, day] = startDateStr.split('-').map(num => parseInt(num, 10));
-        // Note: month is 0-indexed in JavaScript Date
-        const startDate = new Date(year, month - 1, day);
-        console.log('Fecha parseada en createWeeklyMenu:', startDate);
-        
-        // Format date for ID
-        const weekId = formatDateForId(startDate);
-        console.log('ID de semana generado:', weekId);
+        const startDate = new Date(startDateStr);
+        const weekId = formatDateYMD(startDate);
         
         // Check if menu already exists
-        try {
-            const existingMenu = await firebase.firestore().collection('weeklyMenus').doc(weekId).get();
-            console.log('¿Existe menú?', existingMenu.exists);
-            
-            if (existingMenu.exists) {
-                throw new Error('Ya existe un menú para esta semana.');
-            }
-            
-            // Get total employees count
-            console.log('Obteniendo conteo de empleados...');
-            const employeesSnapshot = await firebase.firestore().collection('employees')
-                .where('active', '==', true)
-                .get();
-            
-            const totalEmployees = employeesSnapshot.size;
-            console.log('Total de empleados activos:', totalEmployees);
-            
-            // Get app settings for confirmation window
-            console.log('Obteniendo configuraciones de la aplicación...');
-            const settingsSnapshot = await firebase.firestore().collection('settings').doc('appSettings').get();
-            let confirmStartTime, confirmEndTime;
-            
-            if (settingsSnapshot.exists) {
-                const settings = settingsSnapshot.data();
-                console.log('Configuraciones obtenidas:', settings);
-                
-                // Default to 48 hours before if not set
-                const confirmHoursBefore = settings.confirmHoursBefore || 48;
-                console.log('Horas antes para confirmar:', confirmHoursBefore);
-                
-                // Calculate confirmation window start and end times
-                confirmStartTime = new Date(startDate);
-                confirmStartTime.setHours(confirmStartTime.getHours() - confirmHoursBefore);
-                
-                confirmEndTime = new Date(startDate);
-                confirmEndTime.setHours(8, 0, 0, 0); // 8:00 AM on Monday
-            } else {
-                console.log('No se encontraron configuraciones, usando valores predeterminados');
-                // Default confirmation window (48 hours before)
-                confirmStartTime = new Date(startDate);
-                confirmStartTime.setHours(confirmStartTime.getHours() - 48);
-                
-                confirmEndTime = new Date(startDate);
-                confirmEndTime.setHours(8, 0, 0, 0); // 8:00 AM on Monday
-            }
-            
-            console.log('Ventana de confirmación:', {
-                inicio: confirmStartTime,
-                fin: confirmEndTime
-            });
-            
-            // Create weeklyMenu document
-            console.log('Creando documento de menú semanal...');
-            const currentUser = firebase.auth().currentUser;
-            console.log('Usuario actual:', currentUser ? currentUser.uid : 'No autenticado');
-            
-            if (!currentUser) {
-                throw new Error('No hay usuario autenticado. Por favor, inicie sesión nuevamente.');
-            }
-            
-            await firebase.firestore().collection('weeklyMenus').doc(weekId).set({
-                startDate: firebase.firestore.Timestamp.fromDate(startDate),
-                status: 'pending',
-                confirmStartDate: firebase.firestore.Timestamp.fromDate(confirmStartTime),
-                confirmEndDate: firebase.firestore.Timestamp.fromDate(confirmEndTime),
-                totalEmployees,
-                confirmedEmployees: 0,
-                createdBy: currentUser.uid,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            
-            // Create daily menu documents
-            console.log('Creando documentos de menú diario...');
-            const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-            const batch = firebase.firestore().batch();
-            
-            days.forEach((day, index) => {
-                const dayDate = new Date(startDate);
-                dayDate.setDate(dayDate.getDate() + index);
-                
-                const dayRef = firebase.firestore().collection('weeklyMenus').doc(weekId).collection('dailyMenus').doc(day);
-                batch.set(dayRef, {
-                    date: firebase.firestore.Timestamp.fromDate(dayDate),
-                    mainDish: '',
-                    sideDish: '',
-                    soup: '',
-                    salad: '',
-                    dessert: '',
-                    vegetarianOption: ''
-                });
-            });
-            
-            console.log('Ejecutando batch para crear menús diarios...');
-            await batch.commit();
-            console.log('Menú semanal creado exitosamente');
-            
-            return weekId;
-        } catch (error) {
-            console.error('Error en createWeeklyMenu:', error);
-            throw error;
+        const existingMenu = await db.collection('weeklyMenus').doc(weekId).get();
+        
+        if (existingMenu.exists) {
+            throw new Error('Ya existe un menú para esta semana.');
         }
+        
+        // Get total employees count
+        const employeesSnapshot = await db.collection('employees')
+            .where('active', '==', true)
+            .get();
+        
+        const totalEmployees = employeesSnapshot.size;
+        
+        // Get app settings for confirmation window
+        const settingsSnapshot = await db.collection('settings').doc('appSettings').get();
+        let confirmStartTime, confirmEndTime;
+        
+        if (settingsSnapshot.exists) {
+            const settings = settingsSnapshot.data();
+            
+            // Calculate confirmation start and end times based on settings
+            confirmStartTime = new Date(startDate);
+            confirmStartTime.setDate(confirmStartTime.getDate() - 4); // Thursday before the week
+            confirmStartTime.setHours(16, 10, 0, 0); // 16:10
+            
+            confirmEndTime = new Date(startDate);
+            confirmEndTime.setDate(confirmEndTime.getDate() - 2); // Saturday before the week
+            confirmEndTime.setHours(10, 0, 0, 0); // 10:00
+        } else {
+            // Default times if settings don't exist
+            confirmStartTime = new Date(startDate);
+            confirmStartTime.setDate(confirmStartTime.getDate() - 4); // Thursday
+            confirmStartTime.setHours(16, 10, 0, 0); // 16:10
+            
+            confirmEndTime = new Date(startDate);
+            confirmEndTime.setDate(confirmEndTime.getDate() - 2); // Saturday
+            confirmEndTime.setHours(10, 0, 0, 0); // 10:00
+        }
+        
+        // Create weeklyMenu document
+        await db.collection('weeklyMenus').doc(weekId).set({
+            startDate: firebase.firestore.Timestamp.fromDate(startDate),
+            status: 'pending',
+            confirmStartDate: firebase.firestore.Timestamp.fromDate(confirmStartTime),
+            confirmEndDate: firebase.firestore.Timestamp.fromDate(confirmEndTime),
+            totalEmployees,
+            confirmedEmployees: 0,
+            createdBy: auth.currentUser.uid,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // Create dailyMenus subcollection
+        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        const batch = db.batch();
+        
+        days.forEach((day, index) => {
+            const dayDate = new Date(startDate);
+            dayDate.setDate(dayDate.getDate() + index);
+            
+            const dayRef = db.collection('weeklyMenus').doc(weekId).collection('dailyMenus').doc(day);
+            batch.set(dayRef, {
+                date: firebase.firestore.Timestamp.fromDate(dayDate),
+                mainDish: '',
+                sideDish: '',
+                dessert: '',
+                vegetarianOption: ''
+            });
+        });
+        
+        await batch.commit();
     }
 }
 
@@ -574,7 +535,7 @@ function getNextMonday() {
 }
 
 // Format date for input field (YYYY-MM-DD)
-function formatDateForInput(date) {
+function formatDateYMD(date) {
     const year = date.getFullYear();
     const month = padZero(date.getMonth() + 1);
     const day = padZero(date.getDate());
@@ -582,26 +543,8 @@ function formatDateForInput(date) {
     return `${year}-${month}-${day}`;
 }
 
-// Format date for Firestore document ID (YYYY-MM-DD)
-function formatDateForId(date) {
-    // Asegurarse de que la fecha sea válida
-    if (!(date instanceof Date) || isNaN(date)) {
-        console.error('Fecha inválida en formatDateForId:', date);
-        throw new Error('Fecha inválida para generar ID');
-    }
-    
-    // Crear un ID consistente en formato YYYYMMDD
-    const year = date.getFullYear();
-    const month = padZero(date.getMonth() + 1);
-    const day = padZero(date.getDate());
-    
-    const id = `${year}${month}${day}`;
-    console.log('ID generado:', id);
-    return id;
-}
-
 // Format date for display (DD/MM/YYYY)
-function formatDateShort(date) {
+function formatDateDMY(date) {
     const day = padZero(date.getDate());
     const month = padZero(date.getMonth() + 1);
     const year = date.getFullYear();

@@ -1,4 +1,6 @@
 // Menu View - Coordinator Menu View
+import logger from '../../utils/logger.js';
+import { showErrorNotification } from '../../utils/error-handler.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     // Check authentication and role
@@ -44,7 +46,8 @@ document.addEventListener('DOMContentLoaded', () => {
             window.location.href = '../../index.html';
         } catch (error) {
             console.error('Error logging out:', error);
-            showError('Error al cerrar sesión. Intente nuevamente.');
+            logger.error('Error logging out:', error);
+            showErrorNotification(error);
         }
     });
 });
@@ -104,7 +107,45 @@ function initMenuView(branchId) {
             menuStatusBadge.className = 'status-badge';
             
             // Get current menu
-            currentMenu = await getCurrentWeeklyMenu();
+            logger.info('Cargando menú semanal actual');
+            try {
+                currentMenu = await getCurrentWeeklyMenu();
+            } catch (error) {
+                logger.error('Error getting current weekly menu:', error);
+                showErrorNotification(error);
+                
+                // Show fallback UI
+                weekDatesElement.textContent = 'Error al cargar';
+                menuStatusBadge.textContent = 'Error';
+                menuStatusBadge.className = 'status-badge error';
+                
+                menuDetails.innerHTML = `
+                    <div class="error-message">
+                        <p>Error al cargar el menú. ${error.message}</p>
+                        <p>Si el problema persiste, contacta al administrador.</p>
+                    </div>
+                `;
+                
+                // Show no menu modal with error message
+                const noMenuModalContent = document.querySelector('#noMenuModal .modal-content');
+                if (noMenuModalContent) {
+                    noMenuModalContent.innerHTML = `
+                        <h3>Error al cargar el menú</h3>
+                        <p>${error.message}</p>
+                        <p>Esto puede deberse a un problema de configuración en la base de datos.</p>
+                        <button id="refreshMenuBtn" class="btn btn-primary">Intentar nuevamente</button>
+                    `;
+                }
+                noMenuModal.style.display = 'block';
+                
+                // Re-attach event listener to the refresh button
+                document.getElementById('refreshMenuBtn').addEventListener('click', () => {
+                    noMenuModal.style.display = 'none';
+                    loadMenuData();
+                });
+                
+                return;
+            }
             
             if (!currentMenu) {
                 // No menu available
@@ -165,8 +206,19 @@ function initMenuView(branchId) {
                 goToConfirmBtn.style.display = 'none';
             }
         } catch (error) {
-            console.error('Error loading menu data:', error);
-            showError('Error al cargar los datos del menú. Intente nuevamente.');
+            logger.error('Error loading menu data:', error);
+            showErrorNotification(error);
+            
+            // Show fallback UI for critical error
+            weekDatesElement.textContent = 'Error';
+            menuStatusBadge.textContent = 'Error';
+            menuStatusBadge.className = 'status-badge error';
+            
+            menuDetails.innerHTML = `
+                <div class="error-message">
+                    <p>Error al cargar los datos. Por favor, intenta nuevamente más tarde.</p>
+                </div>
+            `;
         }
     }
     
@@ -201,8 +253,7 @@ function initMenuView(branchId) {
         const dayDate = dayMenu.date.toDate();
         
         // Format day and date
-        // Usar la función getSpanishDayName para obtener el nombre del día con acento correcto
-        const dayName = getSpanishDayName(currentDay);
+        const dayName = getDayName(dayDate.getDay());
         const formattedDate = formatDateDMY(dayDate);
         
         // Build menu details HTML
@@ -278,7 +329,9 @@ function initMenuView(branchId) {
                 tuesday: 0,
                 wednesday: 0,
                 thursday: 0,
-                friday: 0
+                friday: 0,
+                saturday: 0,
+                sunday: 0
             };
             
             confirmation.employees.forEach(employee => {
@@ -332,7 +385,7 @@ function initMenuView(branchId) {
                 `;
                 
                 // Show days as badges
-                const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+                const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
                 days.forEach((day, index) => {
                     const shortDayName = getShortDayName(index + 1); // Monday is 1
                     const isConfirmed = employee.days.includes(day);
@@ -357,7 +410,7 @@ function initMenuView(branchId) {
             
             branchConfirmations.innerHTML = html;
         } catch (error) {
-            console.error('Error loading branch confirmations:', error);
+            logger.error('Error loading branch confirmations:', error);
             branchConfirmations.innerHTML = `
                 <div class="error-message">
                     Error al cargar las confirmaciones.
@@ -433,7 +486,7 @@ function initMenuView(branchId) {
                 </tr>
             `;
         } catch (error) {
-            console.error('Error loading branches summary:', error);
+            logger.error('Error loading branches summary:', error);
             branchesSummaryBody.innerHTML = `
                 <tr>
                     <td colspan="5" class="text-center">Error al cargar el resumen</td>
@@ -455,39 +508,16 @@ function initMenuView(branchId) {
                 return 'Desconocido';
         }
     }
-    
-    // Normalizar nombre del día (convertir de español a clave en inglés)
-    function normalizeDayName(spanishName) {
-        const dayMap = {
-            'lunes': 'monday',
-            'martes': 'tuesday',
-            'miércoles': 'wednesday',
-            'miercoles': 'wednesday', // Sin acento por si acaso
-            'jueves': 'thursday',
-            'viernes': 'friday'
-        };
-        return dayMap[spanishName.toLowerCase()] || spanishName.toLowerCase();
-    }
-    
-    // Obtener nombre en español desde clave en inglés
-    function getSpanishDayName(dayKey) {
-        const dayMap = {
-            'monday': 'Lunes',
-            'tuesday': 'Martes',
-            'wednesday': 'Miércoles',
-            'thursday': 'Jueves',
-            'friday': 'Viernes'
-        };
-        return dayMap[dayKey] || dayKey;
-    }
 }
 
 // Helper function to show success notification
 function showSuccess(message) {
+    logger.info('Success:', message);
     showNotification(message, { type: 'success' });
 }
 
 // Helper function to show error notification
 function showError(message) {
+    logger.error('Error:', message);
     showNotification(message, { type: 'error' });
 }

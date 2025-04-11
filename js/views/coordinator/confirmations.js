@@ -101,7 +101,7 @@ function initConfirmations(branchId, coordinatorId) {
         updateSummary();
     });
     
-    // Save confirmation button
+    // Save confirmation button - THIS CREATES THE CONFIRMATIONS COLLECTION
     saveConfirmationBtn.addEventListener('click', async () => {
         try {
             // Disable save button
@@ -174,10 +174,25 @@ function initConfirmations(branchId, coordinatorId) {
             confirmationState = 'loading';
             updateUI();
             
-            // Load current menu
-            currentMenu = await getCurrentWeeklyMenu();
+            logger.info('Cargando datos de confirmaciones');
             
-            if (!currentMenu) {
+            // Load current menu
+            try {
+                logger.debug('Intentando obtener el menú semanal actual');
+                currentMenu = await getCurrentWeeklyMenu();
+                
+                if (!currentMenu) {
+                    logger.warn('No se encontró un menú activo');
+                    confirmationState = 'unavailable';
+                    updateUI();
+                    noMenuModal.style.display = 'block';
+                    return;
+                }
+                
+                logger.debug('Menú encontrado', { id: currentMenu.id, status: currentMenu.status });
+            } catch (error) {
+                logger.error('Error al cargar el menú actual', error);
+                showError('Error al cargar el menú. Intente refrescar la página.');
                 confirmationState = 'unavailable';
                 updateUI();
                 noMenuModal.style.display = 'block';
@@ -186,10 +201,27 @@ function initConfirmations(branchId, coordinatorId) {
             
             // Check if confirmation period is open
             const now = new Date();
-            const confirmStart = currentMenu.confirmStartDate.toDate();
-            const confirmEnd = currentMenu.confirmEndDate.toDate();
+            const confirmStart = currentMenu.confirmStartDate ? currentMenu.confirmStartDate.toDate() : null;
+            const confirmEnd = currentMenu.confirmEndDate ? currentMenu.confirmEndDate.toDate() : null;
+            
+            if (!confirmStart || !confirmEnd) {
+                logger.error('Fechas de confirmación no definidas en el menú', { menuId: currentMenu.id });
+                showError('El menú no tiene fechas de confirmación definidas. Contacte al administrador.');
+                confirmationState = 'unavailable';
+                updateUI();
+                noMenuModal.style.display = 'block';
+                return;
+            }
+            
+            logger.debug('Periodo de confirmación', { 
+                start: confirmStart.toISOString(), 
+                end: confirmEnd.toISOString(),
+                now: now.toISOString(),
+                isOpen: now >= confirmStart && now <= confirmEnd
+            });
             
             if (!viewOnly && (now < confirmStart || now > confirmEnd)) {
+                logger.info('Periodo de confirmación cerrado');
                 confirmationState = 'closed';
                 confirmStartDate.textContent = formatDateTime(confirmStart);
                 confirmEndDate.textContent = formatDateTime(confirmEnd);
@@ -231,7 +263,7 @@ function initConfirmations(branchId, coordinatorId) {
         
         const startDate = currentMenu.startDate.toDate();
         const endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + 4); // Add 4 days to get to Friday
+        endDate.setDate(endDate.getDate() + 6); // Add 6 days to get to Sunday
         
         weekDatesElement.textContent = `${formatDateDMY(startDate)} al ${formatDateDMY(endDate)}`;
     }
@@ -250,6 +282,9 @@ function initConfirmations(branchId, coordinatorId) {
         
         // Create employee list
         let html = '';
+        
+        // Define days for consistency
+        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
         
         employees.forEach(employee => {
             // Check if employee has confirmations
@@ -270,40 +305,13 @@ function initConfirmations(branchId, coordinatorId) {
                             ''}
                     </div>
                     
+                    ${days.map(day => `
                     <div class="day-checkbox">
-                        <input type="checkbox" class="employee-day-checkbox" data-day="monday" title="Lunes"
-                            ${confirmedDays.includes('monday') ? 'checked' : ''} 
+                        <input type="checkbox" class="employee-day-checkbox" data-day="${day}" 
+                            ${confirmedDays.includes(day) ? 'checked' : ''} 
                             ${confirmationState !== 'available' ? 'disabled' : ''}>
-                        <span class="day-label">Lunes</span>
                     </div>
-                    
-                    <div class="day-checkbox">
-                        <input type="checkbox" class="employee-day-checkbox" data-day="tuesday" title="Martes"
-                            ${confirmedDays.includes('tuesday') ? 'checked' : ''} 
-                            ${confirmationState !== 'available' ? 'disabled' : ''}>
-                        <span class="day-label">Martes</span>
-                    </div>
-                    
-                    <div class="day-checkbox">
-                        <input type="checkbox" class="employee-day-checkbox" data-day="wednesday" title="Miércoles"
-                            ${confirmedDays.includes('wednesday') ? 'checked' : ''} 
-                            ${confirmationState !== 'available' ? 'disabled' : ''}>
-                        <span class="day-label">Miércoles</span>
-                    </div>
-                    
-                    <div class="day-checkbox">
-                        <input type="checkbox" class="employee-day-checkbox" data-day="thursday" title="Jueves"
-                            ${confirmedDays.includes('thursday') ? 'checked' : ''} 
-                            ${confirmationState !== 'available' ? 'disabled' : ''}>
-                        <span class="day-label">Jueves</span>
-                    </div>
-                    
-                    <div class="day-checkbox">
-                        <input type="checkbox" class="employee-day-checkbox" data-day="friday" title="Viernes"
-                            ${confirmedDays.includes('friday') ? 'checked' : ''} 
-                            ${confirmationState !== 'available' ? 'disabled' : ''}>
-                        <span class="day-label">Viernes</span>
-                    </div>
+                    `).join('')}
                 </div>
             `;
         });
@@ -329,7 +337,8 @@ function initConfirmations(branchId, coordinatorId) {
         }
         
         // Count confirmations for each day
-        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        const dayNames = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
         const counts = {};
         const totalEmployees = employees.length;
         
@@ -351,8 +360,7 @@ function initConfirmations(branchId, coordinatorId) {
         let html = '';
         
         days.forEach((day, index) => {
-            // Usar la nueva función para obtener el nombre del día en español
-            const dayName = getSpanishDayName(index);
+            const dayName = dayNames[index];
             const confirmedCount = counts[day];
             const percentage = totalEmployees > 0 ? Math.round((confirmedCount / totalEmployees) * 100) : 0;
             
@@ -463,31 +471,67 @@ function initConfirmations(branchId, coordinatorId) {
         }
     }
     
+    // Submit confirmations - THIS CREATES THE CONFIRMATIONS COLLECTION
+    async function submitConfirmations(weekId, branchId, coordinatorId, employees) {
+        try {
+            // Get Firestore instance
+            const firestore = firebase.firestore();
+            
+            // Check if confirmation already exists
+            const existingQuery = await firestore.collection('confirmations')
+                .where('weekId', '==', weekId)
+                .where('branchId', '==', branchId)
+                .limit(1)
+                .get();
+            
+            let confirmationId;
+            
+            if (!existingQuery.empty) {
+                // Update existing confirmation
+                confirmationId = existingQuery.docs[0].id;
+                await firestore.collection('confirmations').doc(confirmationId).update({
+                    employees,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            } else {
+                // Create new confirmation
+                const confirmationRef = await firestore.collection('confirmations').add({
+                    weekId,
+                    branchId,
+                    coordinatorId,
+                    employees,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                confirmationId = confirmationRef.id;
+                
+                // Update confirmed count on menu
+                const confirmedEmployees = employees.filter(emp => emp.days.length > 0).length;
+                await firestore.collection('weeklyMenus').doc(weekId).update({
+                    confirmedEmployees: firebase.firestore.FieldValue.increment(confirmedEmployees)
+                });
+            }
+            
+            return { success: true, confirmationId };
+        } catch (error) {
+            console.error('Error submitting confirmations:', error);
+            throw error;
+        }
+    }
+    
     // Get day name from index
     function getDayFromIndex(index) {
-        // Nombres de los días en inglés para uso interno en la base de datos
-        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
         return days[index];
     }
     
-    // Get Spanish day name from index - para mostrar en la interfaz
-    function getSpanishDayName(index) {
-        // Nombres de los días en español con acentos correctos
-        const spanishDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
-        return spanishDays[index];
-    }
-    
-    // Normalizar nombre del día (convertir de español a clave en inglés)
-    function normalizeDayName(spanishName) {
-        const dayMap = {
-            'lunes': 'monday',
-            'martes': 'tuesday',
-            'miércoles': 'wednesday',
-            'miercoles': 'wednesday', // Sin acento por si acaso
-            'jueves': 'thursday',
-            'viernes': 'friday'
-        };
-        return dayMap[spanishName.toLowerCase()] || spanishName.toLowerCase();
+    // Normalize day name to handle accented characters
+    function normalizeDayName(dayName) {
+        if (!dayName) return '';
+        // Convert to lowercase and remove accents
+        return dayName.toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '');
     }
     
     // Pad number with leading zero
@@ -495,18 +539,22 @@ function initConfirmations(branchId, coordinatorId) {
         return num.toString().padStart(2, '0');
     }
     
-    // Get status text based on confirmation status
-    function getStatusText(status) {
-        switch(status) {
-            case 'confirmed':
-                return 'Confirmado';
-            case 'pending':
-                return 'Pendiente';
-            case 'declined':
-                return 'Rechazado';
-            default:
-                return 'Desconocido';
-        }
+    // Format date as DD/MM/YYYY
+    function formatDateDMY(date) {
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        
+        return `${day}/${month}/${year}`;
+    }
+    
+    // Format date and time (DD/MM/YYYY HH:MM)
+    function formatDateTime(date) {
+        const formattedDate = formatDateDMY(date);
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        
+        return `${formattedDate} ${hours}:${minutes}`;
     }
 }
 

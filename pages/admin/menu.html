@@ -67,19 +67,23 @@
                 <div class="menu-status-container">
                     <div class="menu-status">
                         <h2>Menú Semanal: <span id="weekDates">Cargando...</span></h2>
-                        <div class="status-badge" id="statusBadge">Pendiente</div>
-                    </div>
-                    
-                    <div class="menu-actions">
-                        <button id="createMenuBtn" class="btn btn-primary">
-                            <i class="material-icons">add</i>
-                            Crear Menú
-                        </button>
-                        
-                        <button id="publishMenuBtn" class="btn btn-secondary" disabled>
-                            <i class="material-icons">publish</i>
-                            Publicar Menú
-                        </button>
+                        <div class="menu-actions">
+                            <div class="menu-selector">
+                                <select id="menuSelector" class="form-control">
+                                    <option value="current">Menú Actual</option>
+                                    <option value="next">Próxima Semana</option>
+                                </select>
+                            </div>
+                            <button id="createMenuBtn" class="btn btn-primary">
+                                <i class="material-icons">add</i>
+                                Crear Menú
+                            </button>
+                            <button id="publishMenuBtn" class="btn btn-secondary" disabled>
+                                <i class="material-icons">publish</i>
+                                Publicar Menú
+                            </button>
+                        </div>
+                        <div class="status-badge pending" id="menuStatus">Pendiente</div>
                     </div>
                 </div>
                 
@@ -91,6 +95,8 @@
                         <div class="day-tab" data-day="wednesday">Miércoles</div>
                         <div class="day-tab" data-day="thursday">Jueves</div>
                         <div class="day-tab" data-day="friday">Viernes</div>
+                        <div class="day-tab" data-day="saturday">Sábado</div>
+                        <div class="day-tab" data-day="sunday">Domingo</div>
                     </div>
                     
                     <!-- Menu Form -->
@@ -162,20 +168,24 @@
                 <span class="close-modal">&times;</span>
                 <h2>Crear Nuevo Menú Semanal</h2>
                 
-                <div class="form-group">
-                    <label for="menuStartDate">Fecha Inicial (Lunes)</label>
-                    <input type="date" id="menuStartDate" name="menuStartDate">
-                </div>
-                
-                <p class="info-text">
-                    El menú se creará para la semana que comienza en la fecha seleccionada.
-                    Asegúrese de seleccionar un lunes.
-                </p>
-                
-                <div class="form-actions">
-                    <button id="cancelCreateMenu" class="btn btn-outline">Cancelar</button>
-                    <button id="confirmCreateMenu" class="btn btn-primary">Crear Menú</button>
-                </div>
+                <form id="createMenuForm">
+                    <div class="form-group">
+                        <label for="menuStartDate">Fecha Inicial (Lunes)</label>
+                        <input type="date" id="menuStartDate" name="menuStartDate" required>
+                    </div>
+                    
+                    <p class="info-text">
+                        El menú se creará para la semana que comienza en la fecha seleccionada.
+                        Asegúrese de seleccionar un lunes.
+                    </p>
+                    
+                    <div id="createMenuError" class="error-message" style="display: none;"></div>
+                    
+                    <div class="form-actions">
+                        <button type="button" id="cancelCreateMenu" class="btn btn-outline">Cancelar</button>
+                        <button type="submit" id="confirmCreateMenu" class="btn btn-primary">Crear Menú</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -194,6 +204,6 @@
     <script src="../../js/services/state/state-manager.js"></script>
     <script src="../../js/services/notification/notification-service.js"></script>
     <script src="../../js/utils/date-utils.js"></script>
-    <script src="../../js/views/admin/menu.js"></script>
+    <script src="../../js/views/admin/menu-fixed.js"></script>
 </body>
 </html>

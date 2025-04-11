@@ -1,6 +1,4 @@
 // State Manager - Simple state management for the application
-// Prevent duplicate declarations
-if (typeof StateManager !== 'function' && typeof stateManager === 'undefined') {
 
 /**
  * StateManager - Manages application state with observers pattern
@@ -191,7 +189,4 @@ function clearAppState() {
     Object.values(STATE_KEYS).forEach(key => {
         sessionStorage.removeItem(`app_state_${key}`);
     });
-}
-
-// Cierre del bloque condicional para evitar declaraciones duplicadas
 }

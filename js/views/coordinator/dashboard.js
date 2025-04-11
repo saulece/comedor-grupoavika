@@ -1,4 +1,22 @@
 // Dashboard.js - Coordinator Dashboard
+// Importaciones usando variables globales en lugar de import
+const logger = window.logger || console;
+// Funciones de utilidad
+const formatDateDMY = (date) => {
+    if (!date) return '';
+    return date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+};
+const getDayName = (date) => {
+    if (!date) return '';
+    return date.toLocaleDateString('es-ES', { weekday: 'long' });
+};
+const handleFirebaseError = (error, functionName, options = {}) => {
+    console.error(`Error en ${functionName}:`, error);
+    return {
+        ...error,
+        userMessage: options.userMessage || 'Ha ocurrido un error. Intente nuevamente más tarde.'
+    };
+};
 
 document.addEventListener('DOMContentLoaded', () => {
     // Check authentication and role
@@ -94,12 +112,62 @@ function initDashboard(branchId, coordinatorId) {
     // Load dashboard data
     async function loadDashboardData() {
         try {
+            // Show loading state
+            confirmationStatus.innerHTML = '<span class="loading-spinner"></span> Cargando...';
+            weekDates.textContent = 'Cargando...';
+            
+            logger.info('Cargando datos del dashboard');
+            
             // Load current menu
-            currentMenu = await getCurrentWeeklyMenu();
+            try {
+                logger.debug('Intentando obtener el menú semanal actual');
+                currentMenu = await getCurrentWeeklyMenu();
+                
+                if (currentMenu) {
+                    logger.debug('Menú encontrado', { id: currentMenu.id, status: currentMenu.status });
+                } else {
+                    logger.warn('No se encontró un menú activo');
+                }
+            } catch (error) {
+                logger.error('Error al cargar el menú actual', error);
+                showError('Error al cargar el menú. Intente refrescar la página.');
+                
+                // Display fallback UI
+                weekDates.textContent = 'No disponible';
+                menuPreview.innerHTML = `
+                    <div class="empty-message">
+                        <p>No se pudo cargar el menú. Por favor, intente nuevamente.</p>
+                        <button class="btn btn-primary" onclick="location.reload()">Refrescar página</button>
+                    </div>
+                `;
+                dayTabsContainer.innerHTML = '';
+                return;
+            }
             
             // Load employees data
-            const employeesResult = await getEmployeesByBranch(branchId);
-            employeesData = employeesResult;
+            try {
+                logger.debug('Cargando empleados de la sucursal', { branchId });
+                // Use firebase.firestore() directly for better consistency
+                const firestore = firebase.firestore();
+                const employeesSnapshot = await firestore.collection('employees')
+                    .where('branch', '==', branchId)
+                    .orderBy('name')
+                    .get();
+                
+                employeesData = [];
+                employeesSnapshot.forEach(doc => {
+                    employeesData.push({
+                        id: doc.id,
+                        ...doc.data()
+                    });
+                });
+                
+                logger.debug(`Se encontraron ${employeesData.length} empleados`);
+            } catch (error) {
+                logger.error('Error al cargar los empleados', error);
+                showError('Error al cargar los datos de empleados. Intente refrescar la página.');
+                employeesData = [];
+            }
             
             // Display menu preview
             displayMenuPreview();
@@ -114,11 +182,17 @@ function initDashboard(branchId, coordinatorId) {
             loadRecentActivity();
             
             // Store in state manager
-            setCurrentMenu(currentMenu);
+            if (currentMenu) setCurrentMenu(currentMenu);
             setCurrentEmployees(employeesData.filter(e => e.active));
+            
+            logger.info('Dashboard cargado correctamente');
         } catch (error) {
-            console.error('Error loading dashboard data:', error);
-            showError('Error al cargar datos del dashboard. Intente nuevamente.');
+            const handledError = handleFirebaseError(error, 'loadDashboardData', {
+                userMessage: 'Error al cargar datos del dashboard. Intente nuevamente.'
+            });
+            
+            logger.error('Error general al cargar el dashboard', handledError);
+            showError(handledError.userMessage || 'Error al cargar datos del dashboard. Intente nuevamente.');
         }
     }
     
@@ -145,11 +219,12 @@ function initDashboard(branchId, coordinatorId) {
         // Create day tabs
         let tabsHtml = '';
         const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+        const dayNames = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
         
         days.forEach((day, index) => {
             tabsHtml += `
                 <div class="day-tab ${day === currentDay ? 'active' : ''}" data-day="${day}">
-                    ${getSpanishDayName(day)}
+                    ${dayNames[index]}
                 </div>
             `;
         });
@@ -191,8 +266,7 @@ function initDashboard(branchId, coordinatorId) {
         const dayDate = dayMenu.date.toDate();
         
         // Format day and date
-        // Usar la función getSpanishDayName para obtener el nombre del día con acento correcto
-        const dayName = getSpanishDayName(currentDay);
+        const dayName = getDayName(dayDate.getDay());
         const formattedDate = formatDateDMY(dayDate);
         
         // Build menu details HTML
@@ -253,8 +327,27 @@ function initDashboard(branchId, coordinatorId) {
         const confirmStart = currentMenu.confirmStartDate.toDate();
         const confirmEnd = currentMenu.confirmEndDate.toDate();
         
-        // Get confirmation for current branch
-        const confirmation = await getConfirmationsByBranch(currentMenu.id, branchId);
+        // Get confirmation for current branch using firebase.firestore() directly
+        let confirmation = null;
+        try {
+            const firestore = firebase.firestore();
+            const confirmationQuery = await firestore.collection('confirmations')
+                .where('weekId', '==', currentMenu.id)
+                .where('branchId', '==', branchId)
+                .limit(1)
+                .get();
+            
+            if (!confirmationQuery.empty) {
+                const doc = confirmationQuery.docs[0];
+                confirmation = {
+                    id: doc.id,
+                    ...doc.data()
+                };
+            }
+        } catch (error) {
+            logger.error('Error al obtener confirmaciones', error);
+            // Continue with null confirmation
+        }
         
         // Build status HTML
         let html = '';
@@ -367,12 +460,27 @@ function initDashboard(branchId, coordinatorId) {
         totalEmployees.textContent = totalCount;
         activeEmployees.textContent = activeCount;
         
-        // Get confirmations for current menu
+        // Get confirmations for current menu using firebase.firestore() directly
         if (currentMenu) {
-            const confirmation = await getConfirmationsByBranch(currentMenu.id, branchId);
-            const confirmedCount = confirmation ? (confirmation.employees ? confirmation.employees.length : 0) : 0;
-            
-            confirmedEmployees.textContent = confirmedCount;
+            try {
+                const firestore = firebase.firestore();
+                const confirmationQuery = await firestore.collection('confirmations')
+                    .where('weekId', '==', currentMenu.id)
+                    .where('branchId', '==', branchId)
+                    .limit(1)
+                    .get();
+                
+                let confirmedCount = 0;
+                if (!confirmationQuery.empty) {
+                    const confirmation = confirmationQuery.docs[0].data();
+                    confirmedCount = confirmation.employees ? confirmation.employees.length : 0;
+                }
+                
+                confirmedEmployees.textContent = confirmedCount;
+            } catch (error) {
+                logger.error('Error al obtener confirmaciones para estadísticas', error);
+                confirmedEmployees.textContent = '0';
+            }
         } else {
             confirmedEmployees.textContent = '0';
         }
@@ -385,15 +493,18 @@ function initDashboard(branchId, coordinatorId) {
                 <div class="loading-message">Cargando actividades...</div>
             `;
             
+            // Get Firestore instance directly for better consistency
+            const firestore = firebase.firestore();
+            
             // Get recent confirmations
-            const confirmationsQuery = await db.collection('confirmations')
+            const confirmationsQuery = await firestore.collection('confirmations')
                 .where('branchId', '==', branchId)
                 .orderBy('timestamp', 'desc')
                 .limit(3)
                 .get();
             
             // Get employee actions (added/updated)
-            const employeeActionsQuery = await db.collection('employees')
+            const employeeActionsQuery = await firestore.collection('employees')
                 .where('branch', '==', branchId)
                 .orderBy('createdAt', 'desc')
                 .limit(3)
@@ -499,31 +610,6 @@ function initDashboard(branchId, coordinatorId) {
     // Pad number with leading zero
     function padZero(num) {
         return num.toString().padStart(2, '0');
-    }
-    
-    // Normalizar nombre del día (convertir de español a clave en inglés)
-    function normalizeDayName(spanishName) {
-        const dayMap = {
-            'lunes': 'monday',
-            'martes': 'tuesday',
-            'miércoles': 'wednesday',
-            'miercoles': 'wednesday', // Sin acento por si acaso
-            'jueves': 'thursday',
-            'viernes': 'friday'
-        };
-        return dayMap[spanishName.toLowerCase()] || spanishName.toLowerCase();
-    }
-    
-    // Obtener nombre en español desde clave en inglés
-    function getSpanishDayName(dayKey) {
-        const dayMap = {
-            'monday': 'Lunes',
-            'tuesday': 'Martes',
-            'wednesday': 'Miércoles',
-            'thursday': 'Jueves',
-            'friday': 'Viernes'
-        };
-        return dayMap[dayKey] || dayKey;
     }
 }
 

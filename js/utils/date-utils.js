@@ -49,6 +49,7 @@ function formatDateTime(date) {
 function getMondayOfWeek(date = new Date()) {
     const day = date.getDay();
     const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+    
     return new Date(date.setDate(diff));
 }
 
@@ -61,6 +62,7 @@ function getFridayOfWeek(date = new Date()) {
     const monday = getMondayOfWeek(date);
     const friday = new Date(monday);
     friday.setDate(monday.getDate() + 4);
+    
     return friday;
 }
 
@@ -70,10 +72,10 @@ function getFridayOfWeek(date = new Date()) {
  * @returns {Date} Next Monday
  */
 function getNextMonday(date = new Date()) {
-    const day = date.getDay();
-    const daysToAdd = day === 0 ? 1 : 8 - day;
-    const nextMonday = new Date(date);
-    nextMonday.setDate(date.getDate() + daysToAdd);
+    const currentMonday = getMondayOfWeek(date);
+    const nextMonday = new Date(currentMonday);
+    nextMonday.setDate(currentMonday.getDate() + 7);
+    
     return nextMonday;
 }
 
@@ -104,72 +106,10 @@ function getShortDayName(dayIndex) {
  */
 function getMonthName(monthIndex) {
     const months = [
-        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
         'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
     ];
     return months[monthIndex];
-}
-
-/**
- * Format a relative date (today, yesterday, tomorrow, or DMY format)
- * @param {Date} date - Date to format
- * @returns {string} Formatted relative date
- */
-function formatRelativeDate(date) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    
-    const compareDate = new Date(date);
-    compareDate.setHours(0, 0, 0, 0);
-    
-    if (compareDate.getTime() === today.getTime()) {
-        return 'Hoy';
-    } else if (compareDate.getTime() === yesterday.getTime()) {
-        return 'Ayer';
-    } else if (compareDate.getTime() === tomorrow.getTime()) {
-        return 'Mañana';
-    } else {
-        return formatDateDMY(date);
-    }
-}
-
-/**
- * Calculate time difference in a human readable format
- * @param {Date} date1 - First date
- * @param {Date} date2 - Second date
- * @returns {string} Human readable time difference
- */
-function getTimeDifference(date1, date2) {
-    const diff = Math.abs(date2 - date1);
-    
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    
-    if (days > 0) {
-        return `${days} día${days !== 1 ? 's' : ''}`;
-    } else if (hours > 0) {
-        return `${hours} hora${hours !== 1 ? 's' : ''}`;
-    } else {
-        return `${minutes} minuto${minutes !== 1 ? 's' : ''}`;
-    }
-}
-
-/**
- * Check if a date is within a specified range
- * @param {Date} date - Date to check
- * @param {Date} startDate - Start of range
- * @param {Date} endDate - End of range
- * @returns {boolean} True if date is within range
- */
-function isDateInRange(date, startDate, endDate) {
-    return date >= startDate && date <= endDate;
 }
 
 /**
@@ -183,3 +123,17 @@ function formatTime(date) {
     
     return `${hours}:${minutes}`;
 }
+
+// Hacer las funciones disponibles globalmente
+window.dateUtils = {
+    formatDateYMD,
+    formatDateDMY,
+    formatDateTime,
+    getMondayOfWeek,
+    getFridayOfWeek,
+    getNextMonday,
+    getDayName,
+    getShortDayName,
+    getMonthName,
+    formatTime
+};
