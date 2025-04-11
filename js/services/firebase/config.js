@@ -10,8 +10,14 @@ const firebaseConfig = {
     measurementId: "G-P3ZDJJQVW9"
 };
 
-// Initialize Firebase
-firebase.initializeApp(firebaseConfig);
+// Check if Firebase is already initialized to prevent duplicate initialization
+if (!firebase.apps.length) {
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    console.log("Firebase initialized");
+} else {
+    console.log("Firebase already initialized");
+}
 
 // Initialize services
 const auth = firebase.auth();
@@ -19,5 +25,3 @@ const db = firebase.firestore();
 
 // Optional: Initialize Analytics
 const analytics = firebase.analytics ? firebase.analytics() : null;
-
-console.log("Firebase initialized");

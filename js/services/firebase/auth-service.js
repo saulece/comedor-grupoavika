@@ -1,4 +1,6 @@
 // Auth Service - Handles all authentication related operations
+// Prevent duplicate declarations
+if (typeof loginWithEmail !== 'function') {
 
 /**
  * Login with email and password
@@ -111,4 +113,7 @@ async function updateLastLogin() {
     return db.collection('users').doc(user.uid).update({
         lastLogin: firebase.firestore.FieldValue.serverTimestamp()
     });
+}
+
+// Cierre del bloque condicional para evitar declaraciones duplicadas
 }

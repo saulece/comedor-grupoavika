@@ -153,8 +153,13 @@ function initMenuManagement() {
         }
         
         // Validate if selected date is a Monday
-        const date = new Date(startDateStr);
-        console.log('Fecha parseada:', date);
+        // Fix date parsing by splitting the date string and creating a new Date object
+        // Format is expected to be YYYY-MM-DD
+        const [year, month, day] = startDateStr.split('-').map(num => parseInt(num, 10));
+        // Note: month is 0-indexed in JavaScript Date (0 = January, 1 = February, etc.)
+        const date = new Date(year, month - 1, day);
+        
+        console.log('Fecha parseada correctamente:', date);
         console.log('Día de la semana:', date.getDay()); // 0=Domingo, 1=Lunes, etc.
         
         if (date.getDay() !== 1) { // 1 = Monday
@@ -436,8 +441,11 @@ function initMenuManagement() {
     async function createWeeklyMenu(startDateStr) {
         console.log('Iniciando createWeeklyMenu con fecha:', startDateStr);
         
-        // Parse date string to Date object
-        const startDate = new Date(startDateStr);
+        // Parse date string to Date object correctly
+        // Format is expected to be YYYY-MM-DD
+        const [year, month, day] = startDateStr.split('-').map(num => parseInt(num, 10));
+        // Note: month is 0-indexed in JavaScript Date
+        const startDate = new Date(year, month - 1, day);
         console.log('Fecha parseada en createWeeklyMenu:', startDate);
         
         // Format date for ID
@@ -576,7 +584,20 @@ function formatDateForInput(date) {
 
 // Format date for Firestore document ID (YYYY-MM-DD)
 function formatDateForId(date) {
-    return formatDateForInput(date);
+    // Asegurarse de que la fecha sea válida
+    if (!(date instanceof Date) || isNaN(date)) {
+        console.error('Fecha inválida en formatDateForId:', date);
+        throw new Error('Fecha inválida para generar ID');
+    }
+    
+    // Crear un ID consistente en formato YYYYMMDD
+    const year = date.getFullYear();
+    const month = padZero(date.getMonth() + 1);
+    const day = padZero(date.getDate());
+    
+    const id = `${year}${month}${day}`;
+    console.log('ID generado:', id);
+    return id;
 }
 
 // Format date for display (DD/MM/YYYY)

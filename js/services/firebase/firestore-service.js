@@ -1,4 +1,6 @@
 // Firestore Service - Handles all Firestore operations
+// Prevent duplicate declarations
+if (typeof getCurrentWeeklyMenu !== 'function') {
 
 /**
  * Get current weekly menu
@@ -375,4 +377,7 @@ async function getAppSettings() {
         console.error('Error getting app settings:', error);
         throw error;
     }
+}
+
+// Cierre del bloque condicional para evitar declaraciones duplicadas
 }

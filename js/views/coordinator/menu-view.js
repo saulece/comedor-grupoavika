@@ -201,7 +201,8 @@ function initMenuView(branchId) {
         const dayDate = dayMenu.date.toDate();
         
         // Format day and date
-        const dayName = getDayName(dayDate.getDay());
+        // Usar la función getSpanishDayName para obtener el nombre del día con acento correcto
+        const dayName = getSpanishDayName(currentDay);
         const formattedDate = formatDateDMY(dayDate);
         
         // Build menu details HTML
@@ -453,6 +454,31 @@ function initMenuView(branchId) {
             default:
                 return 'Desconocido';
         }
+    }
+    
+    // Normalizar nombre del día (convertir de español a clave en inglés)
+    function normalizeDayName(spanishName) {
+        const dayMap = {
+            'lunes': 'monday',
+            'martes': 'tuesday',
+            'miércoles': 'wednesday',
+            'miercoles': 'wednesday', // Sin acento por si acaso
+            'jueves': 'thursday',
+            'viernes': 'friday'
+        };
+        return dayMap[spanishName.toLowerCase()] || spanishName.toLowerCase();
+    }
+    
+    // Obtener nombre en español desde clave en inglés
+    function getSpanishDayName(dayKey) {
+        const dayMap = {
+            'monday': 'Lunes',
+            'tuesday': 'Martes',
+            'wednesday': 'Miércoles',
+            'thursday': 'Jueves',
+            'friday': 'Viernes'
+        };
+        return dayMap[dayKey] || dayKey;
     }
 }
 

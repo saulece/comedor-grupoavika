@@ -271,33 +271,38 @@ function initConfirmations(branchId, coordinatorId) {
                     </div>
                     
                     <div class="day-checkbox">
-                        <input type="checkbox" class="employee-day-checkbox" data-day="monday" 
+                        <input type="checkbox" class="employee-day-checkbox" data-day="monday" title="Lunes"
                             ${confirmedDays.includes('monday') ? 'checked' : ''} 
                             ${confirmationState !== 'available' ? 'disabled' : ''}>
+                        <span class="day-label">Lunes</span>
                     </div>
                     
                     <div class="day-checkbox">
-                        <input type="checkbox" class="employee-day-checkbox" data-day="tuesday" 
+                        <input type="checkbox" class="employee-day-checkbox" data-day="tuesday" title="Martes"
                             ${confirmedDays.includes('tuesday') ? 'checked' : ''} 
                             ${confirmationState !== 'available' ? 'disabled' : ''}>
+                        <span class="day-label">Martes</span>
                     </div>
                     
                     <div class="day-checkbox">
-                        <input type="checkbox" class="employee-day-checkbox" data-day="wednesday" 
+                        <input type="checkbox" class="employee-day-checkbox" data-day="wednesday" title="Miércoles"
                             ${confirmedDays.includes('wednesday') ? 'checked' : ''} 
                             ${confirmationState !== 'available' ? 'disabled' : ''}>
+                        <span class="day-label">Miércoles</span>
                     </div>
                     
                     <div class="day-checkbox">
-                        <input type="checkbox" class="employee-day-checkbox" data-day="thursday" 
+                        <input type="checkbox" class="employee-day-checkbox" data-day="thursday" title="Jueves"
                             ${confirmedDays.includes('thursday') ? 'checked' : ''} 
                             ${confirmationState !== 'available' ? 'disabled' : ''}>
+                        <span class="day-label">Jueves</span>
                     </div>
                     
                     <div class="day-checkbox">
-                        <input type="checkbox" class="employee-day-checkbox" data-day="friday" 
+                        <input type="checkbox" class="employee-day-checkbox" data-day="friday" title="Viernes"
                             ${confirmedDays.includes('friday') ? 'checked' : ''} 
                             ${confirmationState !== 'available' ? 'disabled' : ''}>
+                        <span class="day-label">Viernes</span>
                     </div>
                 </div>
             `;
@@ -346,7 +351,8 @@ function initConfirmations(branchId, coordinatorId) {
         let html = '';
         
         days.forEach((day, index) => {
-            const dayName = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'][index];
+            // Usar la nueva función para obtener el nombre del día en español
+            const dayName = getSpanishDayName(index);
             const confirmedCount = counts[day];
             const percentage = totalEmployees > 0 ? Math.round((confirmedCount / totalEmployees) * 100) : 0;
             
@@ -459,8 +465,29 @@ function initConfirmations(branchId, coordinatorId) {
     
     // Get day name from index
     function getDayFromIndex(index) {
+        // Nombres de los días en inglés para uso interno en la base de datos
         const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
         return days[index];
+    }
+    
+    // Get Spanish day name from index - para mostrar en la interfaz
+    function getSpanishDayName(index) {
+        // Nombres de los días en español con acentos correctos
+        const spanishDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+        return spanishDays[index];
+    }
+    
+    // Normalizar nombre del día (convertir de español a clave en inglés)
+    function normalizeDayName(spanishName) {
+        const dayMap = {
+            'lunes': 'monday',
+            'martes': 'tuesday',
+            'miércoles': 'wednesday',
+            'miercoles': 'wednesday', // Sin acento por si acaso
+            'jueves': 'thursday',
+            'viernes': 'friday'
+        };
+        return dayMap[spanishName.toLowerCase()] || spanishName.toLowerCase();
     }
     
     // Pad number with leading zero

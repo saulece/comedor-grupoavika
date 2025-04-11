@@ -145,12 +145,11 @@ function initDashboard(branchId, coordinatorId) {
         // Create day tabs
         let tabsHtml = '';
         const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
-        const dayNames = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
         
         days.forEach((day, index) => {
             tabsHtml += `
                 <div class="day-tab ${day === currentDay ? 'active' : ''}" data-day="${day}">
-                    ${dayNames[index]}
+                    ${getSpanishDayName(day)}
                 </div>
             `;
         });
@@ -192,7 +191,8 @@ function initDashboard(branchId, coordinatorId) {
         const dayDate = dayMenu.date.toDate();
         
         // Format day and date
-        const dayName = getDayName(dayDate.getDay());
+        // Usar la función getSpanishDayName para obtener el nombre del día con acento correcto
+        const dayName = getSpanishDayName(currentDay);
         const formattedDate = formatDateDMY(dayDate);
         
         // Build menu details HTML
@@ -499,6 +499,31 @@ function initDashboard(branchId, coordinatorId) {
     // Pad number with leading zero
     function padZero(num) {
         return num.toString().padStart(2, '0');
+    }
+    
+    // Normalizar nombre del día (convertir de español a clave en inglés)
+    function normalizeDayName(spanishName) {
+        const dayMap = {
+            'lunes': 'monday',
+            'martes': 'tuesday',
+            'miércoles': 'wednesday',
+            'miercoles': 'wednesday', // Sin acento por si acaso
+            'jueves': 'thursday',
+            'viernes': 'friday'
+        };
+        return dayMap[spanishName.toLowerCase()] || spanishName.toLowerCase();
+    }
+    
+    // Obtener nombre en español desde clave en inglés
+    function getSpanishDayName(dayKey) {
+        const dayMap = {
+            'monday': 'Lunes',
+            'tuesday': 'Martes',
+            'wednesday': 'Miércoles',
+            'thursday': 'Jueves',
+            'friday': 'Viernes'
+        };
+        return dayMap[dayKey] || dayKey;
     }
 }
 
