@@ -164,20 +164,24 @@
                 <span class="close-modal">&times;</span>
                 <h2>Crear Nuevo Menú Semanal</h2>
                 
-                <div class="form-group">
-                    <label for="menuStartDate">Fecha Inicial (Lunes)</label>
-                    <input type="date" id="menuStartDate" name="menuStartDate">
-                </div>
-                
-                <p class="info-text">
-                    El menú se creará para la semana que comienza en la fecha seleccionada.
-                    Asegúrese de seleccionar un lunes.
-                </p>
-                
-                <div class="form-actions">
-                    <button id="cancelCreateMenu" class="btn btn-outline">Cancelar</button>
-                    <button id="confirmCreateMenu" class="btn btn-primary">Crear Menú</button>
-                </div>
+                <form id="createMenuForm">
+                    <div class="form-group">
+                        <label for="menuStartDate">Fecha Inicial (Lunes)</label>
+                        <input type="date" id="menuStartDate" name="menuStartDate" required>
+                    </div>
+                    
+                    <p class="info-text">
+                        El menú se creará para la semana que comienza en la fecha seleccionada.
+                        Asegúrese de seleccionar un lunes.
+                    </p>
+                    
+                    <div id="createMenuError" class="error-message" style="display: none;"></div>
+                    
+                    <div class="form-actions">
+                        <button type="button" id="cancelCreateMenu" class="btn btn-outline">Cancelar</button>
+                        <button type="submit" id="confirmCreateMenu" class="btn btn-primary">Crear Menú</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>

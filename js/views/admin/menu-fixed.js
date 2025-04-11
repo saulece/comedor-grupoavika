@@ -49,15 +49,13 @@ function initMenuManagement() {
     const saveMenuBtn = document.getElementById('saveMenuBtn');
     const dayTabs = document.querySelectorAll('.day-tab');
     const menuFormMessage = document.getElementById('menuFormMessage');
-    
-    // Modal elements
     const createMenuModal = document.getElementById('createMenuModal');
-    const menuStartDateInput = document.getElementById('menuStartDate');
-    const confirmCreateMenuBtn = document.getElementById('confirmCreateMenu');
-    const cancelCreateMenuBtn = document.getElementById('cancelCreateMenu');
+    const createMenuForm = document.getElementById('createMenuForm');
     const closeModalBtn = document.querySelector('.close-modal');
-    
-    // Form inputs
+    const menuStartDateInput = document.getElementById('menuStartDate');
+    const cancelCreateMenuBtn = document.getElementById('cancelCreateMenu');
+    const confirmCreateMenuBtn = document.getElementById('confirmCreateMenu');
+    const createMenuError = document.getElementById('createMenuError');
     const mainDishInput = document.getElementById('mainDish');
     const sideDishInput = document.getElementById('sideDish');
     const dessertInput = document.getElementById('dessert');
@@ -156,78 +154,91 @@ function initMenuManagement() {
             menuStartDateInput.min = formatDateYMD(new Date()); // Prevent past dates
             
             // Clear previous error
-            createMenuError.textContent = '';
-            createMenuError.style.display = 'none';
+            if (createMenuError) {
+                createMenuError.textContent = '';
+                createMenuError.style.display = 'none';
+            }
         } catch (error) {
             console.error('Error showing create menu modal:', error);
         }
     });
     
+    // Close modal when clicking on X
+    if (closeModalBtn) {
+        closeModalBtn.addEventListener('click', () => {
+            createMenuModal.style.display = 'none';
+        });
+    }
+    
+    // Close modal when clicking on Cancel button
+    if (cancelCreateMenuBtn) {
+        cancelCreateMenuBtn.addEventListener('click', () => {
+            createMenuModal.style.display = 'none';
+        });
+    }
+    
+    // Close modal when clicking outside of it
+    window.addEventListener('click', (event) => {
+        if (event.target === createMenuModal) {
+            createMenuModal.style.display = 'none';
+        }
+    });
+    
     // Create menu form submit
-    createMenuForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        try {
+    if (createMenuForm) {
+        createMenuForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
             const startDateStr = menuStartDateInput.value;
             
             if (!startDateStr) {
-                createMenuError.textContent = 'Por favor seleccione una fecha de inicio.';
-                createMenuError.style.display = 'block';
+                if (createMenuError) {
+                    createMenuError.textContent = 'Por favor seleccione una fecha de inicio.';
+                    createMenuError.style.display = 'block';
+                } else {
+                    alert('Por favor seleccione una fecha de inicio.');
+                }
                 return;
             }
             
-            const startDate = new Date(startDateStr);
-            
-            // No longer require the date to be a Monday - allow any day of the week
-            // This allows more flexibility for the admin
-            
-            // Show loading state
-            createMenuBtn.disabled = true;
-            confirmCreateMenuBtn.disabled = true;
-            confirmCreateMenuBtn.innerHTML = '<span class="spinner"></span> Creando...';
-            
-            // Create weekly menu
-            await createWeeklyMenu(startDateStr);
-            
-            // Close modal and reload menu
-            createMenuModal.style.display = 'none';
-            createMenuBtn.disabled = false;
-            confirmCreateMenuBtn.disabled = false;
-            confirmCreateMenuBtn.innerHTML = 'Crear Menú';
-            
-            // Show success message
-            showMessage('Menú creado correctamente.', 'success');
-            
-            // Reload menu
-            loadCurrentMenu();
-        } catch (error) {
-            console.error('Error creating menu:', error);
-            
-            createMenuError.textContent = error.message || 'Error al crear el menú. Intente nuevamente.';
-            createMenuError.style.display = 'block';
-            
-            createMenuBtn.disabled = false;
-            confirmCreateMenuBtn.disabled = false;
-            confirmCreateMenuBtn.innerHTML = 'Crear Menú';
-        }
-    });
-    
-    // Cancel create menu button
-    cancelCreateMenuBtn.addEventListener('click', () => {
-        createMenuModal.style.display = 'none';
-    });
-    
-    // Close modal button
-    closeModalBtn.addEventListener('click', () => {
-        createMenuModal.style.display = 'none';
-    });
-    
-    // Close modal when clicking outside
-    window.addEventListener('click', (e) => {
-        if (e.target === createMenuModal) {
-            createMenuModal.style.display = 'none';
-        }
-    });
+            try {
+                // Show loading state
+                createMenuBtn.disabled = true;
+                confirmCreateMenuBtn.disabled = true;
+                confirmCreateMenuBtn.innerHTML = '<span class="spinner"></span> Creando...';
+                
+                // Create weekly menu
+                await createWeeklyMenu(startDateStr);
+                
+                // Close modal and reload menu
+                createMenuModal.style.display = 'none';
+                createMenuBtn.disabled = false;
+                confirmCreateMenuBtn.disabled = false;
+                confirmCreateMenuBtn.innerHTML = 'Crear Menú';
+                
+                // Show success message
+                showMessage('Menú creado correctamente.', 'success');
+                
+                // Reload menu
+                loadCurrentMenu();
+            } catch (error) {
+                console.error('Error creating menu:', error);
+                
+                if (createMenuError) {
+                    createMenuError.textContent = error.message || 'Error al crear el menú. Intente nuevamente.';
+                    createMenuError.style.display = 'block';
+                } else {
+                    alert('Error al crear el menú: ' + error.message);
+                }
+                
+                createMenuBtn.disabled = false;
+                confirmCreateMenuBtn.disabled = false;
+                confirmCreateMenuBtn.innerHTML = 'Crear Menú';
+            }
+        });
+    } else {
+        console.error('Error: createMenuForm not found');
+    }
     
     // Publish menu button
     publishMenuBtn.addEventListener('click', async () => {
