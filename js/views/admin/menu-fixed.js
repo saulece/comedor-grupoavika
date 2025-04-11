@@ -162,7 +162,7 @@ function initMenuManagement() {
             loadCurrentMenu();
         } catch (error) {
             console.error('Error creating menu:', error);
-            alert('Error al crear el menú. Intente nuevamente.');
+            alert('Error al crear el menú. Intente nuevamente: ' + error.message);
         }
     });
     
@@ -246,8 +246,7 @@ function initMenuManagement() {
                 // Start countdown timer if in-progress
                 startCountdownTimer();
                 
-                // Enable or disable create menu button based on current menu status
-                // Allow creating new menu regardless of current menu status
+                // Always enable create menu button
                 createMenuBtn.disabled = false;
             } else {
                 // No menu found, hide form
@@ -271,6 +270,9 @@ function initMenuManagement() {
         } catch (error) {
             console.error('Error loading menu:', error);
             showMessage('Error al cargar los datos del menú.', 'error');
+            
+            // Always enable create menu button even on error
+            createMenuBtn.disabled = false;
         }
     }
     
@@ -441,80 +443,92 @@ function initMenuManagement() {
     
     // Create a new weekly menu
     async function createWeeklyMenu(startDateStr) {
-        const startDate = new Date(startDateStr);
-        const weekId = formatDateYMD(startDate);
-        
-        // Check if menu already exists
-        const existingMenu = await db.collection('weeklyMenus').doc(weekId).get();
-        
-        if (existingMenu.exists) {
-            throw new Error('Ya existe un menú para esta semana.');
-        }
-        
-        // Get total employees count
-        const employeesSnapshot = await db.collection('employees')
-            .where('active', '==', true)
-            .get();
-        
-        const totalEmployees = employeesSnapshot.size;
-        
-        // Get app settings for confirmation window
-        const settingsSnapshot = await db.collection('settings').doc('appSettings').get();
-        let confirmStartTime, confirmEndTime;
-        
-        if (settingsSnapshot.exists) {
-            const settings = settingsSnapshot.data();
+        try {
+            const startDate = new Date(startDateStr);
+            const weekId = formatDateYMD(startDate);
             
-            // Calculate confirmation start and end times based on settings
-            confirmStartTime = new Date(startDate);
-            confirmStartTime.setDate(confirmStartTime.getDate() - 4); // Thursday before the week
-            confirmStartTime.setHours(16, 10, 0, 0); // 16:10
+            console.log('Creating menu for week:', weekId);
             
-            confirmEndTime = new Date(startDate);
-            confirmEndTime.setDate(confirmEndTime.getDate() - 2); // Saturday before the week
-            confirmEndTime.setHours(10, 0, 0, 0); // 10:00
-        } else {
-            // Default times if settings don't exist
-            confirmStartTime = new Date(startDate);
-            confirmStartTime.setDate(confirmStartTime.getDate() - 4); // Thursday
-            confirmStartTime.setHours(16, 10, 0, 0); // 16:10
+            // Check if menu already exists
+            const existingMenu = await db.collection('weeklyMenus').doc(weekId).get();
             
-            confirmEndTime = new Date(startDate);
-            confirmEndTime.setDate(confirmEndTime.getDate() - 2); // Saturday
-            confirmEndTime.setHours(10, 0, 0, 0); // 10:00
-        }
-        
-        // Create weeklyMenu document
-        await db.collection('weeklyMenus').doc(weekId).set({
-            startDate: firebase.firestore.Timestamp.fromDate(startDate),
-            status: 'pending',
-            confirmStartDate: firebase.firestore.Timestamp.fromDate(confirmStartTime),
-            confirmEndDate: firebase.firestore.Timestamp.fromDate(confirmEndTime),
-            totalEmployees,
-            confirmedEmployees: 0,
-            createdBy: auth.currentUser.uid,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        
-        // Create dailyMenus subcollection
-        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-        const batch = db.batch();
-        
-        days.forEach((day, index) => {
-            const dayDate = new Date(startDate);
-            dayDate.setDate(dayDate.getDate() + index);
+            if (existingMenu.exists) {
+                throw new Error('Ya existe un menú para esta semana.');
+            }
             
-            const dayRef = db.collection('weeklyMenus').doc(weekId).collection('dailyMenus').doc(day);
-            batch.set(dayRef, {
-                date: firebase.firestore.Timestamp.fromDate(dayDate),
-                mainDish: '',
-                sideDish: '',
-                dessert: '',
-                vegetarianOption: ''
+            // Get total employees count
+            const employeesSnapshot = await db.collection('employees')
+                .where('active', '==', true)
+                .get();
+            
+            const totalEmployees = employeesSnapshot.size;
+            
+            // Get app settings for confirmation window
+            const settingsSnapshot = await db.collection('settings').doc('appSettings').get();
+            let confirmStartTime, confirmEndTime;
+            
+            if (settingsSnapshot.exists) {
+                const settings = settingsSnapshot.data();
+                
+                // Calculate confirmation start and end times based on settings
+                confirmStartTime = new Date(startDate);
+                confirmStartTime.setDate(confirmStartTime.getDate() - 4); // Thursday before the week
+                confirmStartTime.setHours(16, 10, 0, 0); // 16:10
+                
+                confirmEndTime = new Date(startDate);
+                confirmEndTime.setDate(confirmEndTime.getDate() - 2); // Saturday before the week
+                confirmEndTime.setHours(10, 0, 0, 0); // 10:00
+            } else {
+                // Default times if settings don't exist
+                confirmStartTime = new Date(startDate);
+                confirmStartTime.setDate(confirmStartTime.getDate() - 4); // Thursday
+                confirmStartTime.setHours(16, 10, 0, 0); // 16:10
+                
+                confirmEndTime = new Date(startDate);
+                confirmEndTime.setDate(confirmEndTime.getDate() - 2); // Saturday
+                confirmEndTime.setHours(10, 0, 0, 0); // 10:00
+            }
+            
+            console.log('Creating weekly menu document...');
+            
+            // Create weeklyMenu document
+            await db.collection('weeklyMenus').doc(weekId).set({
+                startDate: firebase.firestore.Timestamp.fromDate(startDate),
+                status: 'pending',
+                confirmStartDate: firebase.firestore.Timestamp.fromDate(confirmStartTime),
+                confirmEndDate: firebase.firestore.Timestamp.fromDate(confirmEndTime),
+                totalEmployees,
+                confirmedEmployees: 0,
+                createdBy: auth.currentUser.uid,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
-        });
-        
-        await batch.commit();
+            
+            console.log('Creating daily menus...');
+            
+            // Create dailyMenus subcollection
+            const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+            const batch = db.batch();
+            
+            days.forEach((day, index) => {
+                const dayDate = new Date(startDate);
+                dayDate.setDate(dayDate.getDate() + index);
+                
+                const dayRef = db.collection('weeklyMenus').doc(weekId).collection('dailyMenus').doc(day);
+                batch.set(dayRef, {
+                    date: firebase.firestore.Timestamp.fromDate(dayDate),
+                    mainDish: '',
+                    sideDish: '',
+                    dessert: '',
+                    vegetarianOption: ''
+                });
+            });
+            
+            await batch.commit();
+            console.log('Weekly menu created successfully!');
+        } catch (error) {
+            console.error('Error in createWeeklyMenu:', error);
+            throw error;
+        }
     }
 }
 
