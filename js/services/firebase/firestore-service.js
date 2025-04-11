@@ -1,21 +1,5 @@
 // Firestore Service - Handles all Firestore operations
 
-// Cargar extensiones de desarrollo si estamos en modo desarrollo
-if (typeof DEVELOPMENT_MODE !== 'undefined' && DEVELOPMENT_MODE) {
-    // Cargar script de desarrollo dinámicamente
-    const devScript = document.createElement('script');
-    devScript.src = '../../js/services/firebase/firestore-service-dev.js';
-    devScript.onload = function() {
-        if (typeof devLog === 'function') {
-            devLog('Extensiones de Firestore para desarrollo cargadas correctamente');
-        }
-    };
-    devScript.onerror = function() {
-        console.warn('No se pudieron cargar las extensiones de Firestore para desarrollo');
-    };
-    document.head.appendChild(devScript);
-}
-
 /**
  * Get Firestore instance
  * @returns {Object} Firebase Firestore instance
@@ -45,47 +29,6 @@ function handleFirebaseError(error, functionName, options = {}) {
  */
 async function getCurrentWeeklyMenu() {
     try {
-        // Verificar si estamos en modo desarrollo con datos de prueba
-        if (typeof DEVELOPMENT_MODE !== 'undefined' && DEVELOPMENT_MODE && 
-            typeof DEV_CONFIG !== 'undefined' && DEV_CONFIG.useTestData) {
-            
-            if (typeof devLog === 'function') {
-                devLog('Obteniendo menú semanal de datos de prueba');
-            }
-            
-            // Intentar usar la función simulateFirestoreQuery si está disponible
-            if (typeof simulateFirestoreQuery === 'function') {
-                const testMenus = await simulateFirestoreQuery('weeklyMenus', {
-                    filters: [
-                        { field: 'status', operator: 'in', value: ['published', 'in-progress'] }
-                    ],
-                    orderBy: { field: 'startDate', direction: 'desc' }
-                });
-                
-                if (testMenus && testMenus.length > 0) {
-                    if (typeof devLog === 'function') {
-                        devLog('Menú semanal de prueba encontrado', testMenus[0]);
-                    }
-                    return testMenus[0];
-                }
-            }
-            
-            // Si no está disponible simulateFirestoreQuery, intentar con getTestDataForCollection
-            if (typeof getTestDataForCollection === 'function') {
-                const testMenus = getTestDataForCollection('weeklyMenus');
-                if (testMenus && testMenus.length > 0) {
-                    if (typeof devLog === 'function') {
-                        devLog('Menú semanal de prueba encontrado', testMenus[0]);
-                    }
-                    return testMenus[0];
-                }
-            }
-            
-            // Si no se encontraron datos de prueba, continuar con el flujo normal
-            if (typeof devLog === 'function') {
-                devLog('No se encontraron datos de prueba para el menú semanal, usando flujo normal');
-            }
-        }
         
         // Get current date
         const today = new Date();

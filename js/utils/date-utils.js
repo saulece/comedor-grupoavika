@@ -1,21 +1,5 @@
 // Date Utilities
 
-// Cargar utilidades de desarrollo si estamos en modo desarrollo
-if (typeof DEVELOPMENT_MODE !== 'undefined' && DEVELOPMENT_MODE) {
-    // Cargar script de utilidades de desarrollo dinámicamente
-    const devUtilsScript = document.createElement('script');
-    devUtilsScript.src = '../../js/utils/dev-utils.js';
-    devUtilsScript.onload = function() {
-        if (typeof devLog === 'function') {
-            devLog('Utilidades de desarrollo para fechas cargadas correctamente');
-        }
-    };
-    devUtilsScript.onerror = function() {
-        console.warn('No se pudieron cargar las utilidades de desarrollo para fechas');
-    };
-    document.head.appendChild(devUtilsScript);
-}
-
 /**
  * Format a date to YYYY-MM-DD
  * @param {Date} date - Date object
