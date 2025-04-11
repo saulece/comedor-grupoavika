@@ -145,43 +145,70 @@ function initMenuManagement() {
     });
     
     // Create menu button
-    createMenuBtn.addEventListener('click', () => {
-        // Set default date to next Monday
-        const nextMonday = getNextMonday();
-        menuStartDateInput.value = formatDateYMD(nextMonday);
-        
-        // Show modal
-        createMenuModal.style.display = 'block';
+    createMenuBtn.addEventListener('click', async () => {
+        try {
+            // Show create menu modal
+            createMenuModal.style.display = 'flex';
+            
+            // Set default date to next Monday
+            const nextMonday = getNextMonday();
+            menuStartDateInput.value = formatDateYMD(nextMonday);
+            menuStartDateInput.min = formatDateYMD(new Date()); // Prevent past dates
+            
+            // Clear previous error
+            createMenuError.textContent = '';
+            createMenuError.style.display = 'none';
+        } catch (error) {
+            console.error('Error showing create menu modal:', error);
+        }
     });
     
-    // Confirm create menu button
-    confirmCreateMenuBtn.addEventListener('click', async () => {
-        const startDate = menuStartDateInput.value;
-        
-        if (!startDate) {
-            alert('Por favor seleccione una fecha válida.');
-            return;
-        }
-        
-        // Validate if selected date is a Monday
-        const date = new Date(startDate);
-        if (date.getDay() !== 1) { // 1 = Monday
-            alert('Por favor seleccione un lunes como fecha inicial.');
-            return;
-        }
+    // Create menu form submit
+    createMenuForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
         
         try {
-            // Create new weekly menu
-            await createWeeklyMenu(startDate);
+            const startDateStr = menuStartDateInput.value;
             
-            // Close modal
+            if (!startDateStr) {
+                createMenuError.textContent = 'Por favor seleccione una fecha de inicio.';
+                createMenuError.style.display = 'block';
+                return;
+            }
+            
+            const startDate = new Date(startDateStr);
+            
+            // No longer require the date to be a Monday - allow any day of the week
+            // This allows more flexibility for the admin
+            
+            // Show loading state
+            createMenuBtn.disabled = true;
+            confirmCreateMenuBtn.disabled = true;
+            confirmCreateMenuBtn.innerHTML = '<span class="spinner"></span> Creando...';
+            
+            // Create weekly menu
+            await createWeeklyMenu(startDateStr);
+            
+            // Close modal and reload menu
             createMenuModal.style.display = 'none';
+            createMenuBtn.disabled = false;
+            confirmCreateMenuBtn.disabled = false;
+            confirmCreateMenuBtn.innerHTML = 'Crear Menú';
             
-            // Reload menu data
+            // Show success message
+            showMessage('Menú creado correctamente.', 'success');
+            
+            // Reload menu
             loadCurrentMenu();
         } catch (error) {
             console.error('Error creating menu:', error);
-            alert('Error al crear el menú. Intente nuevamente: ' + error.message);
+            
+            createMenuError.textContent = error.message || 'Error al crear el menú. Intente nuevamente.';
+            createMenuError.style.display = 'block';
+            
+            createMenuBtn.disabled = false;
+            confirmCreateMenuBtn.disabled = false;
+            confirmCreateMenuBtn.innerHTML = 'Crear Menú';
         }
     });
     
@@ -463,7 +490,22 @@ function initMenuManagement() {
     // Create a new weekly menu
     async function createWeeklyMenu(startDateStr) {
         try {
-            const startDate = new Date(startDateStr);
+            const selectedDate = new Date(startDateStr);
+            
+            // Ajustar la fecha para que el lunes sea el primer día de la semana
+            // Si la fecha seleccionada no es lunes, encontramos el lunes de esa semana
+            const dayOfWeek = selectedDate.getDay(); // 0 = domingo, 1 = lunes, ..., 6 = sábado
+            const startDate = new Date(selectedDate);
+            
+            // Si es domingo (0), retrocedemos 6 días para llegar al lunes anterior
+            // Si es otro día, retrocedemos (dayOfWeek - 1) días
+            const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+            startDate.setDate(startDate.getDate() - daysToSubtract);
+            startDate.setHours(0, 0, 0, 0);
+            
+            console.log('Fecha seleccionada:', formatDateDMY(selectedDate), 'día de la semana:', dayOfWeek);
+            console.log('Fecha de inicio ajustada (lunes):', formatDateDMY(startDate));
+            
             const weekId = formatDateYMD(startDate);
             
             console.log('Creating menu for week:', weekId);

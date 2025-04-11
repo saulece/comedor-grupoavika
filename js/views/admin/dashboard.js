@@ -120,7 +120,7 @@ function initDashboard() {
             }
             
             const totalEmployees = menuData.totalEmployees || 0;
-            const totalMealSlots = totalEmployees * 5; // 5 days
+            const totalMealSlots = totalEmployees * 7; // 7 days (incluye sábado y domingo)
             const confirmedSlots = await getConfirmedMealSlots(menuDoc.id);
             const unconfirmedSlots = totalMealSlots - confirmedSlots;
             const estimatedSavings = unconfirmedSlots * mealCost;
@@ -179,7 +179,9 @@ function initDashboard() {
                 'tuesday': 'Martes',
                 'wednesday': 'Miércoles',
                 'thursday': 'Jueves',
-                'friday': 'Viernes'
+                'friday': 'Viernes',
+                'saturday': 'Sábado',
+                'sunday': 'Domingo'
             };
             
             let html = '';
@@ -188,7 +190,7 @@ function initDashboard() {
             const confirmationsData = await getConfirmationsByDay(menuId);
             
             // Sort days
-            const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+            const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
             
             for (const day of days) {
                 const dayMenu = dailyMenusSnapshot.docs.find(doc => doc.id === day);
@@ -258,7 +260,9 @@ function initDashboard() {
                         tuesday: 0,
                         wednesday: 0,
                         thursday: 0,
-                        friday: 0
+                        friday: 0,
+                        saturday: 0,
+                        sunday: 0
                     },
                     total: 0,
                     confirmed: false
@@ -301,6 +305,8 @@ function initDashboard() {
                         <td>${branch.days.wednesday}</td>
                         <td>${branch.days.thursday}</td>
                         <td>${branch.days.friday}</td>
+                        <td>${branch.days.saturday}</td>
+                        <td>${branch.days.sunday}</td>
                         <td>${branch.total}</td>
                     </tr>
                 `;
@@ -311,7 +317,7 @@ function initDashboard() {
             } else {
                 branchConfirmationsBody.innerHTML = `
                     <tr>
-                        <td colspan="7" class="text-center">No hay datos disponibles</td>
+                        <td colspan="9" class="text-center">No hay datos disponibles</td>
                     </tr>
                 `;
             }
@@ -319,7 +325,7 @@ function initDashboard() {
             console.error('Error loading branch confirmations:', error);
             branchConfirmationsBody.innerHTML = `
                 <tr>
-                    <td colspan="7" class="text-center">Error al cargar confirmaciones</td>
+                    <td colspan="9" class="text-center">Error al cargar confirmaciones</td>
                 </tr>
             `;
         }
@@ -388,7 +394,9 @@ function initDashboard() {
                 tuesday: 0,
                 wednesday: 0,
                 thursday: 0,
-                friday: 0
+                friday: 0,
+                saturday: 0,
+                sunday: 0
             };
             
             // Count confirmations by day
@@ -416,7 +424,9 @@ function initDashboard() {
                 tuesday: 0,
                 wednesday: 0,
                 thursday: 0,
-                friday: 0
+                friday: 0,
+                saturday: 0,
+                sunday: 0
             };
         }
     }
