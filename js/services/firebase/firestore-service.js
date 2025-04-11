@@ -1,4 +1,6 @@
 // Firestore Service - Handles all Firestore operations
+import logger from '../../utils/logger.js';
+import { handleFirebaseError } from '../../utils/error-handler.js';
 
 /**
  * Get current weekly menu
@@ -8,6 +10,8 @@ async function getCurrentWeeklyMenu() {
     try {
         // Get current date
         const today = new Date();
+        
+        logger.debug('Fetching current weekly menu');
         
         // Query for the most recent active menu
         const menuSnapshot = await db.collection('weeklyMenus')
@@ -19,6 +23,8 @@ async function getCurrentWeeklyMenu() {
         if (!menuSnapshot.empty) {
             const menuDoc = menuSnapshot.docs[0];
             const menuData = menuDoc.data();
+            
+            logger.debug('Found weekly menu', { id: menuDoc.id });
             
             // Get daily menus
             const dailyMenusSnapshot = await db.collection('weeklyMenus')
@@ -38,10 +44,15 @@ async function getCurrentWeeklyMenu() {
             };
         }
         
+        logger.info('No active weekly menu found');
         return null;
     } catch (error) {
-        console.error('Error getting current weekly menu:', error);
-        throw error;
+        const handledError = handleFirebaseError(error, 'getCurrentWeeklyMenu', {
+            indexHelp: 'Es posible que necesites crear un índice compuesto para la colección "weeklyMenus" con los campos "status" y "startDate"'
+        });
+        
+        // Re-throw the error to be handled by the caller
+        throw handledError;
     }
 }
 
@@ -52,6 +63,8 @@ async function getCurrentWeeklyMenu() {
  */
 async function getEmployeesByBranch(branchId) {
     try {
+        logger.debug('Fetching employees by branch', { branchId });
+        
         const employeesSnapshot = await db.collection('employees')
             .where('branch', '==', branchId)
             .orderBy('name')
@@ -66,10 +79,13 @@ async function getEmployeesByBranch(branchId) {
             });
         });
         
+        logger.debug('Fetched employees', { count: employees.length });
         return employees;
     } catch (error) {
-        console.error('Error getting employees:', error);
-        throw error;
+        const handledError = handleFirebaseError(error, 'getEmployeesByBranch');
+        
+        // Re-throw the error to be handled by the caller
+        throw handledError;
     }
 }
 
@@ -80,19 +96,25 @@ async function getEmployeesByBranch(branchId) {
  */
 async function getBranchDetails(branchId) {
     try {
+        logger.debug('Fetching branch details', { branchId });
+        
         const branchDoc = await db.collection('branches').doc(branchId).get();
         
         if (branchDoc.exists) {
+            logger.debug('Found branch', { id: branchDoc.id });
             return {
                 id: branchDoc.id,
                 ...branchDoc.data()
             };
         }
         
+        logger.info('Branch not found');
         return null;
     } catch (error) {
-        console.error('Error getting branch details:', error);
-        throw error;
+        const handledError = handleFirebaseError(error, 'getBranchDetails');
+        
+        // Re-throw the error to be handled by the caller
+        throw handledError;
     }
 }
 
@@ -104,6 +126,8 @@ async function getBranchDetails(branchId) {
  */
 async function getConfirmationsByBranch(weekId, branchId) {
     try {
+        logger.debug('Fetching confirmations by branch', { weekId, branchId });
+        
         const confirmationQuery = await db.collection('confirmations')
             .where('weekId', '==', weekId)
             .where('branchId', '==', branchId)
@@ -112,16 +136,20 @@ async function getConfirmationsByBranch(weekId, branchId) {
         
         if (!confirmationQuery.empty) {
             const confirmationDoc = confirmationQuery.docs[0];
+            logger.debug('Found confirmation', { id: confirmationDoc.id });
             return {
                 id: confirmationDoc.id,
                 ...confirmationDoc.data()
             };
         }
         
+        logger.info('No confirmations found');
         return null;
     } catch (error) {
-        console.error('Error getting confirmations:', error);
-        throw error;
+        const handledError = handleFirebaseError(error, 'getConfirmationsByBranch');
+        
+        // Re-throw the error to be handled by the caller
+        throw handledError;
     }
 }
 
@@ -135,6 +163,8 @@ async function getConfirmationsByBranch(weekId, branchId) {
  */
 async function submitConfirmations(weekId, branchId, coordinatorId, employees) {
     try {
+        logger.debug('Submitting confirmations', { weekId, branchId });
+        
         // Check if confirmation already exists
         const existingQuery = await db.collection('confirmations')
             .where('weekId', '==', weekId)
@@ -179,10 +209,13 @@ async function submitConfirmations(weekId, branchId, coordinatorId, employees) {
         
         await batch.commit();
         
+        logger.debug('Confirmations submitted', { confirmationId });
         return { success: true, confirmationId };
     } catch (error) {
-        console.error('Error submitting confirmations:', error);
-        throw error;
+        const handledError = handleFirebaseError(error, 'submitConfirmations');
+        
+        // Re-throw the error to be handled by the caller
+        throw handledError;
     }
 }
 
@@ -194,6 +227,8 @@ async function submitConfirmations(weekId, branchId, coordinatorId, employees) {
  */
 async function addEmployee(employeeData, coordinatorId) {
     try {
+        logger.debug('Adding employee', { employeeData });
+        
         const employeeRef = db.collection('employees').doc();
         
         await employeeRef.set({
@@ -211,10 +246,13 @@ async function addEmployee(employeeData, coordinatorId) {
             });
         }
         
+        logger.debug('Employee added', { id: employeeRef.id });
         return employeeRef.id;
     } catch (error) {
-        console.error('Error adding employee:', error);
-        throw error;
+        const handledError = handleFirebaseError(error, 'addEmployee');
+        
+        // Re-throw the error to be handled by the caller
+        throw handledError;
     }
 }
 
@@ -226,6 +264,8 @@ async function addEmployee(employeeData, coordinatorId) {
  */
 async function updateEmployee(employeeId, employeeData) {
     try {
+        logger.debug('Updating employee', { employeeId });
+        
         // Get employee data before update
         const employeeDoc = await db.collection('employees').doc(employeeId).get();
         const oldData = employeeDoc.data();
@@ -258,9 +298,13 @@ async function updateEmployee(employeeId, employeeData) {
             
             await batch.commit();
         }
+        
+        logger.debug('Employee updated', { id: employeeId });
     } catch (error) {
-        console.error('Error updating employee:', error);
-        throw error;
+        const handledError = handleFirebaseError(error, 'updateEmployee');
+        
+        // Re-throw the error to be handled by the caller
+        throw handledError;
     }
 }
 
@@ -271,6 +315,8 @@ async function updateEmployee(employeeId, employeeData) {
  */
 async function deleteEmployee(employeeId) {
     try {
+        logger.debug('Deleting employee', { employeeId });
+        
         // Get employee data before deletion
         const employeeDoc = await db.collection('employees').doc(employeeId).get();
         
@@ -289,9 +335,13 @@ async function deleteEmployee(employeeId) {
                 employeeCount: firebase.firestore.FieldValue.increment(-1)
             });
         }
+        
+        logger.debug('Employee deleted', { id: employeeId });
     } catch (error) {
-        console.error('Error deleting employee:', error);
-        throw error;
+        const handledError = handleFirebaseError(error, 'deleteEmployee');
+        
+        // Re-throw the error to be handled by the caller
+        throw handledError;
     }
 }
 
@@ -304,6 +354,8 @@ async function deleteEmployee(employeeId) {
  */
 async function importEmployees(employees, branchId, coordinatorId) {
     try {
+        logger.debug('Importing employees', { count: employees.length });
+        
         const batch = db.batch();
         const timestamp = firebase.firestore.FieldValue.serverTimestamp();
         
@@ -337,14 +389,17 @@ async function importEmployees(employees, branchId, coordinatorId) {
         
         await batch.commit();
         
+        logger.debug('Employees imported', { count: employees.length });
         return {
             success: true,
             total: employees.length,
             active: activeCount
         };
     } catch (error) {
-        console.error('Error importing employees:', error);
-        throw error;
+        const handledError = handleFirebaseError(error, 'importEmployees');
+        
+        // Re-throw the error to be handled by the caller
+        throw handledError;
     }
 }
 
@@ -354,13 +409,17 @@ async function importEmployees(employees, branchId, coordinatorId) {
  */
 async function getAppSettings() {
     try {
+        logger.debug('Fetching app settings');
+        
         const settingsDoc = await db.collection('settings').doc('appSettings').get();
         
         if (settingsDoc.exists) {
+            logger.debug('Found app settings');
             return settingsDoc.data();
         }
         
         // Return default settings if not found
+        logger.info('No app settings found, using defaults');
         return {
             confirmationWindow: {
                 startDay: 'thursday',
@@ -372,7 +431,9 @@ async function getAppSettings() {
             branches: ['CDO', 'Ishinoka', 'Centenario', 'Delicias', 'Fuentes', 'Matriz', 'Corporativo']
         };
     } catch (error) {
-        console.error('Error getting app settings:', error);
-        throw error;
+        const handledError = handleFirebaseError(error, 'getAppSettings');
+        
+        // Re-throw the error to be handled by the caller
+        throw handledError;
     }
 }
