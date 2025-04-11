@@ -2,15 +2,18 @@
 
 document.addEventListener('DOMContentLoaded', () => {
     // Check authentication and role
-    auth.onAuthStateChanged(async (user) => {
+    firebase.auth().onAuthStateChanged(async (user) => {
         if (!user) {
             // Redirect to login if not authenticated
             window.location.href = '../../index.html';
             return;
         }
         
+        // Obtener la instancia de Firestore una sola vez
+        const firestore = typeof getFirestore === 'function' ? getFirestore() : firebase.firestore();
+        
         // Check if user is coordinator
-        const userDoc = await db.collection('users').doc(user.uid).get();
+        const userDoc = await firestore.collection('users').doc(user.uid).get();
         if (!userDoc.exists || userDoc.data().role !== 'coordinator') {
             // Redirect non-coordinator users
             window.location.href = '../../index.html';
@@ -27,7 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('userName').textContent = userData.displayName || 'Coordinador';
         
         // Get branch details
-        const branchDoc = await db.collection('branches').doc(userData.branch).get();
+        const branchDoc = await firestore.collection('branches').doc(userData.branch).get();
         if (branchDoc.exists) {
             const branchData = branchDoc.data();
             document.getElementById('branchName').textContent = branchData.name;
@@ -297,19 +300,31 @@ function initEmployeeManagement(branchId, coordinatorId) {
             employeeTableBody.innerHTML = '<tr><td colspan="5" class="text-center">Cargando empleados...</td></tr>';
             
             // Get employees for branch
-            const employeesSnapshot = await db.collection('employees')
-                .where('branch', '==', branchId)
-                .orderBy('name')
-                .get();
-            
-            employees = [];
-            
-            employeesSnapshot.forEach(doc => {
-                employees.push({
-                    id: doc.id,
-                    ...doc.data()
+            let employeesResult;
+            if (typeof getEmployeesByBranch === 'function') {
+                employeesResult = await getEmployeesByBranch(branchId);
+                employees = employeesResult;
+            } else if (window.firestoreService && typeof window.firestoreService.getEmployeesByBranch === 'function') {
+                employeesResult = await window.firestoreService.getEmployeesByBranch(branchId);
+                employees = employeesResult;
+            } else {
+                const firestore = typeof getFirestore === 'function' ? getFirestore() : firebase.firestore();
+                const employeesSnapshot = await firestore.collection('employees')
+                    .where('branch', '==', branchId)
+                    .orderBy('name')
+                    .get();
+                
+                employees = [];
+                
+                employeesSnapshot.forEach(doc => {
+                    employees.push({
+                        id: doc.id,
+                        ...doc.data()
+                    });
                 });
-            });
+            }
+            
+            // Ya se han cargado los empleados en el bloque anterior
             
             // Update state
             setCurrentEmployees(employees);
@@ -465,79 +480,119 @@ function initEmployeeManagement(branchId, coordinatorId) {
     
     // Add employee function - CREATES THE EMPLOYEES COLLECTION
     async function addEmployee(employeeData, createdBy) {
-        // Add to Firestore
-        const employeeRef = await db.collection('employees').add({
-            ...employeeData,
-            createdBy: createdBy,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        
-        // Update branch employee count if employee is active
-        if (employeeData.active) {
-            await db.collection('branches').doc(employeeData.branch).update({
-                employeeCount: firebase.firestore.FieldValue.increment(1)
+        // Add to Firestore using the global function if available
+        if (typeof window.addEmployee === 'function') {
+            return await window.addEmployee(employeeData, createdBy);
+        } else if (window.firestoreService && typeof window.firestoreService.addEmployee === 'function') {
+            return await window.firestoreService.addEmployee(employeeData, createdBy);
+        } else {
+            // Fallback to direct Firestore access
+            const firestore = typeof getFirestore === 'function' ? getFirestore() : firebase.firestore();
+            
+            // Add to Firestore
+            const employeeRef = await firestore.collection('employees').add({
+                ...employeeData,
+                createdBy: createdBy,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
+            
+            // Update branch employee count if employee is active
+            if (employeeData.active) {
+                await firestore.collection('branches').doc(employeeData.branch).update({
+                    employeeCount: firebase.firestore.FieldValue.increment(1)
+                });
+            }
+            
+            return employeeRef.id;
         }
-        
-        return employeeRef.id;
     }
     
     // Update employee
     async function updateEmployee(employeeId, employeeData) {
-        // Get current employee data
-        const employeeDoc = await db.collection('employees').doc(employeeId).get();
-        
-        if (!employeeDoc.exists) {
-            throw new Error('Empleado no encontrado');
-        }
-        
-        const currentData = employeeDoc.data();
-        
-        // Update employee
-        await db.collection('employees').doc(employeeId).update({
-            ...employeeData,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        
-        // Update branch employee count if active status changed
-        if (currentData.active !== employeeData.active) {
-            // Increment if now active, decrement if now inactive
-            const change = employeeData.active ? 1 : -1;
+        // Use the global function if available
+        if (typeof window.updateEmployee === 'function') {
+            return await window.updateEmployee(employeeId, employeeData);
+        } else if (window.firestoreService && typeof window.firestoreService.updateEmployee === 'function') {
+            return await window.firestoreService.updateEmployee(employeeId, employeeData);
+        } else {
+            // Fallback to direct Firestore access
+            const firestore = typeof getFirestore === 'function' ? getFirestore() : firebase.firestore();
             
-            await db.collection('branches').doc(employeeData.branch).update({
-                employeeCount: firebase.firestore.FieldValue.increment(change)
+            // Get current employee data
+            const employeeDoc = await firestore.collection('employees').doc(employeeId).get();
+            
+            if (!employeeDoc.exists) {
+                throw new Error('Empleado no encontrado');
+            }
+            
+            const currentData = employeeDoc.data();
+            
+            // Update employee
+            await firestore.collection('employees').doc(employeeId).update({
+                ...employeeData,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
+            
+            // Update branch employee count if active status changed
+            if (currentData.active !== employeeData.active) {
+                // Increment if now active, decrement if now inactive
+                const change = employeeData.active ? 1 : -1;
+                
+                await firestore.collection('branches').doc(employeeData.branch).update({
+                    employeeCount: firebase.firestore.FieldValue.increment(change)
+                });
+            }
         }
     }
     
     // Delete employee
     async function deleteEmployee(employeeId) {
-        // Get employee data
-        const employeeDoc = await db.collection('employees').doc(employeeId).get();
-        
-        if (!employeeDoc.exists) {
-            throw new Error('Empleado no encontrado');
-        }
-        
-        const employeeData = employeeDoc.data();
-        
-        // Delete employee
-        await db.collection('employees').doc(employeeId).delete();
-        
-        // Update branch employee count if employee was active
-        if (employeeData.active) {
-            await db.collection('branches').doc(employeeData.branch).update({
-                employeeCount: firebase.firestore.FieldValue.increment(-1)
-            });
+        // Use the global function if available
+        if (typeof window.deleteEmployee === 'function') {
+            return await window.deleteEmployee(employeeId);
+        } else if (window.firestoreService && typeof window.firestoreService.deleteEmployee === 'function') {
+            return await window.firestoreService.deleteEmployee(employeeId);
+        } else {
+            // Fallback to direct Firestore access
+            const firestore = typeof getFirestore === 'function' ? getFirestore() : firebase.firestore();
+            
+            // Get employee data
+            const employeeDoc = await firestore.collection('employees').doc(employeeId).get();
+            
+            if (!employeeDoc.exists) {
+                throw new Error('Empleado no encontrado');
+            }
+            
+            const employeeData = employeeDoc.data();
+            
+            // Delete employee
+            await firestore.collection('employees').doc(employeeId).delete();
+            
+            // Update branch employee count if employee was active
+            if (employeeData.active) {
+                await firestore.collection('branches').doc(employeeData.branch).update({
+                    employeeCount: firebase.firestore.FieldValue.increment(-1)
+                });
+            }
         }
     }
     
     // Import employees
     async function importEmployees(employees, branchId, coordinatorId) {
         try {
+            // Use the global function if available
+            if (typeof window.importEmployees === 'function') {
+                return await window.importEmployees(employees, branchId, coordinatorId);
+            } else if (window.firestoreService && typeof window.firestoreService.importEmployees === 'function') {
+                return await window.firestoreService.importEmployees(employees, branchId, coordinatorId);
+            }
+            
+            // Fallback to direct Firestore access
+            const firestore = typeof getFirestore === 'function' ? getFirestore() : firebase.firestore();
+            
             // Use batch write
-            const batch = db.batch();
+            const batch = firestore.batch();
             let activeCount = 0;
             let successCount = 0;
             let errorCount = 0;
@@ -552,7 +607,7 @@ function initEmployeeManagement(branchId, coordinatorId) {
                         continue;
                     }
                     
-                    const employeeRef = db.collection('employees').doc();
+                    const employeeRef = firestore.collection('employees').doc();
                     
                     // Determine if position indicates a coordinator role
                     const position = employee.position || '';
@@ -593,7 +648,7 @@ function initEmployeeManagement(branchId, coordinatorId) {
             // Only update branch if we have successfully added employees
             if (successCount > 0) {
                 // Update branch employee count
-                const branchRef = db.collection('branches').doc(branchId);
+                const branchRef = firestore.collection('branches').doc(branchId);
                 batch.update(branchRef, {
                     employeeCount: firebase.firestore.FieldValue.increment(activeCount)
                 });

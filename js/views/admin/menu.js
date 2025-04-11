@@ -2,7 +2,7 @@
 
 document.addEventListener('DOMContentLoaded', () => {
     // Check authentication and role
-    auth.onAuthStateChanged(async (user) => {
+    firebase.auth().onAuthStateChanged(async (user) => {
         if (!user) {
             // Redirect to login if not authenticated
             window.location.href = '../../index.html';
@@ -19,7 +19,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         // Display user name
-        const userDoc = await db.collection('users').doc(user.uid).get();
+        const firestore = typeof getFirestore === 'function' ? getFirestore() : firebase.firestore();
+        const userDoc = await firestore.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
             document.getElementById('userName').textContent = userDoc.data().displayName || 'Administrador';
         }
@@ -109,7 +110,8 @@ function initMenuManagement() {
             // Save to Firestore
             // Normalizar el día actual para manejar acentos
             const normalizedDay = normalizeDayName(currentDay);
-            await db.collection('weeklyMenus').doc(currentWeekId)
+            const firestore = typeof getFirestore === 'function' ? getFirestore() : firebase.firestore();
+            await firestore.collection('weeklyMenus').doc(currentWeekId)
                 .collection('dailyMenus').doc(normalizedDay).update(dayMenuData);
             
             showMessage('Menú guardado correctamente.', 'success');
@@ -193,9 +195,10 @@ function initMenuManagement() {
         
         try {
             // Update menu status to in-progress
-            await db.collection('weeklyMenus').doc(currentWeekId).update({
+            const firestore = typeof getFirestore === 'function' ? getFirestore() : firebase.firestore();
+            await firestore.collection('weeklyMenus').doc(currentWeekId).update({
                 status: 'in-progress',
-                publishedBy: auth.currentUser.uid,
+                publishedBy: firebase.auth().currentUser.uid,
                 publishedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
             
@@ -215,13 +218,32 @@ function initMenuManagement() {
             // Get current date
             const today = new Date();
             
-            // Query for the most recent menu
-            const menuSnapshot = await db.collection('weeklyMenus')
-                .orderBy('startDate', 'desc')
-                .limit(1)
-                .get();
-            
-            if (!menuSnapshot.empty) {
+            // Intentar usar la función global getCurrentWeeklyMenu si está disponible
+            if (typeof getCurrentWeeklyMenu === 'function') {
+                menuData = await getCurrentWeeklyMenu();
+                if (menuData) {
+                    currentWeekId = menuData.id;
+                    // Continuar con la visualización del menú
+                    displayMenuDetails();
+                    // Cargar el menú del primer día
+                    loadDayMenu();
+                    // Verificar si el menú está completo
+                    checkMenuCompleteness();
+                    // Iniciar el temporizador de cuenta regresiva si está en progreso
+                    startCountdownTimer();
+                    // Habilitar o deshabilitar el botón de crear menú según el estado del menú actual
+                    createMenuBtn.disabled = false;
+                    return;
+                }
+            } else {
+                // Query for the most recent menu
+                const firestore = typeof getFirestore === 'function' ? getFirestore() : firebase.firestore();
+                const menuSnapshot = await firestore.collection('weeklyMenus')
+                    .orderBy('startDate', 'desc')
+                    .limit(1)
+                    .get();
+                
+                if (!menuSnapshot.empty) {
                 const menuDoc = menuSnapshot.docs[0];
                 currentWeekId = menuDoc.id;
                 menuData = menuDoc.data();
@@ -230,7 +252,8 @@ function initMenuManagement() {
                 displayMenuDetails();
                 
                 // Load daily menus
-                const dailyMenusSnapshot = await db.collection('weeklyMenus')
+                const firestore = typeof getFirestore === 'function' ? getFirestore() : firebase.firestore();
+                const dailyMenusSnapshot = await firestore.collection('weeklyMenus')
                     .doc(currentWeekId)
                     .collection('dailyMenus')
                     .get();
@@ -271,6 +294,7 @@ function initMenuManagement() {
                 
                 // Enable create menu button
                 createMenuBtn.disabled = false;
+            }
             }
         } catch (error) {
             console.error('Error loading menu:', error);
@@ -456,83 +480,47 @@ function initMenuManagement() {
     
     // Create a new weekly menu
     async function createWeeklyMenu(startDateStr) {
-        const startDate = new Date(startDateStr);
-        const weekId = formatDateYMD(startDate);
-        
-        // Check if menu already exists
-        const existingMenu = await db.collection('weeklyMenus').doc(weekId).get();
-        
-        if (existingMenu.exists) {
-            throw new Error('Ya existe un menú para esta semana.');
-        }
-        
-        // Get total employees count
-        const employeesSnapshot = await db.collection('employees')
-            .where('active', '==', true)
-            .get();
-        
-        const totalEmployees = employeesSnapshot.size;
-        
-        // Get app settings for confirmation window
-        const settingsSnapshot = await db.collection('settings').doc('appSettings').get();
-        let confirmStartTime, confirmEndTime;
-        
-        if (settingsSnapshot.exists) {
-            const settings = settingsSnapshot.data();
+        try {
+            const startDate = new Date(startDateStr);
             
-            // Calculate confirmation start and end times based on settings
-            confirmStartTime = new Date(startDate);
-            confirmStartTime.setDate(confirmStartTime.getDate() - 4); // Thursday before the week
-            confirmStartTime.setHours(16, 10, 0, 0); // 16:10
-            
-            confirmEndTime = new Date(startDate);
-            confirmEndTime.setDate(confirmEndTime.getDate() - 2); // Saturday before the week
-            confirmEndTime.setHours(10, 0, 0, 0); // 10:00
-        } else {
-            // Default times if settings don't exist
-            confirmStartTime = new Date(startDate);
-            confirmStartTime.setDate(confirmStartTime.getDate() - 4); // Thursday
-            confirmStartTime.setHours(16, 10, 0, 0); // 16:10
-            
-            confirmEndTime = new Date(startDate);
-            confirmEndTime.setDate(confirmEndTime.getDate() - 2); // Saturday
-            confirmEndTime.setHours(10, 0, 0, 0); // 10:00
-        }
-        
-        // Create weeklyMenu document
-        await db.collection('weeklyMenus').doc(weekId).set({
+            // Create menu document
+            const firestore = typeof getFirestore === 'function' ? getFirestore() : firebase.firestore();
+            const menuRef = await firestore.collection('weeklyMenus').add({
             startDate: firebase.firestore.Timestamp.fromDate(startDate),
             status: 'pending',
-            confirmStartDate: firebase.firestore.Timestamp.fromDate(confirmStartTime),
-            confirmEndDate: firebase.firestore.Timestamp.fromDate(confirmEndTime),
-            totalEmployees,
-            confirmedEmployees: 0,
-            createdBy: auth.currentUser.uid,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            createdBy: firebase.auth().currentUser.uid,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            totalEmployees: 0,
+            confirmedEmployees: 0
         });
         
-        // Create dailyMenus subcollection
+        // Create daily menu documents
         const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-        const batch = db.batch();
+        const batch = firestore.batch();
         
-        days.forEach((day, index) => {
-            const dayDate = new Date(startDate);
-            dayDate.setDate(dayDate.getDate() + index);
+        for (const day of days) {
+            // Normalizar el nombre del día para manejar acentos
+            const normalizedDay = normalizeDayName(day);
+            const dayRef = firestore.collection('weeklyMenus').doc(menuRef.id).collection('dailyMenus').doc(normalizedDay);
             
-            const dayRef = db.collection('weeklyMenus').doc(weekId).collection('dailyMenus').doc(day);
             batch.set(dayRef, {
-                date: firebase.firestore.Timestamp.fromDate(dayDate),
                 mainDish: '',
                 sideDish: '',
                 dessert: '',
                 vegetarianOption: ''
             });
-        });
+        }
         
+        // Commit batch
         await batch.commit();
+        
+        return menuRef.id;
+        } catch (error) {
+            console.error('Error creating menu:', error);
+            throw error;
+        }
     }
-}
-
+    }
 // Helper Functions
 
 // Get next Monday

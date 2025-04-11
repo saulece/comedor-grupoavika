@@ -133,12 +133,21 @@ function initConfirmations(branchId, coordinatorId) {
             });
             
             // Submit confirmations
-            await submitConfirmations(
-                currentMenu.id, 
-                branchId, 
-                coordinatorId, 
-                employeeConfirmations
-            );
+            if (typeof submitConfirmations === 'function') {
+                await submitConfirmations(
+                    currentMenu.id, 
+                    branchId, 
+                    coordinatorId, 
+                    employeeConfirmations
+                );
+            } else {
+                await window.firestoreService.submitConfirmations(
+                    currentMenu.id, 
+                    branchId, 
+                    coordinatorId, 
+                    employeeConfirmations
+                );
+            }
             
             // Show success message
             showSuccess('Confirmaciones guardadas correctamente.');
@@ -179,7 +188,10 @@ function initConfirmations(branchId, coordinatorId) {
             // Load current menu
             try {
                 logger.debug('Intentando obtener el menú semanal actual');
-                currentMenu = await getCurrentWeeklyMenu();
+                // Usar la función global o el objeto firestoreService para mayor compatibilidad
+                currentMenu = typeof getCurrentWeeklyMenu === 'function' ? 
+                    await getCurrentWeeklyMenu() : 
+                    await window.firestoreService.getCurrentWeeklyMenu();
                 
                 if (!currentMenu) {
                     logger.warn('No se encontró un menú activo');
@@ -231,11 +243,15 @@ function initConfirmations(branchId, coordinatorId) {
             }
             
             // Load employees
-            const employeesResult = await getEmployeesByBranch(branchId);
+            const employeesResult = typeof getEmployeesByBranch === 'function' ? 
+                await getEmployeesByBranch(branchId) : 
+                await window.firestoreService.getEmployeesByBranch(branchId);
             employees = employeesResult.filter(employee => employee.active);
             
             // Load existing confirmations
-            confirmations = await getConfirmationsByBranch(currentMenu.id, branchId);
+            confirmations = typeof getConfirmationsByBranch === 'function' ? 
+                await getConfirmationsByBranch(currentMenu.id, branchId) : 
+                await window.firestoreService.getConfirmationsByBranch(currentMenu.id, branchId);
             
             // Confirmation period is open
             confirmationState = 'available';
