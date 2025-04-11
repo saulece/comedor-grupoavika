@@ -107,14 +107,18 @@ function initMenuManagement() {
             };
             
             // Save to Firestore
+            // Normalizar el día actual para manejar acentos
+            const normalizedDay = normalizeDayName(currentDay);
             await db.collection('weeklyMenus').doc(currentWeekId)
-                .collection('dailyMenus').doc(currentDay).update(dayMenuData);
+                .collection('dailyMenus').doc(normalizedDay).update(dayMenuData);
             
             showMessage('Menú guardado correctamente.', 'success');
             
             // Update local data
             if (menuData && menuData.dailyMenus) {
-                menuData.dailyMenus[currentDay] = dayMenuData;
+                // Normalizar el día actual para manejar acentos
+                const normalizedDay = normalizeDayName(currentDay);
+                menuData.dailyMenus[normalizedDay] = dayMenuData;
             }
             
             // Check if all days have a main dish
@@ -302,13 +306,21 @@ function initMenuManagement() {
     
     // Load day menu
     function loadDayMenu() {
-        if (!menuData || !menuData.dailyMenus || !menuData.dailyMenus[currentDay]) {
+        if (!menuData || !menuData.dailyMenus) {
             // Clear form
             clearMenuForm();
             return;
         }
         
-        const dayMenu = menuData.dailyMenus[currentDay];
+        // Normalizar el día actual para manejar acentos
+        const normalizedDay = normalizeDayName(currentDay);
+        const dayMenu = menuData.dailyMenus[normalizedDay];
+        
+        if (!dayMenu) {
+            // Clear form if no menu for this day
+            clearMenuForm();
+            return;
+        }
         
         // Fill form
         mainDishInput.value = dayMenu.mainDish || '';
@@ -346,9 +358,12 @@ function initMenuManagement() {
         let isComplete = true;
         
         for (const day of days) {
-            const dayMenu = menuData.dailyMenus[day];
+            // Normalizar el nombre del día para manejar acentos
+            const normalizedDay = normalizeDayName(day);
+            const dayMenu = menuData.dailyMenus[normalizedDay];
             if (!dayMenu || !dayMenu.mainDish || dayMenu.mainDish.trim() === '') {
                 isComplete = false;
+                console.log(`Día incompleto: ${day}`);
                 break;
             }
         }
@@ -569,4 +584,31 @@ function getStatusText(status) {
         default:
             return 'Desconocido';
     }
+}
+
+// Normalize day name to handle accented characters
+function normalizeDayName(dayName) {
+    if (!dayName) return '';
+    // Convert to lowercase and remove accents
+    return dayName.toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+}
+
+// Map Spanish day name to English day code
+function mapDayNameToCode(dayName) {
+    // Normalize the input to handle accents and case
+    const normalized = normalizeDayName(dayName);
+    
+    const dayMap = {
+        'lunes': 'monday',
+        'martes': 'tuesday',
+        'miercoles': 'wednesday',
+        'jueves': 'thursday',
+        'viernes': 'friday',
+        'sabado': 'saturday',
+        'domingo': 'sunday'
+    };
+    
+    return dayMap[normalized] || normalized;
 }

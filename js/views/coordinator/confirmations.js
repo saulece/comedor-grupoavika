@@ -351,8 +351,10 @@ function initConfirmations(branchId, coordinatorId) {
         const checkboxes = document.querySelectorAll('.employee-day-checkbox');
         checkboxes.forEach(checkbox => {
             const day = checkbox.dataset.day;
-            if (checkbox.checked) {
-                counts[day]++;
+            // Asegurarse de que el día se normalice correctamente
+            const normalizedDay = mapDayNameToCode(day);
+            if (checkbox.checked && counts[normalizedDay] !== undefined) {
+                counts[normalizedDay]++;
             }
         });
         
@@ -532,6 +534,24 @@ function initConfirmations(branchId, coordinatorId) {
         return dayName.toLowerCase()
             .normalize('NFD')
             .replace(/[\u0300-\u036f]/g, '');
+    }
+    
+    // Map Spanish day name to English day code
+    function mapDayNameToCode(dayName) {
+        // Normalize the input to handle accents and case
+        const normalized = normalizeDayName(dayName);
+        
+        const dayMap = {
+            'lunes': 'monday',
+            'martes': 'tuesday',
+            'miercoles': 'wednesday',
+            'jueves': 'thursday',
+            'viernes': 'friday',
+            'sabado': 'saturday',
+            'domingo': 'sunday'
+        };
+        
+        return dayMap[normalized] || normalized;
     }
     
     // Pad number with leading zero

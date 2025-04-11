@@ -58,22 +58,45 @@ function parseExcelFile(file) {
                     header !== null && header !== undefined ? String(header).trim() : ''
                 );
                 
-                // Validate required headers
-                const requiredHeaders = ['Nombre', 'Puesto', 'Restricciones Alimentarias', 'Activo'];
-                const missingHeaders = requiredHeaders.filter(
-                    header => !headers.some(h => h.toLowerCase() === header.toLowerCase())
-                );
+                // Validate required headers - more flexible matching for accents and variations
+                const requiredHeadersMap = {
+                    'nombre': ['nombre', 'name'],
+                    'puesto': ['puesto', 'position', 'cargo', 'rol', 'role'],
+                    'restricciones alimentarias': ['restricciones alimentarias', 'restricciones', 'dietary restrictions', 'alergias', 'allergies'],
+                    'activo': ['activo', 'active', 'estado', 'status']
+                };
                 
-                if (missingHeaders.length > 0) {
-                    reject(new Error(`Faltan columnas requeridas: ${missingHeaders.join(', ')}`));
+                // Check if each required header type has a match
+                const missingHeaderTypes = [];
+                const headerIndexes = {};
+                
+                // For each required header type
+                for (const [headerType, possibleMatches] of Object.entries(requiredHeadersMap)) {
+                    // Find if any possible match exists in the headers
+                    const matchIndex = headers.findIndex(h => 
+                        possibleMatches.some(match => 
+                            h.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === 
+                            match.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                        )
+                    );
+                    
+                    if (matchIndex >= 0) {
+                        headerIndexes[headerType] = matchIndex;
+                    } else {
+                        missingHeaderTypes.push(headerType);
+                    }
+                }
+                
+                if (missingHeaderTypes.length > 0) {
+                    reject(new Error(`Faltan columnas requeridas: ${missingHeaderTypes.join(', ')}`))
                     return;
                 }
                 
-                // Map column indexes
-                const nameIndex = headers.findIndex(h => h.toLowerCase() === 'nombre');
-                const positionIndex = headers.findIndex(h => h.toLowerCase() === 'puesto');
-                const restrictionsIndex = headers.findIndex(h => h.toLowerCase() === 'restricciones alimentarias');
-                const activeIndex = headers.findIndex(h => h.toLowerCase() === 'activo');
+                // Use the found indexes
+                const nameIndex = headerIndexes['nombre'];
+                const positionIndex = headerIndexes['puesto'];
+                const restrictionsIndex = headerIndexes['restricciones alimentarias'];
+                const activeIndex = headerIndexes['activo'];
                 
                 // Process data rows
                 const parsedData = [];

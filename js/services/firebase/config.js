@@ -39,10 +39,16 @@ try {
     // Optional: Initialize Analytics
     const analytics = firebase.analytics ? firebase.analytics() : null;
     
+    // Crear funciones de acceso a Firestore para evitar problemas de inicialización
+    const getFirestore = () => firebase.firestore();
+    const getAuth = () => firebase.auth();
+    
     // Hacer que las variables estén disponibles globalmente
     window.auth = auth;
     window.db = db;
     window.analytics = analytics;
+    window.getFirestore = getFirestore;
+    window.getAuth = getAuth;
     
 } catch (error) {
     console.error("Error al inicializar Firebase:", error);

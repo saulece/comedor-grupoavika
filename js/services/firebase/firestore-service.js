@@ -414,23 +414,53 @@ async function importEmployees(employees, branchId, coordinatorId) {
         
         // Count active employees for branch count update
         let activeCount = 0;
+        let successCount = 0;
+        let errorCount = 0;
         
         // Create batch of employee documents
         for (const employee of employees) {
-            const employeeRef = firestore.collection('employees').doc();
-            
-            batch.set(employeeRef, {
-                name: employee.name,
-                position: employee.position || '',
-                dietaryRestrictions: employee.dietaryRestrictions || '',
-                branch: branchId,
-                active: employee.active === undefined ? true : employee.active,
-                createdBy: coordinatorId,
-                createdAt: timestamp
-            });
-            
-            if (employee.active !== false) {
-                activeCount++;
+            try {
+                // Validar datos requeridos
+                if (!employee.name || typeof employee.name !== 'string') {
+                    logger.error('Invalid employee data: missing name', employee);
+                    errorCount++;
+                    continue;
+                }
+                
+                const employeeRef = firestore.collection('employees').doc();
+                
+                // Determinar si el puesto indica un rol de coordinador
+                const position = employee.position || '';
+                const isCoordinator = position.toLowerCase().includes('coordinador') || 
+                                     position.toLowerCase().includes('coordinator');
+                
+                // Preparar datos del empleado con validación adecuada
+                const employeeData = {
+                    name: employee.name.trim(),
+                    position: position.trim(),
+                    dietaryRestrictions: employee.dietaryRestrictions ? employee.dietaryRestrictions.trim() : '',
+                    branch: branchId,
+                    active: employee.active === undefined ? true : Boolean(employee.active),
+                    createdBy: coordinatorId,
+                    createdAt: timestamp,
+                    updatedAt: timestamp
+                };
+                
+                // Si el empleado es coordinador, agregar información de rol
+                if (isCoordinator) {
+                    employeeData.role = 'coordinator';
+                }
+                
+                batch.set(employeeRef, employeeData);
+                
+                if (employeeData.active !== false) {
+                    activeCount++;
+                }
+                
+                successCount++;
+            } catch (error) {
+                logger.error('Error processing employee during import', { error, employee });
+                errorCount++;
             }
         }
         
@@ -440,13 +470,23 @@ async function importEmployees(employees, branchId, coordinatorId) {
             employeeCount: firebase.firestore.FieldValue.increment(activeCount)
         });
         
-        await batch.commit();
+        // Solo actualizar si hay empleados procesados exitosamente
+        if (successCount > 0) {
+            await batch.commit();
+            logger.debug('Employees imported', { 
+                success: successCount, 
+                errors: errorCount, 
+                active: activeCount 
+            });
+        } else {
+            logger.warn('No valid employees to import');
+        }
         
-        logger.debug('Employees imported', { count: employees.length });
         return {
-            success: true,
-            total: employees.length,
-            active: activeCount
+            success: successCount > 0,
+            total: successCount,
+            active: activeCount,
+            errors: errorCount
         };
     } catch (error) {
         const handledError = handleFirebaseError(error, 'importEmployees');

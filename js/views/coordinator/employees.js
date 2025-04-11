@@ -535,43 +535,82 @@ function initEmployeeManagement(branchId, coordinatorId) {
     
     // Import employees
     async function importEmployees(employees, branchId, coordinatorId) {
-        // Use batch write
-        const batch = db.batch();
-        let activeCount = 0;
-        
-        // Add each employee
-        employees.forEach(employee => {
-            const employeeRef = db.collection('employees').doc();
+        try {
+            // Use batch write
+            const batch = db.batch();
+            let activeCount = 0;
+            let successCount = 0;
+            let errorCount = 0;
             
-            batch.set(employeeRef, {
-                name: employee.name,
-                position: employee.position || '',
-                dietaryRestrictions: employee.dietaryRestrictions || '',
-                active: employee.active !== undefined ? employee.active : true,
-                branch: branchId,
-                createdBy: coordinatorId,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
+            // Add each employee
+            for (const employee of employees) {
+                try {
+                    // Validate required fields
+                    if (!employee.name || typeof employee.name !== 'string') {
+                        console.error('Error en empleado:', 'Nombre inválido o vacío', employee);
+                        errorCount++;
+                        continue;
+                    }
+                    
+                    const employeeRef = db.collection('employees').doc();
+                    
+                    // Determine if position indicates a coordinator role
+                    const position = employee.position || '';
+                    const isCoordinator = position.toLowerCase().includes('coordinador') || 
+                                         position.toLowerCase().includes('coordinator');
+                    
+                    // Prepare employee data with proper validation
+                    const employeeData = {
+                        name: employee.name.trim(),
+                        position: position.trim(),
+                        dietaryRestrictions: employee.dietaryRestrictions ? employee.dietaryRestrictions.trim() : '',
+                        active: employee.active !== undefined ? Boolean(employee.active) : true,
+                        branch: branchId,
+                        createdBy: coordinatorId,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    };
+                    
+                    // If the employee is a coordinator, add role information
+                    if (isCoordinator) {
+                        employeeData.role = 'coordinator';
+                    }
+                    
+                    batch.set(employeeRef, employeeData);
             
-            if (employee.active !== false) {
-                activeCount++;
+                    // Count active employees
+                    if (employeeData.active !== false) {
+                        activeCount++;
+                    }
+                    
+                    successCount++;
+                } catch (error) {
+                    console.error('Error al procesar empleado:', error, employee);
+                    errorCount++;
+                }
             }
-        });
-        
-        // Update branch employee count
-        const branchRef = db.collection('branches').doc(branchId);
-        batch.update(branchRef, {
-            employeeCount: firebase.firestore.FieldValue.increment(activeCount)
-        });
-        
-        // Commit batch
-        await batch.commit();
-        
-        return {
-            success: true,
-            total: employees.length,
-            active: activeCount
-        };
+            
+            // Only update branch if we have successfully added employees
+            if (successCount > 0) {
+                // Update branch employee count
+                const branchRef = db.collection('branches').doc(branchId);
+                batch.update(branchRef, {
+                    employeeCount: firebase.firestore.FieldValue.increment(activeCount)
+                });
+                
+                // Commit batch
+                await batch.commit();
+            }
+            
+            return {
+                success: successCount > 0,
+                total: successCount,
+                active: activeCount,
+                errors: errorCount
+            };
+        } catch (error) {
+            console.error('Error en la importación de empleados:', error);
+            throw new Error(`Error al importar empleados: ${error.message}`);
+        }
     }
 }

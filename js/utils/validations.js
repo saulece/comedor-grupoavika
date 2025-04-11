@@ -310,23 +310,35 @@ function clearValidationError(element) {
  * @returns {boolean} True if form is valid
  */
 function validateForm(form, options = {}) {
-    let isValid = true;
+    if (!form || !(form instanceof HTMLFormElement)) {
+        console.error('Invalid form element provided to validateForm');
+        return false;
+    }
     
-    // Get all form elements
-    const elements = form.querySelectorAll('input, select, textarea');
+    let isValid = true;
+    const elements = form.elements;
     
     // Clear all previous errors
-    elements.forEach(element => {
+    for (let i = 0; i < elements.length; i++) {
+        const element = elements[i];
         clearValidationError(element);
-    });
+    }
     
     // Validate each element
-    elements.forEach(element => {
-        // Skip elements without name or disabled elements
-        if (!element.name || element.disabled) return;
+    for (let i = 0; i < elements.length; i++) {
+        const element = elements[i];
+        const name = element.name;
+        
+        // Skip elements without name
+        if (!name) continue;
+        
+        // Skip buttons and non-input elements
+        if (element.type === 'button' || element.type === 'submit' || element.type === 'reset') {
+            continue;
+        }
         
         // Get element-specific options
-        const elementOptions = options[element.name] || {};
+        const elementOptions = options[name] || {};
         
         // Validate element
         const result = validateFormElement(element, elementOptions);
@@ -334,13 +346,94 @@ function validateForm(form, options = {}) {
         if (!result.valid) {
             showValidationError(element, result.message);
             isValid = false;
-            
-            // Focus first invalid element
-            if (isValid === false) {
-                element.focus();
-            }
         }
-    });
+    }
     
     return isValid;
 }
+
+/**
+ * Normaliza un texto eliminando acentos y convirtiendo a minúsculas
+ * @param {string} text - Texto a normalizar
+ * @returns {string} Texto normalizado
+ */
+function normalizeText(text) {
+    if (!text) return '';
+    return String(text).toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+}
+
+/**
+ * Valida si un día de la semana es válido
+ * @param {string} day - Nombre del día
+ * @returns {Object} Resultado de validación { valid: boolean, message: string, normalizedDay: string }
+ */
+function validateDayOfWeek(day) {
+    if (!day) {
+        return {
+            valid: false,
+            message: 'El día de la semana es requerido.',
+            normalizedDay: ''
+        };
+    }
+    
+    const normalized = normalizeText(day);
+    
+    const validDaysMap = {
+        'lunes': 'monday',
+        'martes': 'tuesday',
+        'miercoles': 'wednesday',
+        'jueves': 'thursday',
+        'viernes': 'friday',
+        'sabado': 'saturday',
+        'domingo': 'sunday',
+        'monday': 'monday',
+        'tuesday': 'tuesday',
+        'wednesday': 'wednesday',
+        'thursday': 'thursday',
+        'friday': 'friday',
+        'saturday': 'saturday',
+        'sunday': 'sunday'
+    };
+    
+    if (!validDaysMap[normalized]) {
+        return {
+            valid: false,
+            message: 'Día de la semana inválido.',
+            normalizedDay: ''
+        };
+    }
+    
+    return {
+        valid: true,
+        normalizedDay: validDaysMap[normalized]
+    };
+}
+
+/**
+ * Convierte un día en español a su equivalente en inglés
+ * @param {string} day - Nombre del día en español
+ * @returns {string} Nombre del día en inglés
+ */
+function mapDayToEnglish(day) {
+    const validation = validateDayOfWeek(day);
+    return validation.valid ? validation.normalizedDay : '';
+}
+
+// Hacer disponible globalmente
+window.validationUtils = {
+    validateRequired,
+    validateEmail,
+    validatePassword,
+    validateDate,
+    validateNumber,
+    validateUrl,
+    validateFormElement,
+    showValidationError,
+    clearValidationError,
+    validateForm,
+    normalizeText,
+    validateDayOfWeek,
+    mapDayToEnglish
+};
