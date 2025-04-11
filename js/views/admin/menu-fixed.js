@@ -106,9 +106,28 @@ function initMenuManagement() {
                 vegetarianOption: vegetarianOptionInput.value.trim()
             };
             
-            // Save to Firestore
-            await db.collection('weeklyMenus').doc(currentWeekId)
-                .collection('dailyMenus').doc(currentDay).update(dayMenuData);
+            // Check if the document exists first
+            const docRef = db.collection('weeklyMenus').doc(currentWeekId)
+                .collection('dailyMenus').doc(currentDay);
+            
+            const docSnapshot = await docRef.get();
+            
+            if (docSnapshot.exists) {
+                // Update existing document
+                await docRef.update(dayMenuData);
+            } else {
+                // Create new document with date field
+                const dayDate = new Date(menuData.startDate.toDate());
+                const dayIndex = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].indexOf(currentDay);
+                if (dayIndex !== -1) {
+                    dayDate.setDate(dayDate.getDate() + dayIndex);
+                }
+                
+                await docRef.set({
+                    ...dayMenuData,
+                    date: firebase.firestore.Timestamp.fromDate(dayDate)
+                });
+            }
             
             showMessage('Menú guardado correctamente.', 'success');
             
@@ -505,25 +524,30 @@ function initMenuManagement() {
             
             console.log('Creating daily menus...');
             
-            // Create dailyMenus subcollection
+            // Create dailyMenus subcollection - use individual set operations instead of batch
             const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-            const batch = db.batch();
             
-            days.forEach((day, index) => {
+            // Create each day document individually to ensure they are all created
+            for (let i = 0; i < days.length; i++) {
+                const day = days[i];
                 const dayDate = new Date(startDate);
-                dayDate.setDate(dayDate.getDate() + index);
+                dayDate.setDate(dayDate.getDate() + i);
                 
-                const dayRef = db.collection('weeklyMenus').doc(weekId).collection('dailyMenus').doc(day);
-                batch.set(dayRef, {
-                    date: firebase.firestore.Timestamp.fromDate(dayDate),
-                    mainDish: '',
-                    sideDish: '',
-                    dessert: '',
-                    vegetarianOption: ''
-                });
-            });
+                console.log(`Creating day document for ${day} (${formatDateDMY(dayDate)})`);
+                
+                await db.collection('weeklyMenus')
+                    .doc(weekId)
+                    .collection('dailyMenus')
+                    .doc(day)
+                    .set({
+                        date: firebase.firestore.Timestamp.fromDate(dayDate),
+                        mainDish: '',
+                        sideDish: '',
+                        dessert: '',
+                        vegetarianOption: ''
+                    });
+            }
             
-            await batch.commit();
             console.log('Weekly menu created successfully!');
         } catch (error) {
             console.error('Error in createWeeklyMenu:', error);
